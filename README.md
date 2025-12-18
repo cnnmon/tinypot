@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+about bonsai:
 
-## Getting Started
+authors start by writing as much of the game as they'd like in the editor, as little as just a few lines, a decision point, and a few (optional) options. the decision point will prompt the player for input.
 
-First, run the development server:
+in the player, whenever the player types whatever they'd like to do, and the story branches accordingly: either defaulting to a similar enough existing option ("run away" is akin to "sneak out"), linking to an existing branch, or generating a new branch permanently and navigating you there in real-time in the game.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+the editor reflects changes in real-time, and authors can use version control to view auto-commits and prune unwanted branches. authors can also set prompts (either scene-based or globally) to guide narrative direction and constraints. authors and players are collaborating on this game intermediated by ai, which bridges the player’s contribution into the author’s stylistic world to generate new sections.
+
+these features provide built-in caching, making the game increasingly fast for playing as it expands and covers possibility space, only generating for new, unseen choices. this also prevents authoring overwhelm, as updates are staggered based on when a player has actually tried an option given the scene's context, which may realistically change as parts of the game are refactored and edited.
+
+how can we learn preferences? after author prunes branches, generate a style guide prompt by analyzing kept vs pruned. use llm to meta-reason: analyze these kept and pruned branches. what patterns distinguish them? generate a style guide. prepend this generated style to future generation prompts
+
+the authoring language:
+
+uses a pseudomarkdown language for interactive narrative authoring.
+
+```
+Can you believe it?
+> FIRE
+# FIRE
+The fire burns brightly.
+~ Ride a bike
+   That's cool!
+   > BIKE
+~ Run away
+   Weirdo…
+# BIKE
+Learn to sail
+> END
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+this should read:
+Can you believe it?
+The fire burns brightly.
+[Waits for input]
+[USER INPUT: "Run away"]
+Weirdo...
+[Waits for input]
+[USER INPUT: "Ride a bike"]
+That's cool!
+Learn to sail
+[END]
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+each scene is denoted by a (#) and will loop its option (~) selection until you go to (>) another scene or END.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+versioning:
+each playthrough should be capable of creating a new BRANCH. the playthrough should be reactive to edits in the editor, but any already committed lines to history should not be changed -- only future lines/options if you're currently perusing them.

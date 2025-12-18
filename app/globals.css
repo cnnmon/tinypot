@@ -45,3 +45,7 @@ html {
   -webkit-text-stroke: 6px black;
   paint-order: stroke fill;
 }
+
+button {
+  user-select: none;
+}

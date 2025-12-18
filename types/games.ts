@@ -7,7 +7,8 @@ export type Game = {
   authorId: string;
   name: string;
   description: string;
-  schema: Schema;
+  lines: string[]; // Raw editor text (source of truth)
+  schema: Schema; // Parsed version (derived from lines)
   branches: Branch[];
   playthroughs: Playthrough[];
 };

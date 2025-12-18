@@ -26,10 +26,10 @@ export interface JumpLine {
 }
 
 export interface OptionLine {
-  id: string;
-  texts: string[]; // Primary text first, followed by similar variants
-  lines: SchemaLine[];
+  type: LineType.OPTION;
+  text: string; // The option text shown to user
+  then: SchemaLine[]; // What happens when this option is chosen
 }
 
-export type SchemaLine = NarrativeLine | OptionLine | JumpLine;
+export type SchemaLine = NarrativeLine | OptionLine | JumpLine | SceneLine;
 export type Schema = SchemaLine[];

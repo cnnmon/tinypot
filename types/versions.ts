@@ -3,7 +3,7 @@
  * Each branch is reviewed, edited, and/or rejected by the author.
  */
 
-import { Schema, SchemaLine } from './schema';
+import { Schema } from './schema';
 
 export enum BranchStatus {
   APPROVED = 'approved',
@@ -17,9 +17,5 @@ export interface Branch {
   id: string;
   status: BranchStatus;
   baseSchema: Schema; // before additions
-  patches: {
-    insertAt: number; // line index related to baseSchema
-    content: SchemaLine[];
-  }[];
-  resolvedSchema: Schema; // after resolving patches
+  resolvedSchema: Schema; // after additions
 }

@@ -1,4 +1,4 @@
-import { ProjectProvider } from '@/context/project';
+import { ProjectProvider } from '@/lib/project';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Chat',
-  description: 'Minimal chat app',
+  title: 'tinypot',
+  description: 'to grow your bonsai',
 };
 
 export default function RootLayout({

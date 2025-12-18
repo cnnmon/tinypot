@@ -4,8 +4,6 @@
  * Later, the author may view branches that spawned from the playthrough.
  */
 
-import { Schema } from './schema';
-
 export interface TextEntry {
   text: string;
   liked?: boolean; // Data collection
@@ -19,7 +17,9 @@ export type PlaythroughEntry = TextEntry | InputEntry;
 
 export interface Playthrough {
   id: string;
-  schema: Schema; // May be modified through real-time generation
-  history: PlaythroughEntry[]; // Log of visible lines to the player in the game
-  branchIds?: string[]; // Keeps track of potential branch ids that spawned
+  gameId: string;
+  currentLineIdx: number; // Current position in schema
+  history: PlaythroughEntry[]; // Committed log - does not change on editor updates
+  branchId?: string[]; // Branch id
+  createdAt: string;
 }

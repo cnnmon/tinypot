@@ -3,7 +3,6 @@
 import Browser from '@/components/Browser';
 import Editor from '@/components/Editor';
 import Player from '@/components/Game';
-import { EditorProvider } from '@/context/editor';
 
 export default function Home() {
   return (
@@ -22,9 +21,7 @@ export default function Home() {
       />
 
       <Browser className="flex-col md:flex-row bg-lime">
-        <EditorProvider>
-          <Editor />
-        </EditorProvider>
+        <Editor />
         <Player />
       </Browser>
     </div>
