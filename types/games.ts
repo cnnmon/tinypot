@@ -1,5 +1,5 @@
-import { Playthrough } from './playthroughs';
-import { Schema } from './schema';
+import { Playthrough, PlaythroughEntry } from './playthroughs';
+import { OptionLine, Schema } from './schema';
 import { Branch } from './versions';
 
 export type Game = {
@@ -12,3 +12,17 @@ export type Game = {
   branches: Branch[];
   playthroughs: Playthrough[];
 };
+
+export enum GameStatus {
+  RUNNING = 'running',
+  WAITING = 'waiting',
+  ENDED = 'ended',
+}
+
+/** Represents the current UI state during gameplay */
+export interface GameState {
+  history: PlaythroughEntry[];
+  currentLineIdx: number;
+  currentOptions: OptionLine[];
+  status: 'running' | 'waiting' | 'ended';
+}

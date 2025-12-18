@@ -8,13 +8,12 @@
 import {
   buildSceneMap,
   createInitialGameState,
-  GameState,
   refreshGameOptions,
   SceneMap,
   selectGameOption,
 } from '@/lib/game';
 import { parseIntoSchema } from '@/lib/project/parser';
-import { Game } from '@/types/games';
+import { Game, GameState } from '@/types/games';
 import { Playthrough } from '@/types/playthroughs';
 import { OptionLine, Schema } from '@/types/schema';
 import { Branch } from '@/types/versions';

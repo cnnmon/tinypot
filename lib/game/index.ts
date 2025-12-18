@@ -3,6 +3,7 @@
  * Handles advancing through narrative, collecting options, and processing jumps.
  */
 
+import { GameState, GameStatus } from '@/types/games';
 import { Playthrough, PlaythroughEntry } from '@/types/playthroughs';
 import { LineType, OptionLine, Schema } from '@/types/schema';
 import { buildSceneMap, SceneMap } from './utils/buildSceneMap';
@@ -12,15 +13,6 @@ import { processOptionThen } from './utils/processOptionThen';
 
 export { buildSceneMap, collectOptions, findLastDecisionPoint, processOptionThen };
 export type { SceneMap };
-
-/** Represents the current UI state during gameplay */
-export interface GameState {
-  history: PlaythroughEntry[];
-  currentLineIdx: number;
-  currentOptions: OptionLine[];
-  isEnded: boolean;
-}
-
 /**
  * Creates initial game state from a schema, running until first decision point.
  */
@@ -59,11 +51,16 @@ export function runGameFrom(
       case LineType.OPTION:
         // Hit options - collect them all and pause for input
         const options = collectOptions(schema, idx);
-        return { history, currentOptions: options, currentLineIdx: idx, isEnded: false };
+        return {
+          history,
+          currentOptions: options,
+          currentLineIdx: idx,
+          status: GameStatus.WAITING,
+        };
 
       case LineType.JUMP:
         if (line.target === 'END') {
-          return { history, currentOptions: [], currentLineIdx: idx, isEnded: true };
+          return { history, currentOptions: [], currentLineIdx: idx, status: GameStatus.ENDED };
         }
         // Jump to scene
         const sceneIdx = sceneMap.get(line.target);
@@ -71,7 +68,7 @@ export function runGameFrom(
           idx = sceneIdx;
         } else {
           console.warn(`Scene "${line.target}" not found`);
-          return { history, currentOptions: [], currentLineIdx: idx, isEnded: true };
+          return { history, currentOptions: [], currentLineIdx: idx, status: GameStatus.ENDED };
         }
         break;
 
@@ -85,11 +82,16 @@ export function runGameFrom(
   const options = collectOptions(schema, lastDecision);
 
   if (options.length > 0) {
-    return { history, currentOptions: options, currentLineIdx: lastDecision, isEnded: false };
+    return {
+      history,
+      currentOptions: options,
+      currentLineIdx: lastDecision,
+      status: GameStatus.RUNNING,
+    };
   }
 
   // No decision points at all - game just ends
-  return { history, currentOptions: [], currentLineIdx: idx, isEnded: true };
+  return { history, currentOptions: [], currentLineIdx: idx, status: GameStatus.ENDED };
 }
 
 /**
@@ -101,7 +103,7 @@ export function selectGameOption(
   currentState: GameState,
   option: OptionLine
 ): GameState {
-  if (currentState.isEnded) return currentState;
+  if (currentState.status === GameStatus.ENDED) return currentState;
 
   // Add the choice to history
   const newHistory: PlaythroughEntry[] = [...currentState.history, { text: option.text }];
@@ -112,7 +114,7 @@ export function selectGameOption(
 
   // Handle END jump
   if (jumpTarget === 'END') {
-    return { ...currentState, history: newHistory, currentOptions: [], isEnded: true };
+    return { ...currentState, history: newHistory, currentOptions: [], status: GameStatus.ENDED };
   }
 
   // If there's a jump target, go there. Otherwise, loop back to same options.
@@ -127,7 +129,7 @@ export function selectGameOption(
     history: newHistory,
     currentLineIdx: currentState.currentLineIdx,
     currentOptions: currentState.currentOptions,
-    isEnded: false,
+    status: GameStatus.RUNNING,
   };
 }
 
@@ -163,7 +165,7 @@ function findNearbyOptions(schema: Schema, fromIdx: number): number {
  * Re-runs from current scene to pick up added/removed narrative lines.
  */
 export function refreshGameOptions(schema: Schema, currentState: GameState): GameState {
-  if (currentState.isEnded) {
+  if (currentState.status === GameStatus.ENDED) {
     return createInitialGameState(schema);
   }
 
@@ -211,7 +213,7 @@ export function resumePlaythrough(playthrough: Playthrough, currentSchema: Schem
       history: playthrough.history,
       currentLineIdx: playthrough.currentLineIdx,
       currentOptions: options,
-      isEnded: false,
+      status: GameStatus.RUNNING,
     };
   }
 
