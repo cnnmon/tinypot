@@ -2,12 +2,10 @@
 
 import Browser from '@/components/Browser';
 import Editor from '@/components/Editor';
-import Game from '@/components/Game';
-import { useGame } from '@/hooks/game';
+import Player from '@/components/Game';
+import { EditorProvider } from '@/context/editor';
 
 export default function Home() {
-  const { lines } = useGame();
-
   return (
     <div className="min-h-screen p-6">
       {/* moving dots! */}
@@ -24,8 +22,10 @@ export default function Home() {
       />
 
       <Browser className="flex-col md:flex-row bg-lime">
-        <Editor />
-        <Game />
+        <EditorProvider>
+          <Editor />
+        </EditorProvider>
+        <Player />
       </Browser>
     </div>
   );

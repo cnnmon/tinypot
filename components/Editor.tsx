@@ -1,9 +1,9 @@
 'use client';
 
-import { useGame } from '@/hooks/game';
+import { useEditor } from '@/context/editor';
 
 export default function Editor() {
-  const { lines, setLines } = useGame();
+  const { lines, editLines } = useEditor();
 
   return (
     <div className="flex-1 bg-white bordered p-4 m-4 overflow-auto rounded-lg">
@@ -15,7 +15,7 @@ export default function Editor() {
         </div>
         <textarea
           value={lines.join('\n')}
-          onChange={(e) => setLines(e.target.value.split('\n'))}
+          onChange={(e) => editLines(e.target.value.split('\n'))}
           spellCheck={false}
           className="flex-1 resize-none outline-none bg-transparent"
         />

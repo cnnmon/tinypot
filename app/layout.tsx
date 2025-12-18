@@ -1,7 +1,7 @@
+import { ProjectProvider } from '@/context/project';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import { GameProvider } from '@/hooks/game';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -26,8 +26,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-          <GameProvider>{children}</GameProvider>
-        </body>
+        <ProjectProvider projectId="123">{children}</ProjectProvider>
+      </body>
     </html>
   );
 }

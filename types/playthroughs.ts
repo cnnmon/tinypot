@@ -8,6 +8,7 @@ import { Schema } from './schema';
 
 export interface TextEntry {
   text: string;
+  liked?: boolean; // Data collection
 }
 
 export interface InputEntry {

@@ -8,7 +8,7 @@ function Header() {
         background: 'linear-gradient(90deg, var(--color-mint) 0%, #ffffff 100%)',
       }}
     >
-      <p className="font-bold text-3xl italic text-white outlined px-3">bonsai</p>
+      <p className="font-bold text-3xl italic text-white outlined px-3">tinypot</p>
       <div className="flex">
         <div className="flex justify-center bordered-left bg-white w-10 font-black text-3xl select-none">
           -
