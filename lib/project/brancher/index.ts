@@ -1,12 +1,7 @@
-/**
- * Brancher - handles schema diffing and branch creation logic.
- * Branches represent changes from a base schema to a resolved schema.
- */
-
 import { Schema, SchemaLine } from '@/types/schema';
 import { Branch, BranchStatus } from '@/types/versions';
 
-export interface SchemaDiff {
+interface SchemaDiff {
   divergeAt: number;
   hasChanges: boolean;
   added: SchemaLine[];
@@ -16,7 +11,7 @@ export interface SchemaDiff {
 /**
  * Compares two schemas and returns where they diverge.
  */
-export function diffSchemas(baseSchema: Schema, newSchema: Schema): SchemaDiff {
+function diffSchemas(baseSchema: Schema, newSchema: Schema): SchemaDiff {
   let divergeAt = 0;
 
   // Find first point of divergence
@@ -100,7 +95,10 @@ export function mergeBranch(branch: Branch, currentSchema: Schema): Schema | nul
 
   // If changes are in different areas, we can merge
   // (Simple case: branch changes are after current changes, or vice versa)
-  if (baseDiff.divergeAt >= branch.baseSchema.length && branchDiff.divergeAt >= branch.baseSchema.length) {
+  if (
+    baseDiff.divergeAt >= branch.baseSchema.length &&
+    branchDiff.divergeAt >= branch.baseSchema.length
+  ) {
     // Both added to the end - concatenate
     return [...currentSchema, ...branchDiff.added];
   }
@@ -108,4 +106,3 @@ export function mergeBranch(branch: Branch, currentSchema: Schema): Schema | nul
   // For now, return null for complex merges
   return null;
 }
-

@@ -30,6 +30,7 @@ import {
 } from 'react';
 import { createBranch, getOrCreateGame, updateGame } from '../db';
 import { schemasEqual } from './brancher';
+import { getChangedLineNumbers } from './differ';
 
 interface ProjectContextValue {
   game: Game;
@@ -43,6 +44,11 @@ interface ProjectContextValue {
   gameState: GameState;
   selectOption: (option: OptionLine) => void;
   restart: () => void;
+
+  // Branch viewing
+  viewingBranch: Branch | null;
+  setViewingBranch: (branch: Branch | null) => void;
+  changedLines: Set<number>;
 
   // Branch creation
   createBranchFromPlaythrough: () => Promise<Branch | null>;
@@ -92,6 +98,18 @@ export function ProjectProvider({
 
   // Playthrough metadata (for persistence)
   const [playthrough, setPlaythrough] = useState<Playthrough | null>(null);
+
+  // Branch viewing state
+  const [viewingBranch, setViewingBranch] = useState<Branch | null>(null);
+
+  // Compute changed lines when viewing a branch
+  const changedLines = useMemo(() => {
+    if (!viewingBranch || !game) return new Set<number>();
+    // Compare current lines against the branch's base (main schema)
+    // When viewing a branch, highlight what's different from main
+    const mainLines = game.lines;
+    return getChangedLineNumbers(mainLines, lines);
+  }, [viewingBranch, game, lines]);
 
   // Load or create game from DB
   useEffect(() => {
@@ -225,6 +243,9 @@ export function ProjectProvider({
         gameState,
         selectOption,
         restart,
+        viewingBranch,
+        setViewingBranch,
+        changedLines,
         createBranchFromPlaythrough,
         playthrough,
       }}

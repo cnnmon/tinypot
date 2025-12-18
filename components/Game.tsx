@@ -9,7 +9,7 @@ export default function Player() {
 
   return (
     <div
-      className="flex-1 border-t-[2.5px] md:border-t-0 md:border-l-[2.5px] p-6 overflow-auto flex flex-col"
+      className="flex-1 border-t-[2.5px] md:border-t-0 md:border-l-[2.5px] p-6 overflow-auto flex flex-col h-1/2 md:h-auto overflow-auto"
       style={{
         background: 'linear-gradient(180deg, var(--color-lime) 0%, #ffffff 100%)',
       }}
@@ -26,11 +26,7 @@ export default function Player() {
       {/* Options */}
       <div className="mt-4 space-y-2">
         {currentOptions.map((option, i) => (
-          <button
-            key={i}
-            onClick={() => selectOption(option)}
-            className="block w-full text-left px-4 py-2 border-2 border-black rounded hover:bg-black hover:text-white transition-colors font-mono cursor-pointer"
-          >
+          <button key={i} onClick={() => selectOption(option)}>
             {option.text}
           </button>
         ))}
