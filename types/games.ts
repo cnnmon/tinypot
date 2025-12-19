@@ -23,6 +23,10 @@ export enum GameStatus {
 export interface GameState {
   history: PlaythroughEntry[];
   currentLineIdx: number;
-  currentOptions: OptionLine[];
   status: 'running' | 'waiting' | 'ended';
+  animatedCount: number;
+
+  // Options
+  currentOptions: OptionLine[];
+  consumedOptions: string[];
 }

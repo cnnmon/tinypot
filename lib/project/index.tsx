@@ -6,10 +6,10 @@
  */
 
 import {
-  buildSceneMap,
   createInitialGameState,
+  jumpBackToChoice,
+  markHistoryAnimated,
   refreshGameOptions,
-  SceneMap,
   selectGameOption,
 } from '@/lib/game';
 import { parseIntoSchema } from '@/lib/project/parser';
@@ -28,6 +28,7 @@ import {
   useState,
 } from 'react';
 import { createBranch, getOrCreateGame, updateGame } from '../db';
+import { buildSceneMap, SceneMap } from '../game/utils';
 import { schemasEqual } from './brancher';
 import { getChangedLineNumbers } from './differ';
 
@@ -42,7 +43,9 @@ interface ProjectContextValue {
   // Game/playthrough state
   gameState: GameState;
   selectOption: (option: OptionLine) => void;
-  restart: () => void;
+  jumpToChoice: (historyIndex: number) => void;
+  fullRestart: () => void;
+  onAnimationComplete: () => void;
 
   // Branch viewing
   viewingBranch: Branch | null;
@@ -185,13 +188,20 @@ export function ProjectProvider({
     [schema, sceneMap]
   );
 
-  // Restart the game with current schema
-  const restart = useCallback(() => {
+  // Jump back to a specific choice in history
+  const jumpToChoice = useCallback(
+    (historyIndex: number) => {
+      setGameState((prev) => jumpBackToChoice(schema, prev, historyIndex));
+    },
+    [schema]
+  );
+
+  // Full restart - starts from the very beginning
+  const fullRestart = useCallback(() => {
     const newState = createInitialGameState(schema);
     setGameState(newState);
-    baseSchemaRef.current = schema; // New playthrough starts from current schema
+    baseSchemaRef.current = schema;
 
-    // Create new playthrough metadata
     if (game) {
       setPlaythrough({
         id: crypto.randomUUID(),
@@ -202,6 +212,11 @@ export function ProjectProvider({
       });
     }
   }, [schema, game]);
+
+  // Mark history as fully animated (called by History component)
+  const onAnimationComplete = useCallback(() => {
+    setGameState((prev) => markHistoryAnimated(prev));
+  }, []);
 
   // Create a branch from the current playthrough (diff from base schema)
   const createBranchFromPlaythrough = useCallback(async (): Promise<Branch | null> => {
@@ -241,7 +256,9 @@ export function ProjectProvider({
         schema,
         gameState,
         selectOption,
-        restart,
+        jumpToChoice,
+        fullRestart,
+        onAnimationComplete,
         viewingBranch,
         setViewingBranch,
         changedLines,

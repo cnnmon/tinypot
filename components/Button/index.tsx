@@ -1,21 +1,35 @@
 import { twMerge } from 'tailwind-merge';
 
+type ButtonVariant = 'primary' | 'secondary';
+
+const variantStyles: Record<ButtonVariant, string> = {
+  primary: 'bg-mint hover:bg-black hover:text-white',
+  secondary: 'bg-white hover:bg-gray-100',
+};
+
 export default function Button({
   children,
   onClick,
   className,
+  variant = 'primary',
+  disabled = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   className?: string;
+  variant?: ButtonVariant;
+  disabled?: boolean;
 }) {
   return (
     <button
       className={twMerge(
-        'rounded-lg bg-mint bordered px-3 py-2 hover:bg-black hover:text-white transition-colors',
+        'rounded-lg bordered px-3 py-2 transition-colors',
+        variantStyles[variant],
+        disabled && 'opacity-50 cursor-not-allowed',
         className
       )}
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
     >
       {children}
     </button>

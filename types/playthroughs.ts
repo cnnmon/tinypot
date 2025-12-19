@@ -7,6 +7,7 @@
 export interface TextEntry {
   text: string;
   liked?: boolean; // Data collection
+  isChoice?: boolean; // True if this was a player choice
 }
 
 export interface InputEntry {

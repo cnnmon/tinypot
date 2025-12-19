@@ -9,66 +9,102 @@ import { LineType, OptionLine, Schema } from '@/types/schema';
 import { buildSceneMap, SceneMap } from './utils/buildSceneMap';
 import { collectOptions } from './utils/collectOptions';
 import { findLastDecisionPoint } from './utils/findLastDecisionPoint';
+import { findSceneIntroEnd } from './utils/findSceneIntroEnd';
 import { processOptionThen } from './utils/processOptionThen';
 
-export { buildSceneMap, collectOptions, findLastDecisionPoint, processOptionThen };
-export type { SceneMap };
+/**
+ * Marks all history entries as animated (used after animation completes).
+ */
+export function markHistoryAnimated(state: GameState): GameState {
+  return { ...state, animatedCount: state.history.length };
+}
 /**
  * Creates initial game state from a schema, running until first decision point.
  */
 export function createInitialGameState(schema: Schema): GameState {
   const sceneMap = buildSceneMap(schema);
-  return runGameFrom(schema, 0, sceneMap, []);
+  const sceneIntroEndIdx = findSceneIntroEnd(schema, 0);
+  return runGameFrom(schema, 0, sceneMap, [], sceneIntroEndIdx, 0, [], false);
 }
 
 /**
  * Core game runner - advances from a starting index until hitting options or end.
- * Returns the new game state.
+ * If skipIntro is true, skips narrative lines until hitting options.
  */
 export function runGameFrom(
   schema: Schema,
   startIdx: number,
   sceneMap: SceneMap,
-  prevHistory: PlaythroughEntry[] = []
+  prevHistory: PlaythroughEntry[] = [],
+  sceneIntroEndIdx: number = 0,
+  animatedCount: number = 0,
+  consumedOptions: string[] = [],
+  skipIntro: boolean = false
 ): GameState {
   const history = [...prevHistory];
   let idx = startIdx;
+  let skipping = skipIntro;
 
   while (idx < schema.length) {
     const line = schema[idx];
 
     switch (line.type) {
       case LineType.NARRATIVE:
-        history.push({ text: line.text });
+        if (!skipping) {
+          history.push({ text: line.text });
+        }
         idx++;
         break;
 
       case LineType.SCENE:
-        // Scene markers are just labels, skip them
         idx++;
+        // Only reset consumed options if this is a new scene (not skipping)
+        if (!skipping) {
+          consumedOptions = [];
+        }
         break;
 
       case LineType.OPTION:
-        // Hit options - collect them all and pause for input
+        skipping = false; // Stop skipping when we reach options
         const options = collectOptions(schema, idx);
         return {
           history,
           currentOptions: options,
           currentLineIdx: idx,
           status: GameStatus.WAITING,
+          animatedCount,
+          consumedOptions,
         };
 
       case LineType.JUMP:
         if (line.target === 'END') {
-          return { history, currentOptions: [], currentLineIdx: idx, status: GameStatus.ENDED };
+          return {
+            history,
+            currentOptions: [],
+            currentLineIdx: idx,
+            status: GameStatus.ENDED,
+            animatedCount,
+            consumedOptions,
+          };
         }
-        // Jump to scene
         const sceneIdx = sceneMap.get(line.target);
         if (sceneIdx !== undefined) {
           idx = sceneIdx;
+          // Only reset consumed options and update intro if entering a new scene
+          if (!skipping) {
+            consumedOptions = [];
+            sceneIntroEndIdx = history.length + findSceneIntroEnd(schema, sceneIdx);
+          }
         } else {
           console.warn(`Scene "${line.target}" not found`);
-          return { history, currentOptions: [], currentLineIdx: idx, status: GameStatus.ENDED };
+          return {
+            history,
+            currentOptions: [],
+            currentLineIdx: idx,
+            status: GameStatus.ENDED,
+            animatedCount,
+            consumedOptions,
+          };
         }
         break;
 
@@ -86,16 +122,26 @@ export function runGameFrom(
       history,
       currentOptions: options,
       currentLineIdx: lastDecision,
-      status: GameStatus.RUNNING,
+      status: GameStatus.WAITING,
+      animatedCount,
+      consumedOptions,
     };
   }
 
-  // No decision points at all - game just ends
-  return { history, currentOptions: [], currentLineIdx: idx, status: GameStatus.ENDED };
+  return {
+    history,
+    currentOptions: [],
+    currentLineIdx: idx,
+    status: GameStatus.ENDED,
+    animatedCount,
+    consumedOptions,
+  };
 }
 
 /**
  * Processes an option selection and returns the next game state.
+ * Sets animatedCount to previous history length so new entries animate in.
+ * Adds option to consumedOptions so it can be disabled.
  */
 export function selectGameOption(
   schema: Schema,
@@ -105,8 +151,17 @@ export function selectGameOption(
 ): GameState {
   if (currentState.status === GameStatus.ENDED) return currentState;
 
-  // Add the choice to history
-  const newHistory: PlaythroughEntry[] = [...currentState.history, { text: option.text }];
+  // Mark current history as animated before adding new entries
+  const animatedCount = currentState.history.length;
+
+  // Add option to consumed list
+  const consumedOptions = [...currentState.consumedOptions, option.text];
+
+  // Add the choice to history (marked as a choice for styling)
+  const newHistory: PlaythroughEntry[] = [
+    ...currentState.history,
+    { text: option.text, isChoice: true },
+  ];
 
   // Process the "then" block
   const { lines: thenLines, jumpTarget } = processOptionThen(option.then);
@@ -114,22 +169,47 @@ export function selectGameOption(
 
   // Handle END jump
   if (jumpTarget === 'END') {
-    return { ...currentState, history: newHistory, currentOptions: [], status: GameStatus.ENDED };
+    return {
+      ...currentState,
+      history: newHistory,
+      currentOptions: [],
+      status: GameStatus.ENDED,
+      animatedCount,
+      consumedOptions,
+    };
   }
 
-  // If there's a jump target, go there. Otherwise, loop back to same options.
+  // If there's a jump target, go there
   if (jumpTarget) {
     const sceneIdx = sceneMap.get(jumpTarget);
     const nextIdx = sceneIdx !== undefined ? sceneIdx : currentState.currentLineIdx + 1;
-    return runGameFrom(schema, nextIdx, sceneMap, newHistory);
+    const newSceneIntroEnd = newHistory.length + findSceneIntroEnd(schema, nextIdx);
+
+    // Check if jumping back to the SAME scene
+    const currentScene = getCurrentSceneLabel(schema, currentState.currentLineIdx);
+    const isSameScene = currentScene === jumpTarget;
+    const shouldSkipIntro = isSameScene && consumedOptions.length > 0;
+
+    return runGameFrom(
+      schema,
+      nextIdx,
+      sceneMap,
+      newHistory,
+      newSceneIntroEnd,
+      animatedCount,
+      isSameScene ? consumedOptions : [], // Keep consumed options if same scene
+      shouldSkipIntro
+    );
   }
 
-  // No jump = stay at current options (loop back)
+  // No jump = stay at current options (loop back with consumed options tracked)
   return {
+    ...currentState,
     history: newHistory,
-    currentLineIdx: currentState.currentLineIdx,
     currentOptions: currentState.currentOptions,
-    status: GameStatus.RUNNING,
+    status: GameStatus.WAITING,
+    animatedCount,
+    consumedOptions,
   };
 }
 
@@ -143,6 +223,19 @@ function findSceneStart(schema: Schema, beforeIdx: number): number {
     }
   }
   return 0;
+}
+
+/**
+ * Gets the label of the current scene (nearest SCENE marker before idx).
+ */
+function getCurrentSceneLabel(schema: Schema, beforeIdx: number): string | null {
+  for (let i = beforeIdx - 1; i >= 0; i--) {
+    const line = schema[i];
+    if (line.type === LineType.SCENE) {
+      return line.label;
+    }
+  }
+  return null;
 }
 
 /**
@@ -178,9 +271,75 @@ export function refreshGameOptions(schema: Schema, currentState: GameState): Gam
   // Find scene start before these options
   const sceneStart = findSceneStart(schema, optionsIdx);
   const sceneMap = buildSceneMap(schema);
+  const sceneIntroEndIdx = findSceneIntroEnd(schema, sceneStart);
 
-  // Re-run from scene start to rebuild history for this scene
-  return runGameFrom(schema, sceneStart, sceneMap, []);
+  // Re-run from scene start to rebuild history
+  return runGameFrom(
+    schema,
+    sceneStart,
+    sceneMap,
+    [],
+    sceneIntroEndIdx,
+    currentState.animatedCount,
+    currentState.consumedOptions,
+    false // Don't skip intro on schema refresh
+  );
+}
+
+/**
+ * Jumps back to a specific choice in history.
+ * Truncates history to just before that choice and restores options.
+ */
+export function jumpBackToChoice(
+  schema: Schema,
+  currentState: GameState,
+  choiceHistoryIndex: number
+): GameState {
+  // Truncate history to just before the choice
+  const newHistory = currentState.history.slice(0, choiceHistoryIndex);
+
+  // Find the choice text to locate it in schema
+  const choiceEntry = currentState.history[choiceHistoryIndex];
+  if (!choiceEntry || !('text' in choiceEntry)) {
+    return currentState; // Invalid index
+  }
+
+  const choiceText = choiceEntry.text;
+
+  // Find the options that contain this choice
+  const optionsIdx = findOptionByText(schema, choiceText);
+  if (optionsIdx === -1) {
+    return currentState; // Choice not found in schema
+  }
+
+  const options = collectOptions(schema, optionsIdx);
+
+  return {
+    history: newHistory,
+    currentOptions: options,
+    currentLineIdx: optionsIdx,
+    status: GameStatus.WAITING,
+    animatedCount: newHistory.length,
+    consumedOptions: [], // Reset consumed options
+  };
+}
+
+/**
+ * Finds the index of an option group containing the given text.
+ */
+function findOptionByText(schema: Schema, text: string): number {
+  for (let i = 0; i < schema.length; i++) {
+    if (schema[i].type === LineType.OPTION) {
+      // Check all options in this group
+      const options = collectOptions(schema, i);
+      if (options.some((opt) => opt.text === text)) {
+        return i;
+      }
+      // Skip past this option group
+      i += options.length - 1;
+    }
+  }
+  return -1;
 }
 
 /**
@@ -202,6 +361,8 @@ export function gameStateToPlaythrough(gameId: string, state: GameState): Playth
  */
 export function resumePlaythrough(playthrough: Playthrough, currentSchema: Schema): GameState {
   const sceneMap = buildSceneMap(currentSchema);
+  const sceneStart = findSceneStart(currentSchema, playthrough.currentLineIdx);
+  const sceneIntroEndIdx = findSceneIntroEnd(currentSchema, sceneStart);
 
   // If at an option point, collect options from current schema
   if (
@@ -213,10 +374,21 @@ export function resumePlaythrough(playthrough: Playthrough, currentSchema: Schem
       history: playthrough.history,
       currentLineIdx: playthrough.currentLineIdx,
       currentOptions: options,
-      status: GameStatus.RUNNING,
+      status: GameStatus.WAITING,
+      animatedCount: playthrough.history.length,
+      consumedOptions: [],
     };
   }
 
   // Otherwise run forward from current position with committed history
-  return runGameFrom(currentSchema, playthrough.currentLineIdx, sceneMap, playthrough.history);
+  return runGameFrom(
+    currentSchema,
+    playthrough.currentLineIdx,
+    sceneMap,
+    playthrough.history,
+    sceneIntroEndIdx,
+    playthrough.history.length,
+    [],
+    false
+  );
 }
