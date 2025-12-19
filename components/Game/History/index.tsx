@@ -71,9 +71,9 @@ export default function History() {
             <div key={i}>
               <p
                 className={twMerge(
-                  'cursor-pointer hover:bg-black/20 px-1 -mx-1 transition-colors',
+                  'cursor-pointer hover:bg-mint/50 px-1 -mx-1 transition-colors',
                   isNew ? 'history-entry-new opacity-0' : '',
-                  isConfirming && 'bg-black/20'
+                  isConfirming && 'bg-mint'
                 )}
                 style={isNew ? { animationDelay: `${delay}ms` } : undefined}
                 onClick={() => handleChoiceClick(i)}
@@ -82,9 +82,7 @@ export default function History() {
                 {entry.text}
               </p>
               {isConfirming && (
-                <p className="text-sm text-black/50 italic pl-4 mt-1">
-                  Click again to jump back to this choice
-                </p>
+                <p className="text-sm text-black/50 pl-4 mt-1">(Click again to redo this choice)</p>
               )}
             </div>
           );

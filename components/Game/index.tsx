@@ -49,7 +49,6 @@ export default function Player() {
         {/* End state - click on choices in history to jump back, or start over */}
         {status === GameStatus.ENDED && (
           <div className="flex flex-col items-center gap-2">
-            <p className="text-sm text-gray-500">Click on a choice above to jump back</p>
             <Button onClick={fullRestart} disabled={isAnimating}>
               Start over
             </Button>

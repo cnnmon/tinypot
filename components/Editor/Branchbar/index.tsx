@@ -13,7 +13,7 @@ export default function Branchbar() {
         className="bg-mint w-full bordered rounded-lg flex items-center justify-between px-3 py-2"
       >
         <div className="flex items-center justify-center">
-          <Branch width={100} height={80} seed={randomSeed} />
+          <Branch seed={randomSeed} />
         </div>
       </div>
 

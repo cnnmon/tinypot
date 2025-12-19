@@ -58,7 +58,7 @@ export default function Branch({
     const decorations: Decoration[] = [];
 
     // Main stem
-    const baseX = width * (0.35 + random() * 0.3);
+    const baseX = width * (0.35 + random() * 0.2);
     const baseY = height * 0.92;
     const tipY = height * (0.12 + random() * 0.15);
     const curve = (random() - 0.5) * width * 0.3;
@@ -73,22 +73,31 @@ export default function Branch({
       `M ${stem.start.x} ${stem.start.y} Q ${stem.ctrl.x} ${stem.ctrl.y} ${stem.end.x} ${stem.end.y}`
     );
 
-    // Pick decoration type randomlyr
+    // Pick decoration type randomly
     const pickDecoration = (): 'leaf' | 'flower' => {
       return random() < LEAF_LIKELIHOOD ? 'leaf' : 'flower';
     };
 
-    decorations.push({
-      type: pickDecoration(),
-      x: stem.end.x,
-      y: stem.end.y,
-      rotation: random() * 360,
-    });
+    // Check if decoration fits within bounds
+    const fitsInBounds = (x: number, y: number, type: 'leaf' | 'flower'): boolean => {
+      const margin = type === 'leaf' ? 18 : 11; // approximate decoration radius
+      return x >= margin && x <= width - margin && y >= margin && y <= height - margin;
+    };
+
+    const stemTipDecoration = pickDecoration();
+    if (fitsInBounds(stem.end.x, stem.end.y, stemTipDecoration)) {
+      decorations.push({
+        type: stemTipDecoration,
+        x: stem.end.x,
+        y: stem.end.y,
+        rotation: random() * 360,
+      });
+    }
 
     // 2-3 side branches, alternating sides to prevent overlap
     const branchCount = 2 + Math.floor(random() * 2);
     const startingSide = random() > 0.5 ? 1 : -1;
-    
+
     for (let i = 0; i < branchCount; i++) {
       // Space branches evenly along stem, from bottom to top
       const t = 0.3 + (i / branchCount) * 0.45;
@@ -97,6 +106,7 @@ export default function Branch({
       // Alternate sides: even index = starting side, odd = opposite
       const side = i % 2 === 0 ? startingSide : -startingSide;
       const len = width * (0.2 + random() * 0.15);
+
       // Branch angle goes outward and slightly upward
       const angle = -Math.PI / 2 + side * (0.5 + random() * 0.4);
 
@@ -111,13 +121,20 @@ export default function Branch({
       };
 
       lines.push(`M ${origin.x} ${origin.y} Q ${ctrlPt.x} ${ctrlPt.y} ${endPt.x} ${endPt.y}`);
-      if (random() < DECORATION_LIKELIHOOD) {
-        decorations.push({
-          type: pickDecoration(),
-          x: endPt.x,
-          y: endPt.y,
-          rotation: random() * 360,
-        });
+
+      const pseudoRandom = (offset: number) => ((random() * 10 + offset) % 10) / 10;
+
+      if (pseudoRandom(30) < DECORATION_LIKELIHOOD) {
+        const branchDecoration = pickDecoration();
+        if (fitsInBounds(endPt.x, endPt.y, branchDecoration)) {
+          const alpha = pseudoRandom(5000);
+          decorations.push({
+            type: branchDecoration,
+            x: endPt.x,
+            y: endPt.y,
+            rotation: side === -1 ? alpha * -80 : alpha * 80,
+          });
+        }
       }
     }
 

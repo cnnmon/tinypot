@@ -7,7 +7,7 @@ function Header() {
       }}
     >
       <p className="font-bold text-3xl text-white outlined px-3">
-        <i>tinypot</i> 🪴
+        <i>tinypot</i>
       </p>
       <div className="flex">
         <div className="flex justify-center bordered-left bg-white w-10 font-black text-3xl select-none">
