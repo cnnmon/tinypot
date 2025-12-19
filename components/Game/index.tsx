@@ -2,6 +2,7 @@
 
 import { useProject } from '@/lib/project';
 import { GameStatus } from '@/types/games';
+import Button from '../Button';
 import History from './History';
 
 export default function Player() {
@@ -18,15 +19,15 @@ export default function Player() {
       <div className="shrink-0 w-full space-y-2 p-2 bg-white bordered-top">
         {/* Options */}
         {currentOptions.map((option, i) => (
-          <button key={i} onClick={() => selectOption(option)}>
+          <Button key={i} onClick={() => selectOption(option)} className="w-full">
             {option.text}
-          </button>
+          </Button>
         ))}
 
         {/* End state */}
         {status === GameStatus.ENDED && (
           <div className="flex flex-col items-center justify-center">
-            <button onClick={restart}>Restart?</button>
+            <Button onClick={restart}>Restart?</Button>
           </div>
         )}
       </div>

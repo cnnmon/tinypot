@@ -51,5 +51,5 @@ html {
 }
 
 button {
-  @apply select-none w-full text-left px-4 py-2 border-2 border-black rounded hover:bg-black hover:text-white transition-colors font-mono cursor-pointer;
+  @apply cursor-pointer;
 }

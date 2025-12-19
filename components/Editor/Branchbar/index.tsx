@@ -1,30 +1,29 @@
+import { IconButton } from '@/components/Button';
 import { useProject } from '@/lib/project';
-import { twMerge } from 'tailwind-merge';
+import { XMarkIcon } from '@heroicons/react/16/solid';
+import Branch from './Branch';
 
 export default function Branchbar() {
-  const { game, viewingBranch, setViewingBranch } = useProject();
+  const { game, setViewingBranch } = useProject();
 
   return (
     <div className="flex items-center gap-2 text-sm font-mono">
-      <button
+      <div
         onClick={() => setViewingBranch(null)}
-        className={twMerge('px-3 py-1 rounded bordered bg-mint')}
+        className="bg-mint w-full bordered rounded-lg flex items-center justify-between px-3"
       >
-        Main branch
-      </button>
+        <div className="flex items-center justify-center">
+          <Branch width={100} height={100} seed={2} />
+        </div>
+        <IconButton onClick={() => setViewingBranch(null)}>
+          <XMarkIcon className="w-4 h-4" />
+        </IconButton>
+      </div>
 
       {game.branches.map((branch, i) => (
-        <button
-          key={branch.id}
-          onClick={() => setViewingBranch(branch)}
-          className={`px-3 py-1 rounded ${
-            viewingBranch?.id === branch.id
-              ? 'bg-black text-white'
-              : 'bg-neutral-200 hover:bg-neutral-300'
-          }`}
-        >
+        <div key={branch.id} onClick={() => setViewingBranch(branch)}>
           branch {i + 1}
-        </button>
+        </div>
       ))}
     </div>
   );
