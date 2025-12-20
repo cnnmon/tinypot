@@ -16,7 +16,7 @@ export default function Branchbar() {
         }}
       >
         <div className="flex items-center justify-center">
-          <Branch seed={randomSeed} />
+          <Branch seed={game.name.length} />
         </div>
       </div>
 

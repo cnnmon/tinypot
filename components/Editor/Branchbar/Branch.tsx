@@ -123,8 +123,7 @@ export default function Branch({
       lines.push(`M ${origin.x} ${origin.y} Q ${ctrlPt.x} ${ctrlPt.y} ${endPt.x} ${endPt.y}`);
 
       const pseudoRandom = (offset: number) => ((random() * 10 + offset) % 10) / 10;
-
-      if (pseudoRandom(30) < DECORATION_LIKELIHOOD) {
+      if (pseudoRandom(30 + i * 5) < DECORATION_LIKELIHOOD) {
         const branchDecoration = pickDecoration();
         if (fitsInBounds(endPt.x, endPt.y, branchDecoration)) {
           const alpha = pseudoRandom(5000);
