@@ -2,9 +2,10 @@
 
 import { useMemo } from 'react';
 
-const MINT = '#b7dcbd';
-const DECORATION_LIKELIHOOD = 0.7;
-const LEAF_LIKELIHOOD = 0.7;
+const FILL = 'white';
+const STROKE_WIDTH = 1.5;
+const DECORATION_LIKELIHOOD = 0.1;
+const LEAF_LIKELIHOOD = 1;
 
 interface Point {
   x: number;
@@ -23,6 +24,7 @@ interface BranchProps {
   height?: number;
   seed: number;
   color?: string;
+  className?: string;
 }
 
 // Seeded random number generator for reproducibility
@@ -51,6 +53,7 @@ export default function Branch({
   height = 71,
   seed,
   color = 'currentColor',
+  className,
 }: BranchProps) {
   const paths = useMemo(() => {
     const random = seededRandom(seed);
@@ -80,7 +83,7 @@ export default function Branch({
 
     // Check if decoration fits within bounds
     const fitsInBounds = (x: number, y: number, type: 'leaf' | 'flower'): boolean => {
-      const margin = type === 'leaf' ? 18 : 11; // approximate decoration radius
+      const margin = type === 'leaf' ? 5 : 10; // approximate decoration radius
       return x >= margin && x <= width - margin && y >= margin && y <= height - margin;
     };
 
@@ -123,7 +126,6 @@ export default function Branch({
       lines.push(`M ${origin.x} ${origin.y} Q ${ctrlPt.x} ${ctrlPt.y} ${endPt.x} ${endPt.y}`);
 
       const pseudoRandom = (offset: number) => ((random() * 10 + offset) % 10) / 10;
-
       if (pseudoRandom(30) < DECORATION_LIKELIHOOD) {
         const branchDecoration = pickDecoration();
         if (fitsInBounds(endPt.x, endPt.y, branchDecoration)) {
@@ -148,10 +150,18 @@ export default function Branch({
       viewBox={`0 0 ${width} ${height}`}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      className={className}
     >
       {/* Branches */}
       {paths.lines.map((d, i) => (
-        <path key={i} d={d} stroke={color} strokeWidth={2.5} strokeLinecap="round" fill="none" />
+        <path
+          key={i}
+          d={d}
+          stroke={color}
+          strokeWidth={STROKE_WIDTH}
+          strokeLinecap="round"
+          fill="none"
+        />
       ))}
 
       {/* Decorations at branch tips */}
@@ -161,12 +171,12 @@ export default function Branch({
             <path
               key={i}
               d="M0 0 C -6 -5 -8 -14 0 -18 C 8 -14 6 -5 0 0"
-              fill={MINT}
+              fill={FILL}
               stroke={color}
-              strokeWidth={2.5}
+              strokeWidth={STROKE_WIDTH * 1.9}
               strokeLinecap="round"
               strokeLinejoin="round"
-              transform={`translate(${dec.x}, ${dec.y}) rotate(${dec.rotation})`}
+              transform={`translate(${dec.x}, ${dec.y}) rotate(${dec.rotation}) scale(0.4)`}
             />
           );
         }
@@ -175,12 +185,12 @@ export default function Branch({
           <path
             key={i}
             d="M-2 -3 C -5 -5 -7 -8 -7 -12 C -7 -17 -4 -20 0 -20 C 4 -20 7 -17 7 -12 C 7 -8 5 -5 2 -3 C 5 -5 8 -7 12 -7 C 17 -7 20 -4 20 0 C 20 4 17 7 12 7 C 8 7 5 5 3 2 C 5 5 7 8 7 12 C 7 17 4 20 0 20 C -4 20 -7 17 -7 12 C -7 8 -5 5 -3 2 C -5 5 -8 7 -12 7 C -17 7 -20 4 -20 0 C -20 -4 -17 -7 -12 -7 C -8 -7 -5 -5 -2 -3 Z"
-            fill={MINT}
+            fill={FILL}
             stroke={color}
-            strokeWidth={4}
+            strokeWidth={STROKE_WIDTH * 2}
             strokeLinecap="round"
             strokeLinejoin="round"
-            transform={`translate(${dec.x}, ${dec.y}) rotate(${dec.rotation}) scale(0.55)`}
+            transform={`translate(${dec.x}, ${dec.y}) rotate(${dec.rotation}) scale(0.4)`}
           />
         );
       })}

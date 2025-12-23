@@ -1,0 +1,31 @@
+import Image from 'next/image';
+import { useMemo } from 'react';
+import CaretDown from '../../public/icons/CaretDown.svg';
+import Branch from '../Editor/Branchbar/Branch';
+
+export default function Header() {
+  const randomSeed = useMemo(() => Math.floor(Math.random() * 100), []);
+
+  return (
+    <div className="flex gap-4">
+      <div className="flex items-center justify-center gap-1">
+        <p>tinypot</p>
+        <div className="relative flex justify-center items-center mb-1">
+          <Branch seed={randomSeed} width={25} height={25} />
+          <Image
+            alt="plantpot"
+            src="icons/PlantPot.svg"
+            width={15}
+            height={15}
+            className="absolute top-[12px]"
+          />
+        </div>
+      </div>
+
+      <button className="flex items-center justify-center gap-1 hover:bg-black hover:text-white">
+        <p>New project</p>
+        <CaretDown width={20} className="stroke-current" />
+      </button>
+    </div>
+  );
+}

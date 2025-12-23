@@ -19,13 +19,13 @@ export const bonsaiTheme = EditorView.theme({
   '.cm-scroller': {
     fontFamily: 'ui-monospace, monospace',
     lineHeight: '1.5',
-    padding: '16px 0',
+    backgroundColor: '#f2f5e1',
   },
   '.cm-content': {
-    padding: '0 16px',
+    padding: '16px 16px',
   },
   '.cm-gutters': {
-    backgroundColor: '#fafafa',
+    backgroundColor: '#DCECD2',
     borderRight: '1px solid #e5e5e5',
     color: '#a3a3a3',
   },
@@ -52,11 +52,11 @@ export const bonsaiTheme = EditorView.theme({
 // Additional theme for bonsai syntax
 export const bonsaiSyntaxTheme = EditorView.theme({
   '.cm-bonsai-scene': {
-    color: '#7c3aed',
+    color: '#5187DF',
     fontWeight: 'bold',
   },
   '.cm-bonsai-goto': {
-    color: '#0891b2',
+    color: '#EB6B7C',
   },
   '.cm-bonsai-option': {
     color: '#059669',

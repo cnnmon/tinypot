@@ -7,7 +7,7 @@ export default function Branchbar() {
   const randomSeed = useMemo(() => Math.floor(Math.random() * 1000000), []);
 
   return (
-    <div className="flex items-center gap-2 text-sm font-mono">
+    <div className="flex items-center gap-2 text-sm">
       <div
         onClick={() => setViewingBranch(null)}
         className="w-full bordered rounded-lg flex items-center justify-between px-3 py-2"

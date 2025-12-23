@@ -1,9 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
 @import 'tailwindcss';
 
 :root {
   --primary: #171717;
   --mint: #b7dcbd;
   --lime: #e6f5c5;
+
+  font-family: Inter, sans-serif;
 
   /* Animation timing */
   --animation-duration: 0.3s;
@@ -16,12 +19,6 @@
   --color-lime: var(--lime);
 }
 
-html {
-  background: linear-gradient(135deg, #d5e7c0 0%, #ffffff 100%);
-  color: var(--primary);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @keyframes scroll-dots {
   to {
     background-position: 15px 15px;
@@ -29,24 +26,7 @@ html {
 }
 
 .bordered {
-  border: 2.5px solid var(--primary);
-}
-
-.bordered-bottom {
-  border-bottom: 2.5px solid var(--primary);
-}
-
-.bordered-left {
-  border-left: 2.5px solid var(--primary);
-}
-
-.bordered-top {
-  border-top: 2.5px solid var(--primary);
-}
-
-.shadowed {
-  /* 2d shadow effect */
-  box-shadow: 7px 7px 0 0 rgba(0, 0, 0, 1);
+  border: 2.5px solid black;
 }
 
 .outlined {
@@ -56,20 +36,4 @@ html {
 
 button {
   @apply cursor-pointer;
-}
-
-/* History entry animations */
-@keyframes fade-slide-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.history-entry-new {
-  animation: fade-slide-in var(--animation-duration) ease-out forwards;
 }

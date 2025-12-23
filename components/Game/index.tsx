@@ -21,13 +21,11 @@ export default function Player() {
   };
 
   return (
-    <>
-      <div className="flex-1 min-h-0 overflow-auto">
-        <History />
-      </div>
+    <div className="h-full overflow-auto">
+      <History />
 
       {/* Footer */}
-      <div className="shrink-0 w-full space-y-2 p-2 bg-white bordered-top">
+      <div className="">
         {/* Options */}
         {status !== GameStatus.ENDED &&
           currentOptions.map((option, i) => {
@@ -55,6 +53,6 @@ export default function Player() {
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

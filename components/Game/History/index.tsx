@@ -12,7 +12,6 @@ export default function History() {
   const { gameState, onAnimationComplete, jumpToChoice } = useProject();
   const { history, status, animatedCount } = gameState;
   const endRef = useRef<HTMLDivElement>(null);
-  const [confirmJumpIndex, setConfirmJumpIndex] = useState<number | null>(null);
 
   const [timing, setTiming] = useState({
     stagger: DEFAULT_STAGGER_MS,
@@ -42,29 +41,18 @@ export default function History() {
     }
   }, [history.length, animatedCount, onAnimationComplete, timing]);
 
-  // Clear confirmation when history changes
-  useEffect(() => {
-    setConfirmJumpIndex(null);
-  }, [history.length]);
-
   const handleChoiceClick = (index: number) => {
-    if (confirmJumpIndex === index) {
-      // Second click - confirm and jump
+    if (confirm('Are you sure you want to jump to this choice?')) {
       jumpToChoice(index);
-      setConfirmJumpIndex(null);
-    } else {
-      // First click - show confirmation
-      setConfirmJumpIndex(index);
     }
   };
 
   return (
-    <div className="p-4 font-mono space-y-2">
+    <div className="space-y-2 h-inherit">
       {history.map((entry, i) => {
         const isNew = i >= animatedCount;
         const delay = isNew ? (i - animatedCount) * timing.stagger : 0;
         const isChoice = 'isChoice' in entry && entry.isChoice && entry.text;
-        const isConfirming = confirmJumpIndex === i;
 
         if (isChoice) {
           return (
@@ -72,8 +60,7 @@ export default function History() {
               <p
                 className={twMerge(
                   'cursor-pointer hover:bg-mint/50 px-1 -mx-1 transition-colors',
-                  isNew ? 'history-entry-new opacity-0' : '',
-                  isConfirming && 'bg-mint'
+                  isNew ? 'history-entry-new opacity-0' : ''
                 )}
                 style={isNew ? { animationDelay: `${delay}ms` } : undefined}
                 onClick={() => handleChoiceClick(i)}
@@ -81,9 +68,6 @@ export default function History() {
                 <span className="text-gray-500">&gt; </span>
                 {entry.text}
               </p>
-              {isConfirming && (
-                <p className="text-sm text-black/50 pl-4 mt-1">(Click again to redo this choice)</p>
-              )}
             </div>
           );
         }

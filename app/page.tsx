@@ -1,40 +1,47 @@
 'use client';
 
-import Browser from '@/components/Browser';
+import Box from '@/components/Box';
 import Editor from '@/components/Editor';
 import Player from '@/components/Game';
+import Header from '@/components/Header';
+import ArrowRight from '@icons/ArrowRight.svg';
 
 export default function Home() {
   return (
-    <div className="min-h-screen p-6">
-      {/* moving dots! */}
-      <div
-        className="fixed -z-10 pointer-events-none animate-[scroll-dots_2s_linear_infinite]"
-        style={{
-          backgroundImage: `radial-gradient(circle, white 3px, transparent 1px)`,
-          backgroundSize: '15px 15px',
-          transform: 'rotate(45deg)',
-          inset: '-50%',
-          width: '200%',
-          height: '200%',
-        }}
-      />
-
-      <Browser>
-        <div className="flex flex-col md:flex-row bg-lime flex-1 min-h-0">
-          <div className="flex-1 min-h-0 overflow-auto flex flex-col">
-            <Editor />
-          </div>
-          <div
-            className="flex-1 min-h-0 overflow-auto border-t-[2.5px] md:border-t-0 md:border-l-[2.5px] flex flex-col justify-between"
-            style={{
-              background: 'linear-gradient(180deg, var(--color-lime) 0%, #ffffff 100%)',
-            }}
+    <div className="h-screen p-4 gap-2 flex flex-col">
+      <Header />
+      <div className="flex flex-col md:flex-row gap-2 mt-2 h-[calc(100%-50px)]">
+        <div className="flex flex-col gap-2 md:max-w-1/4">
+          <Box
+            title="World Bible"
+            icon="folderOpen"
+            className="bg-gradient-to-b from-[#EBF7D2] via-[#B7DCBD] to-white"
           >
-            <Player />
-          </div>
+            <p>Author is making an escape room game with secrets.</p>
+          </Box>
+
+          <Box title="Branches" icon="leaf">
+            <p>Branches are the different paths the player can take in the game.</p>
+            {['hello', 'world'].map((item) => (
+              <button
+                key={item}
+                className="flex items-center justify-between w-full hover:bg-black hover:text-white"
+                onClick={() => {}}
+              >
+                <b>{item}</b>
+                <ArrowRight className="stroke-current w-8 h-8 scale-70" />
+              </button>
+            ))}
+          </Box>
         </div>
-      </Browser>
+
+        <Box title="Editor" icon="scissors">
+          <Editor />
+        </Box>
+        <Box title="Player" icon="hourglass" className="w-[700px]">
+          <Player />
+        </Box>
+      </div>
     </div>
   );
 }
