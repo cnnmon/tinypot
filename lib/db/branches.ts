@@ -3,15 +3,16 @@
  * Replace with actual API calls when ready.
  */
 
+import { Branch, BranchStatus } from '@/types/branch';
 import { Schema } from '@/types/schema';
-import { Branch, BranchStatus } from '@/types/versions';
 
 const BRANCHES_KEY = 'bonsai_branches';
 
 function getBranchesFromStorage(): Branch[] {
   if (typeof window === 'undefined') return [];
   const data = localStorage.getItem(BRANCHES_KEY);
-  return data ? JSON.parse(data) : [];
+  // return data ? JSON.parse(data) : [];
+  return [];
 }
 
 function saveBranchesToStorage(branches: Branch[]): void {
@@ -34,9 +35,10 @@ export async function createBranch(baseSchema: Schema, resolvedSchema: Schema): 
 
   const newBranch: Branch = {
     id: crypto.randomUUID(),
+    projectId: '123',
     status: BranchStatus.APPROVED,
-    baseSchema,
-    resolvedSchema,
+    base: baseSchema,
+    generated: resolvedSchema,
   };
   branches.push(newBranch);
   saveBranchesToStorage(branches);
@@ -45,7 +47,7 @@ export async function createBranch(baseSchema: Schema, resolvedSchema: Schema): 
 
 export async function updateBranchStatus(
   branchId: string,
-  status: BranchStatus
+  status: BranchStatus,
 ): Promise<Branch | null> {
   const branches = getBranchesFromStorage();
   const idx = branches.findIndex((b) => b.id === branchId);

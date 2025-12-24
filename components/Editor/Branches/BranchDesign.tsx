@@ -73,7 +73,7 @@ export default function Branch({
     };
 
     lines.push(
-      `M ${stem.start.x} ${stem.start.y} Q ${stem.ctrl.x} ${stem.ctrl.y} ${stem.end.x} ${stem.end.y}`
+      `M ${stem.start.x} ${stem.start.y} Q ${stem.ctrl.x} ${stem.ctrl.y} ${stem.end.x} ${stem.end.y}`,
     );
 
     // Pick decoration type randomly

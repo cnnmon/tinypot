@@ -3,14 +3,15 @@
  * Replace with actual API calls when ready.
  */
 
-import { Playthrough } from '@/types/playthroughs';
+import { Playthrough } from '@/types/playthrough';
 
 const PLAYTHROUGHS_KEY = 'bonsai_playthroughs';
 
 function getPlaythroughsFromStorage(): Playthrough[] {
   if (typeof window === 'undefined') return [];
   const data = localStorage.getItem(PLAYTHROUGHS_KEY);
-  return data ? JSON.parse(data) : [];
+  //return data ? JSON.parse(data) : [];
+  return [];
 }
 
 function savePlaythroughsToStorage(playthroughs: Playthrough[]): void {
@@ -23,19 +24,19 @@ export async function getPlaythrough(playthroughId: string): Promise<Playthrough
   return playthroughs.find((p) => p.id === playthroughId) || null;
 }
 
-export async function getPlaythroughsForGame(gameId: string): Promise<Playthrough[]> {
+export async function getPlaythroughsForProject(projectId: string): Promise<Playthrough[]> {
   const playthroughs = getPlaythroughsFromStorage();
-  return playthroughs.filter((p) => p.gameId === gameId);
+  return playthroughs.filter((p) => p.projectId === projectId);
 }
 
-export async function createPlaythrough(gameId: string): Promise<Playthrough> {
+export async function createPlaythrough(projectId: string): Promise<Playthrough> {
   const playthroughs = getPlaythroughsFromStorage();
   const newPlaythrough: Playthrough = {
     id: crypto.randomUUID(),
-    gameId,
-    currentLineIdx: 0,
-    history: [],
-    createdAt: new Date().toISOString(),
+    projectId,
+    lines: [],
+    snapshot: [],
+    createdAt: new Date(),
   };
   playthroughs.push(newPlaythrough);
   savePlaythroughsToStorage(playthroughs);
@@ -44,7 +45,7 @@ export async function createPlaythrough(gameId: string): Promise<Playthrough> {
 
 export async function updatePlaythrough(
   playthroughId: string,
-  updates: Partial<Playthrough>
+  updates: Partial<Playthrough>,
 ): Promise<Playthrough | null> {
   const playthroughs = getPlaythroughsFromStorage();
   const idx = playthroughs.findIndex((p) => p.id === playthroughId);

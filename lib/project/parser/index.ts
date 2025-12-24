@@ -1,32 +1,32 @@
-import { LineType, Schema, SchemaLine } from '@/types/schema';
+import { EntryType, Schema, SchemaEntry } from '@/types/schema';
 
 /**
  * Parser for the game script format:
  * - `#` Scene marker (e.g., "# FIRE")
  * - `>` Jump/goto (e.g., "> FIRE" or "> END")
  * - `~` Option (e.g., "~ Ride a bike")
- * - Indented lines after ~ are the "then" block for that option
+ * - Indented entries after ~ are the "then" block for that option
  * - Regular text is narrative
  */
 
-function getIndentLevel(line: string): number {
-  const match = line.match(/^(\s*)/);
+function getIndentLevel(entry: string): number {
+  const match = entry.match(/^(\s*)/);
   return match ? match[1].length : 0;
 }
 
-function stripPrefix(line: string, prefix: string): string {
-  return line.slice(line.indexOf(prefix) + prefix.length).trim();
+function stripPrefix(entry: string, prefix: string): string {
+  return entry.slice(entry.indexOf(prefix) + prefix.length).trim();
 }
 
-export function parseIntoSchema(plainLines: string[]): Schema {
+export function parseIntoSchema(entries: string[]): Schema {
   const schema: Schema = [];
   let i = 0;
 
-  while (i < plainLines.length) {
-    const line = plainLines[i];
-    const trimmed = line.trim();
+  while (i < entries.length) {
+    const entry = entries[i];
+    const trimmed = entry.trim();
 
-    // Skip empty lines
+    // Skip empty entries
     if (!trimmed) {
       i++;
       continue;
@@ -35,7 +35,7 @@ export function parseIntoSchema(plainLines: string[]): Schema {
     // Scene marker: # SCENE_NAME
     if (trimmed.startsWith('#')) {
       schema.push({
-        type: LineType.SCENE,
+        type: EntryType.SCENE,
         label: stripPrefix(trimmed, '#'),
       });
       i++;
@@ -45,7 +45,7 @@ export function parseIntoSchema(plainLines: string[]): Schema {
     // Jump/goto: > TARGET or > END
     if (trimmed.startsWith('>')) {
       schema.push({
-        type: LineType.JUMP,
+        type: EntryType.JUMP,
         target: stripPrefix(trimmed, '>'),
       });
       i++;
@@ -54,30 +54,30 @@ export function parseIntoSchema(plainLines: string[]): Schema {
 
     // Option: ~ Option text
     if (trimmed.startsWith('~')) {
-      const optionIndent = getIndentLevel(line);
+      const optionIndent = getIndentLevel(entry);
       const optionText = stripPrefix(trimmed, '~');
-      const thenBlock: SchemaLine[] = [];
+      const thenBlock: SchemaEntry[] = [];
 
-      // Collect indented lines that follow this option
+      // Collect indented entries that follow this option
       i++;
-      while (i < plainLines.length) {
-        const nextLine = plainLines[i];
-        const nextTrimmed = nextLine.trim();
+      while (i < entries.length) {
+        const nextEntry = entries[i];
+        const nextTrimmed = nextEntry.trim();
 
-        // Empty lines within a then block are skipped but don't end the block
+        // Empty entries within a then block are skipped but don't end the block
         if (!nextTrimmed) {
           i++;
           continue;
         }
 
-        const nextIndent = getIndentLevel(nextLine);
+        const nextIndent = getIndentLevel(nextEntry);
 
-        // If next line is more indented than the option, it's part of the then block
+        // If next entry is more indented than the option, it's part of the then block
         if (nextIndent > optionIndent) {
-          // Parse this line recursively
-          const [parsedLine] = parseIntoSchema([nextTrimmed]);
-          if (parsedLine) {
-            thenBlock.push(parsedLine);
+          // Parse this entry recursively
+          const [parsedEntry] = parseIntoSchema([nextTrimmed]);
+          if (parsedEntry) {
+            thenBlock.push(parsedEntry);
           }
           i++;
         } else {
@@ -87,7 +87,7 @@ export function parseIntoSchema(plainLines: string[]): Schema {
       }
 
       schema.push({
-        type: LineType.OPTION,
+        type: EntryType.OPTION,
         text: optionText,
         then: thenBlock,
       });
@@ -96,7 +96,7 @@ export function parseIntoSchema(plainLines: string[]): Schema {
 
     // Default: narrative text
     schema.push({
-      type: LineType.NARRATIVE,
+      type: EntryType.NARRATIVE,
       text: trimmed,
     });
     i++;

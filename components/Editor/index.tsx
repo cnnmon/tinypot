@@ -1,24 +1,22 @@
 'use client';
 
-import { useProject } from '@/lib/project';
+import useEditor from '@/lib/editor';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
-import { Compartment, EditorState } from '@codemirror/state';
+import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { useEffect, useRef } from 'react';
 import {
   bonsaiHighlighting,
   bonsaiSyntaxTheme,
   bonsaiTheme,
-  createChangedLinesPlugin,
   lineHighlighterPlugin,
 } from './utils/theme';
 
 export default function Editor() {
-  const { lines, editLines, changedLines } = useProject();
+  const { script, setScript } = useEditor();
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
-  const changedLinesCompartment = useRef(new Compartment());
 
   // Initialize CodeMirror
   useEffect(() => {
@@ -27,12 +25,12 @@ export default function Editor() {
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const content = update.state.doc.toString();
-        editLines(content.split('\n'));
+        setScript(content.split('\n'));
       }
     });
 
     const state = EditorState.create({
-      doc: lines.join('\n'),
+      doc: script.join('\n'),
       extensions: [
         lineNumbers(),
         keymap.of([indentWithTab, ...defaultKeymap]),
@@ -40,7 +38,6 @@ export default function Editor() {
         bonsaiSyntaxTheme,
         lineHighlighterPlugin,
         syntaxHighlighting(bonsaiHighlighting),
-        changedLinesCompartment.current.of(createChangedLinesPlugin(changedLines)),
         updateListener,
         EditorView.lineWrapping,
       ],
@@ -64,24 +61,14 @@ export default function Editor() {
     if (!view) return;
 
     const currentContent = view.state.doc.toString();
-    const newContent = lines.join('\n');
+    const newContent = script.join('\n');
 
     if (currentContent !== newContent && !view.hasFocus) {
       view.dispatch({
         changes: { from: 0, to: currentContent.length, insert: newContent },
       });
     }
-  }, [lines]);
+  }, [script]);
 
-  // Update changed lines highlighting
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-
-    view.dispatch({
-      effects: changedLinesCompartment.current.reconfigure(createChangedLinesPlugin(changedLines)),
-    });
-  }, [changedLines]);
-
-  return <div ref={editorRef} className="h-full overflow-scroll bg-zinc-100 rounded-lg" />;
+  return <div ref={editorRef} className="h-full overflow-scroll" />;
 }

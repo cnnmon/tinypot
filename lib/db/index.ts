@@ -1,3 +1,3 @@
 export * from './branches';
-export * from './games';
 export * from './playthroughs';
+export * from './projects';

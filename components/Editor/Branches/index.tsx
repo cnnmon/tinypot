@@ -1,29 +1,24 @@
-import { useProject } from '@/lib/project';
 import { useMemo } from 'react';
-import Branch from './Branch';
+import BranchDesign from './BranchDesign';
 
 export default function Branchbar() {
-  const { game, setViewingBranch } = useProject();
   const randomSeed = useMemo(() => Math.floor(Math.random() * 1000000), []);
 
   return (
     <div className="flex items-center gap-2 text-sm">
       <div
-        onClick={() => setViewingBranch(null)}
         className="w-full bordered rounded-lg flex items-center justify-between px-3 py-2"
         style={{
           background: 'linear-gradient(180deg, var(--color-mint) 0%, var(--color-lime) 100%)',
         }}
       >
         <div className="flex items-center justify-center">
-          <Branch seed={randomSeed} />
+          <BranchDesign seed={randomSeed} />
         </div>
       </div>
 
-      {game.branches.map((branch, i) => (
-        <div key={branch.id} onClick={() => setViewingBranch(branch)}>
-          branch {i + 1}
-        </div>
+      {[].map((_branch, i) => (
+        <div key={i}>branch {i + 1}</div>
       ))}
     </div>
   );
