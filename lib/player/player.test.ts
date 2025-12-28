@@ -59,16 +59,17 @@ describe('Player Flow', () => {
     expect(move2.type).toBe('wait');
   });
 
-  it('should fuzzy match player input "Bike" to "Ride a bike" option', () => {
+  it('should fuzzy match player input "Bike" to "Ride a bike" option', async () => {
     const sceneMap = constructSceneMap({ schema: testSchema });
 
     // Player is at lineIdx 1 (after the first narrative), waiting for input
-    const result = handleInput({
+    const result = await handleInput({
       input: 'Bike',
       schema: testSchema,
       sceneMap,
       sceneId: 'START',
       lineIdx: 1,
+      useFuzzyFallback: false,
     });
 
     expect(result.matched).toBe(true);
@@ -77,15 +78,16 @@ describe('Player Flow', () => {
     expect(result.optionText).toBe('Ride a bike');
   });
 
-  it('should fuzzy match "run" to "Run away" option', () => {
+  it('should fuzzy match "run" to "Run away" option', async () => {
     const sceneMap = constructSceneMap({ schema: testSchema });
 
-    const result = handleInput({
+    const result = await handleInput({
       input: 'run',
       schema: testSchema,
       sceneMap,
       sceneId: 'START',
       lineIdx: 1,
+      useFuzzyFallback: false,
     });
 
     expect(result.matched).toBe(true);
@@ -112,46 +114,49 @@ describe('Player Flow', () => {
     expect(move.type).toBe('end');
   });
 
-  it('should match case-insensitively: "RIDE A BIKE" matches "Ride a bike"', () => {
+  it('should match case-insensitively: "RIDE A BIKE" matches "Ride a bike"', async () => {
     const sceneMap = constructSceneMap({ schema: testSchema });
 
-    const result = handleInput({
+    const result = await handleInput({
       input: 'RIDE A BIKE',
       schema: testSchema,
       sceneMap,
       sceneId: 'START',
       lineIdx: 1,
+      useFuzzyFallback: false,
     });
 
     expect(result.matched).toBe(true);
     expect(result.sceneId).toBe('BIKE');
   });
 
-  it('should pick option with most keyword matches', () => {
+  it('should pick option with most keyword matches', async () => {
     const sceneMap = constructSceneMap({ schema: testSchema });
 
     // "ride bike" has 2 matches with "Ride a bike", vs 0 with "Run away"
-    const result = handleInput({
+    const result = await handleInput({
       input: 'ride bike',
       schema: testSchema,
       sceneMap,
       sceneId: 'START',
       lineIdx: 1,
+      useFuzzyFallback: false,
     });
 
     expect(result.matched).toBe(true);
     expect(result.optionText).toBe('Ride a bike');
   });
 
-  it('should return narratives from option then block for "Ride a bike"', () => {
+  it('should return narratives from option then block for "Ride a bike"', async () => {
     const sceneMap = constructSceneMap({ schema: testSchema });
 
-    const result = handleInput({
+    const result = await handleInput({
       input: 'Bike',
       schema: testSchema,
       sceneMap,
       sceneId: 'START',
       lineIdx: 1,
+      useFuzzyFallback: false,
     });
 
     expect(result.matched).toBe(true);
@@ -159,15 +164,16 @@ describe('Player Flow', () => {
     expect(result.narratives?.[0].text).toBe("That's cool!");
   });
 
-  it('should return narratives from option then block for "Run away"', () => {
+  it('should return narratives from option then block for "Run away"', async () => {
     const sceneMap = constructSceneMap({ schema: testSchema });
 
-    const result = handleInput({
+    const result = await handleInput({
       input: 'run',
       schema: testSchema,
       sceneMap,
       sceneId: 'START',
       lineIdx: 1,
+      useFuzzyFallback: false,
     });
 
     expect(result.matched).toBe(true);

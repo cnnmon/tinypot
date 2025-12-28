@@ -27,7 +27,8 @@ export interface JumpEntry {
 
 export interface OptionEntry {
   type: EntryType.OPTION;
-  text: string; // The option text shown to user
+  text: string; // The primary option text shown to user
+  aliases?: string[]; // Alternative phrasings that match this option
   then: SchemaEntry[]; // What happens when this option is chosen
 }
 

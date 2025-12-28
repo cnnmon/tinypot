@@ -15,6 +15,7 @@ export interface GenerateResponse {
   success: boolean;
   generatedOption: {
     text: string; // The option text (normalized from user input)
+    aliases: string[]; // Alternative phrasings that should match this option
     then: string[]; // Lines of narrative/jumps to add
   } | null;
   error?: string;
@@ -83,10 +84,13 @@ Generate a response that:
 
 Respond in JSON format only:
 {
-  "optionText": "<clean, concise version of the player's action>",
+  "optionText": "<clean, polished version of the player's action for display>",
+  "aliases": ["<the player's original input>", "<other short phrasings that should match>"],
   "narrative": ["<line 1>", "<line 2>", ...],
   "jump": "<scene label to jump to, or null to loop back, or 'END' if this ends the story>"
 }
+
+For aliases: include the player's exact input plus 1-2 short alternative phrasings (e.g., if input is "what", aliases might be ["what", "huh", "ask"]).
 
 Keep narrative punchy and in the author's voice.`,
       },
@@ -118,10 +122,20 @@ Keep narrative punchy and in the author's voice.`,
       thenLines.push(`> ${parsed.jump}`);
     }
 
+    // Build aliases array, always including the original input
+    const aliases: string[] = [];
+    if (parsed.aliases && Array.isArray(parsed.aliases)) {
+      aliases.push(...parsed.aliases);
+    }
+    if (!aliases.includes(userInput)) {
+      aliases.unshift(userInput);
+    }
+
     return Response.json({
       success: true,
       generatedOption: {
         text: parsed.optionText || userInput,
+        aliases,
         then: thenLines,
       },
     } satisfies GenerateResponse);

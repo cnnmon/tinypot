@@ -14,7 +14,7 @@ export const bonsaiHighlighting = HighlightStyle.define([
 export const bonsaiTheme = EditorView.theme({
   '&': {
     height: '100%',
-    fontSize: '14px',
+    fontSize: '15px',
   },
   '.cm-scroller': {
     lineHeight: '1.5',

@@ -16,17 +16,19 @@ export default function Box({
   subtitle,
   icon,
   className,
+  style,
   children,
 }: {
   title: string;
   subtitle?: string;
   icon?: string;
   className?: string;
+  style?: React.CSSProperties;
   children: React.ReactNode;
 }) {
   const Icon = iconToIconMap[icon as keyof typeof iconToIconMap];
   return (
-    <div className={twMerge('flex flex-col bordered p-3 gap-2 min-w-1/4 w-full', className)}>
+    <div style={style} className={twMerge('flex flex-col bordered p-3 gap-2 min-w-1/4 w-full', className)}>
       <div className="flex items-center justify-between gap-2">
         <p className="font-bold">{title}</p>
         {Icon && <Image src={Icon} alt={title} width={20} height={20} />}
