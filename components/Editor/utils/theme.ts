@@ -22,6 +22,7 @@ export const bonsaiTheme = EditorView.theme({
   },
   '.cm-content': {
     padding: '16px 16px',
+    whiteSpace: 'pre',
   },
   '.cm-gutters': {
     backgroundColor: 'transparent',
