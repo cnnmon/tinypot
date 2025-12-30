@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 /**
  * TOOD: Is this edit valid?
  * MIGHT get more complicated with branching & pruning
@@ -6,7 +8,7 @@
 
 import { Schema } from '@/types/schema';
 
-export function isSchemaEditValid({ curr, diff }: { curr: Schema; diff: Schema }): boolean {
+export function isSchemaEditValid(_curr: Schema, _diff: Schema): boolean {
   // Check what kind of diffs exist
   return true;
 }

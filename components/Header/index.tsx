@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import Image from 'next/image';
@@ -10,8 +11,8 @@ export default function Header() {
 
   useEffect(() => {
     setRandomNumber(Math.random());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
   return (
     <div className="flex gap-4">
       <div className="flex items-center justify-center gap-1">

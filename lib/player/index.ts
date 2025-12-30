@@ -49,7 +49,7 @@ export default function usePlayer() {
 
   useEffect(() => {
     // Accept any valid changes
-    if (isSchemaEditValid({ curr: playthrough.snapshot, diff: schema })) {
+    if (isSchemaEditValid(playthrough.snapshot, schema)) {
       setPlaythrough((prev) => ({
         ...prev,
         snapshot: schema,
@@ -58,32 +58,27 @@ export default function usePlayer() {
   }, [schema, playthrough.snapshot]);
 
   // Automatically go next until you can't
-  useEffect(() => {
-    if (status === Status.RUNNING) {
-      handleNext();
-    }
-  }, [status, handleNext]);
+  const addLine = useCallback(
+    (newLine: Line) => {
+      setPlaythrough((prev) => ({
+        ...prev,
+        lines: [...prev.lines, newLine],
+      }));
 
-  /* Utilities */
-  function addLine(newLine: Line) {
-    setPlaythrough((prev) => ({
-      ...prev,
-      lines: [...prev.lines, newLine],
-    }));
+      // Only update scene/line state for narrator lines (advance to NEXT line)
+      const parsedId = parseLineId(newLine.id);
+      if (parsedId) {
+        setState({
+          ...state,
+          currentSceneId: parsedId.sceneId,
+          currentLineIdx: parsedId.lineIdx + 1,
+        });
+      }
+    },
+    [state],
+  );
 
-    // Only update scene/line state for narrator lines (advance to NEXT line)
-    const parsedId = parseLineId(newLine.id);
-    if (parsedId) {
-      setState({
-        ...state,
-        currentSceneId: parsedId.sceneId,
-        currentLineIdx: parsedId.lineIdx + 1,
-      });
-    }
-  }
-
-  /* Player actions */
-  function handleNext() {
+  const handleNext = useCallback(() => {
     const nextMove = step({
       schema: playthrough.snapshot,
       sceneMap,
@@ -106,8 +101,15 @@ export default function usePlayer() {
     if (nextMove.line) {
       addLine(nextMove.line);
     }
-  }
+  }, [state, currentSceneId, currentLineIdx, sceneMap, addLine, playthrough.snapshot]);
 
+  useEffect(() => {
+    if (status === Status.RUNNING) {
+      handleNext();
+    }
+  }, [status, handleNext]);
+
+  /* Player actions */
   const handleSubmit = useCallback(
     async (input: string) => {
       // Add the player's line
@@ -287,7 +289,16 @@ export default function usePlayer() {
         }
       }
     },
-    [playthrough, sceneMap, currentSceneId, currentLineIdx, project, setProject, addOrMergeBranch],
+    [
+      playthrough,
+      sceneMap,
+      currentSceneId,
+      currentLineIdx,
+      project,
+      setProject,
+      addOrMergeBranch,
+      addLine,
+    ],
   );
 
   function handleRestart() {

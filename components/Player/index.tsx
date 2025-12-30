@@ -57,7 +57,7 @@ export default function Player() {
               )}
               initial={isPlayer ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.25, ease: 'easeInOut', delay: isPlayer ? 0 : i * 0.1 }}
+              transition={{ duration: 0.1, ease: 'easeInOut' }}
             >
               {isPlayer ? '> ' : null}
               {line.text}

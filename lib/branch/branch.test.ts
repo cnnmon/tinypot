@@ -1,5 +1,5 @@
+import { EntryType, Schema, SchemaEntry } from '@/types/schema';
 import { describe, expect, it } from 'vitest';
-import { EntryType, Schema } from '@/types/schema';
 import { createBranch, extractScenesFromSchema, scenesEqual } from './index';
 
 describe('Branch diffing', () => {
@@ -256,8 +256,8 @@ describe('Line-level diff detection', () => {
       return '';
     };
 
-    const baseLines = baseHome.map((e) => toText(e as any));
-    const genLines = genHome.map((e) => toText(e as any));
+    const baseLines = baseHome.map((e) => toText(e as SchemaEntry));
+    const genLines = genHome.map((e) => toText(e as SchemaEntry));
 
     // Test classification logic (same as highlighter uses)
     const classifyLine = (line: string) => {
@@ -286,4 +286,3 @@ describe('Line-level diff detection', () => {
     expect(classifyLine('Something completely new')).toBe('green');
   });
 });
-
