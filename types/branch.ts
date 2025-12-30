@@ -1,24 +1,24 @@
 /**
- * Types for schema version history.
- * If a playthrough generates new content,
- * create a branch for the author to review.
+ * Types for branch tracking.
+ * A branch captures one AI generation event for author review.
+ * Tracks at scene level, not individual lines.
  */
 
-import { Schema } from './schema';
+import { SchemaEntry } from './schema';
 
-export enum BranchStatus {
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-}
-
-type Timestamp = string;
-export type BranchHistory = Record<Timestamp, Schema>;
+export type SceneId = string;
+export type Scene = SchemaEntry[]; // scene content after # SCENEID
 
 export interface Branch {
   id: string;
-  projectId: string;
-  status: BranchStatus;
-  base: Schema; // schema before the branch was created
-  generated: Schema; // schema after generated content
-  edited?: Schema; // schema after author edits
+  title: string;
+  playthroughId: string;
+
+  // Track entire scenes, not individual lines
+  sceneIds: string[]; // ["FIRE", "BIKE"]
+  base: Map<SceneId, Scene>; // scene snapshotted before generation
+  generated: Map<SceneId, Scene>; // AI generated off of base
+  authored?: Map<SceneId, Scene>; // author's edits (captured on closure)
+  approved?: boolean; // true = approved, false = rejected, undefined = unresolved
+  createdAt: Date;
 }

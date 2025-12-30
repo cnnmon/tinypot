@@ -2,6 +2,7 @@
 
 import usePlayer, { Status } from '@/lib/player';
 import { Sender } from '@/types/playthrough';
+import { motion } from 'motion/react';
 import { useEffect, useRef } from 'react';
 import { twMerge } from 'tailwind-merge';
 import PlayerInput from './PlayerInput';
@@ -46,20 +47,30 @@ export default function Player() {
 
       <div className="space-y-2 py-2 h-[calc(100%-50px)] overflow-auto">
         {lines.map((line, i) => {
+          const isPlayer = line.sender === Sender.PLAYER;
           return (
-            <p
+            <motion.p
               key={i}
               className={twMerge(
                 line.sender === Sender.SYSTEM && 'italic',
-                line.sender === Sender.NARRATOR && 'text-right',
+                isPlayer && 'text-right',
               )}
+              initial={isPlayer ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.25, ease: 'easeInOut', delay: isPlayer ? 0 : i * 0.1 }}
             >
-              {line.sender === Sender.PLAYER ? '> ' : null}
+              {isPlayer ? '> ' : null}
               {line.text}
-            </p>
+            </motion.p>
           );
         })}
-        {renderStatus()}
+        <motion.div
+          id={lines.length.toString()}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          {renderStatus()}
+        </motion.div>
         <div ref={endRef} />
       </div>
     </div>

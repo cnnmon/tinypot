@@ -19,6 +19,7 @@ export default function PlayerInput({
   return (
     <div className="relative">
       <input
+        autoFocus
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder="What do you want to do?"

@@ -44,7 +44,6 @@ Learn to sail
 each scene is denoted by a (#) and will loop its option (~) selection until you go to (>) another scene or END.
 
 versioning:
-each playthrough should be capable of creating a new BRANCH. the playthrough should be reactive to edits in the editor, but any already committed lines to history should not be changed -- only future lines/options if you're currently perusing them.
+there is an authorial intent burden in working with creative tools. in an existing creative project, authors reprompt llms again and again. unlike with human collaborators, there is no shared convergence of understanding. things get lost, misplaced. the idea of branches in bonsai/tinypot is to converge human creative work -- which tends to be temporal -- into formats llms can understand -- pairwise , and vice versa.
 
-future work:
-want this to be a place where you can prune branches but don't want games to be limited to this interface. i want to expose it as an api so anyone can use it in their projects with their own LLM API keys. this would also benefit my future web games.
+each playthrough should be capable of creating a new BRANCH. the playthrough should be reactive to edits in the editor, but any already committed lines to history should not be changed -- only future lines/options if you're currently perusing them.

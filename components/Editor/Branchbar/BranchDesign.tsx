@@ -1,5 +1,6 @@
 'use client';
 
+import { motion } from 'motion/react';
 import { useMemo } from 'react';
 
 const FILL = 'white';
@@ -83,7 +84,7 @@ export default function Branch({
 
     // Check if decoration fits within bounds
     const fitsInBounds = (x: number, y: number, type: 'leaf' | 'flower'): boolean => {
-      const margin = type === 'leaf' ? 5 : 10; // approximate decoration radius
+      const margin = type === 'leaf' ? 6 : 10; // approximate decoration radius
       return x >= margin && x <= width - margin && y >= margin && y <= height - margin;
     };
 
@@ -153,23 +154,30 @@ export default function Branch({
       className={className}
     >
       {/* Branches */}
-      {paths.lines.map((d, i) => (
-        <path
-          key={i}
-          d={d}
-          stroke={color}
-          strokeWidth={STROKE_WIDTH}
-          strokeLinecap="round"
-          fill="none"
-        />
-      ))}
+      {seed &&
+        paths.lines.map((d, i) => (
+          <motion.path
+            key={i}
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 1, ease: 'easeInOut' }}
+            d={d}
+            stroke={color}
+            strokeWidth={STROKE_WIDTH}
+            strokeLinecap="round"
+            fill="none"
+          />
+        ))}
 
       {/* Decorations at branch tips */}
       {paths.decorations.map((dec, i) => {
         if (dec.type === 'leaf') {
           return (
-            <path
+            <motion.path
               key={i}
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 1, ease: 'easeInOut', delay: i * 0.1 }}
               d="M0 0 C -6 -5 -8 -14 0 -18 C 8 -14 6 -5 0 0"
               fill={FILL}
               stroke={color}

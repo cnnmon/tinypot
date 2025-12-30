@@ -1,8 +1,8 @@
 'use client';
 
 import Box from '@/components/Box';
-import BranchList from '@/components/BranchList';
 import Editor from '@/components/Editor';
+import Branchbar from '@/components/Editor/Branchbar';
 import Header from '@/components/Header';
 import Player from '@/components/Player';
 import { useCallback, useRef, useState } from 'react';
@@ -41,16 +41,12 @@ export default function Home() {
       <Header />
 
       <div className="flex gap-2">
-        <Box
-          title="World Bible"
-          icon="folderOpen"
-          className="bg-gradient-to-b from-[#EBF7D2] via-[#B7DCBD] to-white min-h-45 w-5"
-        >
+        <Box className="bg-gradient-to-b from-[#EBF7D2] via-[#B7DCBD] to-white min-h-45 w-5">
           <p>Author is making a game about...</p>
         </Box>
 
-        <Box title="Branches" icon="leaf">
-          <BranchList />
+        <Box className="max-h-45 overflow-auto">
+          <Branchbar />
         </Box>
       </div>
 
@@ -58,14 +54,14 @@ export default function Home() {
         ref={containerRef}
         className="flex flex-row min-h-[calc(100%-210px)] h-[calc(100%-210px)] pb-5"
       >
-        <Box title="Editor" style={{ width: `${leftWidth}%` }}>
+        <Box style={{ width: `${leftWidth}%` }}>
           <Editor />
         </Box>
         <div
           onMouseDown={handleMouseDown}
           className="w-2 cursor-col-resize hover:bg-gray-300 transition-colors shrink-0"
         />
-        <Box title="Player" style={{ width: `${100 - leftWidth}%` }}>
+        <Box style={{ width: `${100 - leftWidth}%` }}>
           <Player />
         </Box>
       </div>

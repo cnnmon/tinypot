@@ -1,10 +1,11 @@
 'use client';
 
 import { GenerateRequest, GenerateResponse } from '@/app/api/generate/route';
+import { createBranch } from '@/lib/branch';
 import { Line, Playthrough, Sender } from '@/types/playthrough';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProject } from '../project';
-import { addAliasToOption, addGeneratedOptionToScript } from '../project/parser';
+import { addAliasToOption, addGeneratedOptionToScript, parseIntoSchema } from '../project/parser';
 import {
   constructSceneMap,
   getSceneAndLineIdx,
@@ -24,7 +25,7 @@ export enum Status {
 }
 
 export default function usePlayer() {
-  const { projectId, schema, project, setProject } = useProject();
+  const { projectId, schema, project, setProject, addOrMergeBranch } = useProject();
   const [playthrough, setPlaythrough] = useState<Playthrough>({
     id: 'abcdef',
     projectId,
@@ -215,6 +216,9 @@ export default function usePlayer() {
           if (data.success && data.generatedOption) {
             const { text: optionText, aliases, then: thenLines } = data.generatedOption;
 
+            // Capture base schema before applying generation
+            const baseSchema = parseIntoSchema(project.script);
+
             // Update the script with the new option
             const updatedScript = addGeneratedOptionToScript(
               project.script,
@@ -223,6 +227,16 @@ export default function usePlayer() {
               aliases,
               thenLines,
             );
+
+            // Parse generated schema and create branch
+            const generatedSchema = parseIntoSchema(updatedScript);
+            const branch = createBranch(playthrough.id, baseSchema, generatedSchema);
+
+            // Only create/merge branch if there are actual changes
+            if (branch.sceneIds.length > 0) {
+              addOrMergeBranch(branch, baseSchema, generatedSchema);
+            }
+
             setProject({ ...project, script: updatedScript });
 
             // Show generation info
@@ -273,7 +287,7 @@ export default function usePlayer() {
         }
       }
     },
-    [playthrough.snapshot, sceneMap, currentSceneId, currentLineIdx, project, setProject],
+    [playthrough, sceneMap, currentSceneId, currentLineIdx, project, setProject, addOrMergeBranch],
   );
 
   function handleRestart() {
