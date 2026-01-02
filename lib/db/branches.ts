@@ -20,6 +20,7 @@ interface SerializedBranch {
   generated: Record<string, Scene>;
   authored?: Record<string, Scene>;
   approved?: boolean;
+  metalearning?: string;
   createdAt: string;
 }
 
@@ -37,6 +38,7 @@ function serializeBranch(branch: Branch): SerializedBranch {
     generated: Object.fromEntries(branch.generated),
     authored: branch.authored ? Object.fromEntries(branch.authored) : undefined,
     approved: branch.approved,
+    metalearning: branch.metalearning,
     createdAt: branch.createdAt.toISOString(),
   };
 }
@@ -53,6 +55,7 @@ function deserializeBranch(data: SerializedBranch): Branch {
       ? (new Map(Object.entries(data.authored)) as Map<SceneId, Scene>)
       : undefined,
     approved: data.approved,
+    metalearning: data.metalearning,
     createdAt: new Date(data.createdAt),
   };
 }

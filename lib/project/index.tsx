@@ -12,6 +12,9 @@ import {
   SceneId,
 } from '@/lib/branch';
 import { addBranch, loadBranches, saveBranches, updateBranch } from '@/lib/db/branches';
+import { updateGuidebook as saveGuidebook } from '@/lib/db/projects';
+import { runJob } from '@/lib/jobs';
+import { runMetalearning } from '@/lib/jobs/metalearning';
 import { Branch } from '@/types/branch';
 import { Project } from '@/types/project';
 import { Schema } from '@/types/schema';
@@ -42,6 +45,10 @@ interface ProjectContextValue {
   addOrMergeBranch: (branch: Branch, baseSchema: Schema, generatedSchema: Schema) => void;
   approveBranch: (branchId: string) => void;
   rejectBranch: (branchId: string, shouldRevert: boolean) => void;
+  // Guidebook state
+  guidebook: string;
+  setGuidebook: (guidebook: string) => void;
+  isGuidebookUpdating: boolean;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -59,10 +66,56 @@ export function ProjectProvider({
     name: 'project',
     description: 'blah',
     script: DEFAULT_LINES,
+    guidebook: '',
   });
 
   const [branches, setBranches] = useState<Branch[]>(() => loadBranches(projectId));
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [guidebook, setGuidebookState] = useState('');
+  const [isGuidebookUpdating, setIsGuidebookUpdating] = useState(false);
+
+  // Guidebook setter that also persists
+  const setGuidebook = useCallback(
+    (newGuidebook: string) => {
+      setGuidebookState(newGuidebook);
+      saveGuidebook(projectId, newGuidebook);
+    },
+    [projectId],
+  );
+
+  // Kick off metalearning job after branch resolution
+  const startMetalearningJob = useCallback(
+    (resolvedBranch: Branch) => {
+      setIsGuidebookUpdating(true);
+
+      runJob(
+        `metalearning-${resolvedBranch.id}`,
+        () => runMetalearning(projectId, resolvedBranch),
+        {
+          onComplete: (result) => {
+            // Append metalearning to guidebook
+            setGuidebookState((prev) => {
+              const entry = prev ? `${prev}\n${result.metalearning}` : result.metalearning;
+              saveGuidebook(projectId, entry);
+              return entry;
+            });
+            // Update branch in state with metalearning
+            setBranches((prev) =>
+              prev.map((b) =>
+                b.id === resolvedBranch.id ? { ...b, metalearning: result.metalearning } : b,
+              ),
+            );
+            setIsGuidebookUpdating(false);
+          },
+          onError: (error) => {
+            console.error('Metalearning failed:', error);
+            setIsGuidebookUpdating(false);
+          },
+        },
+      );
+    },
+    [projectId],
+  );
 
   const schema = useMemo(() => {
     return parseIntoSchema(project.script);
@@ -110,18 +163,24 @@ export function ProjectProvider({
   // Approve branch - capture authored scenes and mark as approved
   const approveBranch = useCallback(
     (branchId: string) => {
+      let resolvedBranch: Branch | null = null;
       setBranches((prev) => {
         const updated = prev.map((b) => {
           if (b.id !== branchId) return b;
           const authored = captureAuthoredScenes(b, schema);
-          return { ...b, authored, approved: true };
+          resolvedBranch = { ...b, authored, approved: true };
+          return resolvedBranch;
         });
         saveBranches(projectId, updated);
         return updated;
       });
       setSelectedBranchId(null);
+      // Kick off metalearning
+      if (resolvedBranch) {
+        startMetalearningJob(resolvedBranch);
+      }
     },
-    [projectId, schema],
+    [projectId, schema, startMetalearningJob],
   );
 
   // Reject branch - optionally revert to base scenes
@@ -146,18 +205,24 @@ export function ProjectProvider({
         setProject({ ...project, script: updatedScript });
       }
 
+      let resolvedBranch: Branch | null = null;
       setBranches((prev) => {
         const updated = prev.map((b) => {
           if (b.id !== branchId) return b;
           const authored = shouldRevert ? new Map(b.base) : captureAuthoredScenes(b, schema);
-          return { ...b, authored, approved: false };
+          resolvedBranch = { ...b, authored, approved: false };
+          return resolvedBranch;
         });
         saveBranches(projectId, updated);
         return updated;
       });
       setSelectedBranchId(null);
+      // Kick off metalearning
+      if (resolvedBranch) {
+        startMetalearningJob(resolvedBranch);
+      }
     },
-    [branches, project, projectId, schema, setProject],
+    [branches, project, projectId, schema, setProject, startMetalearningJob],
   );
 
   return (
@@ -175,6 +240,9 @@ export function ProjectProvider({
         addOrMergeBranch,
         approveBranch,
         rejectBranch,
+        guidebook,
+        setGuidebook,
+        isGuidebookUpdating,
       }}
     >
       {children}

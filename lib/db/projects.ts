@@ -35,6 +35,7 @@ export async function getOrCreateProject(projectId: string, defaults: Project): 
     name: defaults.name,
     description: defaults.description,
     script: defaults.script,
+    guidebook: defaults.guidebook,
   };
   projects.push(newProject);
   saveProjectsToStorage(projects);
@@ -58,6 +59,7 @@ export async function createProject(
     name,
     description,
     script,
+    guidebook: '',
   };
   projects.push(newProject);
   saveProjectsToStorage(projects);
@@ -82,4 +84,11 @@ export async function deleteProject(projectId: string): Promise<boolean> {
   if (filtered.length === projects.length) return false;
   saveProjectsToStorage(filtered);
   return true;
+}
+
+export async function updateGuidebook(
+  projectId: string,
+  guidebook: string,
+): Promise<Project | null> {
+  return updateProject(projectId, { guidebook });
 }

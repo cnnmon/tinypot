@@ -8,4 +8,5 @@ export type Project = {
   name: string;
   description: string;
   script: string[]; // Parsed into schema
+  guidebook: string;
 };

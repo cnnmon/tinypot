@@ -25,7 +25,7 @@ export enum Status {
 }
 
 export default function usePlayer() {
-  const { projectId, schema, project, setProject, addOrMergeBranch } = useProject();
+  const { projectId, schema, project, setProject, addOrMergeBranch, guidebook } = useProject();
   const [playthrough, setPlaythrough] = useState<Playthrough>({
     id: 'abcdef',
     projectId,
@@ -208,6 +208,7 @@ export default function usePlayer() {
               history,
               existingOptions,
               projectLines: project.script,
+              guidebook,
             } satisfies GenerateRequest),
           });
 

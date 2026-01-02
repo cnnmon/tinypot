@@ -9,6 +9,7 @@ export interface GenerateRequest {
   existingOptions: string[]; // What options already exist (to avoid duplication)
   projectLines: string[]; // Full project for style/context
   worldBible?: string; // Optional author's world context
+  guidebook?: string; // Author preferences learned from metalearning
 }
 
 export interface GenerateResponse {
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
     existingOptions,
     projectLines,
     worldBible,
+    guidebook,
   }: GenerateRequest = await req.json();
 
   if (!userInput) {
@@ -54,6 +56,10 @@ export async function POST(req: Request) {
     ? `\nWorld/Style Guide:\n${worldBible}\n`
     : "";
 
+  const guidebookContext = guidebook
+    ? `\nAUTHOR PREFERENCES (follow these closely):\n${guidebook}\n`
+    : "";
+
   const response = await anthropic.messages.create({
     model: "claude-3-5-haiku-latest",
     max_tokens: 512,
@@ -62,7 +68,7 @@ export async function POST(req: Request) {
         role: "user",
         content: `You are a collaborative interactive fiction author. A player has chosen an action not in the existing options. Generate new narrative content in the author's style.
 
-${worldContext}
+${worldContext}${guidebookContext}
 FULL PROJECT (for style reference):
 \`\`\`
 ${projectContext}

@@ -54,6 +54,7 @@ Does the player's input semantically match any option? Consider:
 - Synonyms (e.g., "leave" matches "run away", "depart" matches "exit")
 - Intent (e.g., "I want to ride my bike" matches "Ride a bike")
 - Paraphrasing (e.g., "get out of here" matches "escape")
+- Catch-all options: If no specific option matches but there's a catch-all like "Anything else", "Other", "Something else", "Do something else", etc., match to that with high confidence.
 
 Respond in JSON format only:
 {
@@ -63,7 +64,7 @@ Respond in JSON format only:
   "normalizedInput": "<short normalized version of what the player meant>"
 }
 
-Only match if confidence >= 0.7. Be strict but fair.`,
+Only match if confidence >= 0.7. Be strict but fair. Always prefer specific matches over catch-alls, but use catch-alls when available and no specific match exists.`,
       },
     ],
   });
