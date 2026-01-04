@@ -6,7 +6,7 @@ import { tags } from '@lezer/highlight';
 export const bonsaiHighlighting = HighlightStyle.define([
   { tag: tags.heading, color: '#7c3aed', fontWeight: 'bold' }, // # SCENE
   { tag: tags.link, color: '#0891b2' }, // > GOTO
-  { tag: tags.list, color: '#059669' }, // ~ Option
+  { tag: tags.list, color: '#059669' }, // * Option
   { tag: tags.string, color: '#6b7280' }, // indented content
 ]);
 
@@ -144,7 +144,7 @@ function bonsaiLineHighlighter(view: EditorView) {
       } else {
         className = 'cm-bonsai-goto';
       }
-    } else if (trimmed.startsWith('~')) {
+    } else if (trimmed.startsWith('*')) {
       className = 'cm-bonsai-option';
     } else if (text.startsWith('   ') || text.startsWith('\t')) {
       className = 'cm-bonsai-indent';

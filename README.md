@@ -19,10 +19,10 @@ Can you believe it?
 > FIRE
 # FIRE
 The fire burns brightly.
-~ Ride a bike
+* Ride a bike
    That's cool!
    > BIKE
-~ Run away
+* Run away
    Weirdo…
 # BIKE
 Learn to sail
@@ -41,7 +41,7 @@ That's cool!
 Learn to sail
 [END]
 
-each scene is denoted by a (#) and will loop its option (~) selection until you go to (>) another scene or END.
+each scene is denoted by a (#) and will loop its option (*) selection until you go to (>) another scene or END.
 
 versioning:
 there is an authorial intent burden in working with creative tools. in an existing creative project, authors reprompt llms again and again. unlike with human collaborators, there is no shared convergence of understanding. things get lost, misplaced. the idea of branches in bonsai/tinypot is to converge human creative work -- which tends to be temporal -- into formats llms can understand -- pairwise , and vice versa.

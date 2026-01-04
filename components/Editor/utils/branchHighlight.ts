@@ -18,7 +18,7 @@ function entryToText(entry: SchemaEntry): string {
     case EntryType.NARRATIVE:
       return entry.text;
     case EntryType.OPTION:
-      return `~ ${entry.text}`;
+      return `* ${entry.text}`;
     case EntryType.JUMP:
       return `> ${entry.target}`;
     case EntryType.SCENE:

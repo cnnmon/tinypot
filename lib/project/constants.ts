@@ -1,10 +1,10 @@
 export const DEFAULT_LINES = [
   '# HOME',
   'The fire burns brightly.',
-  '~ Ride a bike',
+  '* Ride a bike',
   "   That's cool!",
   '   > BIKE',
-  '~ Run away',
+  '* Run away',
   '   Weirdo…',
   '# BIKE',
   'Learn to sail',

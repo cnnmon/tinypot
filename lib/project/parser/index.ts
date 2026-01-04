@@ -4,8 +4,8 @@ import { EntryType, Schema, SchemaEntry } from '@/types/schema';
  * Parser for the game script format:
  * - `#` Scene marker (e.g., "# FIRE")
  * - `>` Jump/goto (e.g., "> FIRE" or "> END")
- * - `~` Option (e.g., "~ Ride a bike")
- * - Indented entries after ~ are the "then" block for that option
+ * - `*` Option (e.g., "* Ride a bike")
+ * - Indented entries after * are the "then" block for that option
  * - Regular text is narrative
  */
 
@@ -78,10 +78,10 @@ export function parseIntoSchema(entries: string[]): Schema {
       continue;
     }
 
-    // Option: ~ Option text or ~ [Option text, Alias1, Alias2]
-    if (trimmed.startsWith('~')) {
+    // Option: * Option text or * [Option text, Alias1, Alias2]
+    if (trimmed.startsWith('*')) {
       const optionIndent = getIndentLevel(entry);
-      const optionRaw = stripPrefix(trimmed, '~');
+      const optionRaw = stripPrefix(trimmed, '*');
       const { text: optionText, aliases } = parseOptionText(optionRaw);
       const thenBlock: SchemaEntry[] = [];
 
@@ -135,8 +135,8 @@ export function parseIntoSchema(entries: string[]): Schema {
 
 /**
  * Add an alias to an option in the script lines.
- * Transforms "~ Ride a bike" to "~ [Ride a bike, Cycle]"
- * or "~ [Ride a bike, Cycle]" to "~ [Ride a bike, Cycle, Pedal]"
+ * Transforms "* Ride a bike" to "* [Ride a bike, Cycle]"
+ * or "* [Ride a bike, Cycle]" to "* [Ride a bike, Cycle, Pedal]"
  */
 export function addAliasToOption(
   lines: string[],
@@ -145,10 +145,10 @@ export function addAliasToOption(
 ): string[] {
   return lines.map((line) => {
     const trimmed = line.trim();
-    if (!trimmed.startsWith('~')) return line;
+    if (!trimmed.startsWith('*')) return line;
 
     const indent = line.match(/^(\s*)/)?.[1] || '';
-    const optionRaw = stripPrefix(trimmed, '~');
+    const optionRaw = stripPrefix(trimmed, '*');
     const { text, aliases } = parseOptionText(optionRaw);
 
     // Check if this is the option we're looking for
@@ -159,7 +159,7 @@ export function addAliasToOption(
 
     // Build new option line with alias
     const allAliases = aliases ? [...aliases, newAlias] : [newAlias];
-    return `${indent}~ [${text}, ${allAliases.join(', ')}]`;
+    return `${indent}* [${text}, ${allAliases.join(', ')}]`;
   });
 }
 
@@ -192,8 +192,8 @@ export function addPlayerInputLog(
     }
 
     // Find the matching option in the target scene
-    if (inTargetScene && trimmed.startsWith('~')) {
-      const optionRaw = stripPrefix(trimmed, '~');
+    if (inTargetScene && trimmed.startsWith('*')) {
+      const optionRaw = stripPrefix(trimmed, '*');
       const { text } = parseOptionText(optionRaw);
 
       if (text === optionText) {
@@ -272,7 +272,7 @@ export function addGeneratedOptionToScript(
     }
 
     // Track last option position in target scene
-    if (inTargetScene && trimmed.startsWith('~')) {
+    if (inTargetScene && trimmed.startsWith('*')) {
       // Find end of this option's then block
       let j = i + 1;
       while (j < lines.length) {
@@ -302,8 +302,8 @@ export function addGeneratedOptionToScript(
 
   // Build the new option block with aliases if present
   const optionLine = aliases.length > 0
-    ? `~ [${optionText}, ${aliases.join(', ')}]`
-    : `~ ${optionText}`;
+    ? `* [${optionText}, ${aliases.join(', ')}]`
+    : `* ${optionText}`;
   const newOptionLines: string[] = [
     optionLine,
     ...thenLines.map((l) => `   ${l}`),

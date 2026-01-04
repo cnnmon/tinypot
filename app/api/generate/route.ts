@@ -7,17 +7,31 @@ export interface GenerateRequest {
   currentScene: string; // The scene label where player is
   history: string[]; // Recent narrative/choice history for context
   existingOptions: string[]; // What options already exist (to avoid duplication)
+  existingScenes: string[]; // All scene labels in the project
   projectLines: string[]; // Full project for style/context
   worldBible?: string; // Optional author's world context
   guidebook?: string; // Author preferences learned from metalearning
 }
 
+/**
+ * Three types of generation responses:
+ * 1. TEXT_ONLY - Just narrative text, no meaningful choice (help text, clarification, flavor)
+ * 2. LINK_SCENE - Jump to an existing scene (player wants to return/explore existing content)
+ * 3. NEW_FORK - Create a new scene with generated content (player takes a new path)
+ */
+export type GenerationType = "TEXT_ONLY" | "LINK_SCENE" | "NEW_FORK";
+
 export interface GenerateResponse {
   success: boolean;
+  type: GenerationType;
   generatedOption: {
     text: string; // The option text (normalized from user input)
     aliases: string[]; // Alternative phrasings that should match this option
     then: string[]; // Lines of narrative/jumps to add
+    newScene?: {
+      label: string; // Scene label for new fork
+      content: string[]; // Lines of content for the new scene
+    };
   } | null;
   error?: string;
 }
@@ -25,6 +39,11 @@ export interface GenerateResponse {
 /**
  * Generates a new branch/option based on player's creative input.
  * Uses project context to maintain consistent style and world.
+ *
+ * The LLM chooses between three response types:
+ * 1. TEXT_ONLY - Just narrative (help text, clarification, flavor that loops back)
+ * 2. LINK_SCENE - Jump to an existing scene (player wants to explore existing content)
+ * 3. NEW_FORK - Create a new scene (player takes an entirely new path)
  */
 export async function POST(req: Request) {
   const {
@@ -32,6 +51,7 @@ export async function POST(req: Request) {
     currentScene,
     history,
     existingOptions,
+    existingScenes,
     projectLines,
     worldBible,
     guidebook,
@@ -40,6 +60,7 @@ export async function POST(req: Request) {
   if (!userInput) {
     return Response.json({
       success: false,
+      type: "TEXT_ONLY",
       generatedOption: null,
       error: "No input provided",
     } satisfies GenerateResponse);
@@ -48,9 +69,12 @@ export async function POST(req: Request) {
   // Build context from project
   const projectContext = projectLines.join("\n");
   const historyContext = history.slice(-10).join("\n"); // Last 10 entries for context
-  const existingContext = existingOptions.length
-    ? `Existing options at this point: ${existingOptions.join(", ")}`
+  const existingOptionsContext = existingOptions.length
+    ? `Existing options at this decision point: ${existingOptions.join(", ")}`
     : "No existing options yet.";
+  const existingScenesContext = existingScenes.length
+    ? `All scenes in the project: ${existingScenes.join(", ")}`
+    : "No scenes defined yet.";
 
   const worldContext = worldBible
     ? `\nWorld/Style Guide:\n${worldBible}\n`
@@ -62,11 +86,11 @@ export async function POST(req: Request) {
 
   const response = await anthropic.messages.create({
     model: "claude-3-5-haiku-latest",
-    max_tokens: 512,
+    max_tokens: 768,
     messages: [
       {
         role: "user",
-        content: `You are a collaborative interactive fiction author. A player has chosen an action not in the existing options. Generate new narrative content in the author's style.
+        content: `You are a collaborative interactive fiction author. A player has typed something that doesn't match existing options. Determine the best response type and generate appropriate content.
 
 ${worldContext}${guidebookContext}
 FULL PROJECT (for style reference):
@@ -75,30 +99,58 @@ ${projectContext}
 \`\`\`
 
 CURRENT SCENE: ${currentScene || "(opening)"}
+${existingScenesContext}
+${existingOptionsContext}
+
 RECENT HISTORY:
 ${historyContext || "(start of game)"}
 
-${existingContext}
+PLAYER'S INPUT: "${userInput}"
 
-PLAYER'S CHOICE: "${userInput}"
+First, decide which response type is most appropriate:
 
-Generate a response that:
-1. Acknowledges the player's creative choice
-2. Provides 1-3 lines of narrative consequence
-3. Either loops back to current scene OR leads somewhere logical
-4. Matches the tone and style of the existing project
+1. TEXT_ONLY - Use when:
+   - Player is asking for clarification ("what?", "help", "look around")
+   - Input is flavor/roleplay that doesn't advance the story
+   - Input doesn't represent a meaningful choice
+   - Response should loop back to same decision point
+
+2. LINK_SCENE - Use when:
+   - Player wants to go somewhere that already exists
+   - Input references an existing scene or location
+   - Player wants to backtrack or revisit
+   - ONLY use if the target scene exists in the project
+
+3. NEW_FORK - Use when:
+   - Player is making a genuinely new choice
+   - Input represents a meaningful story branch
+   - The action would logically lead somewhere new
+   - This aligns with the author's style and world
 
 Respond in JSON format only:
 {
-  "optionText": "<clean, polished version of the player's action for display>",
-  "aliases": ["<the player's original input>", "<other short phrasings that should match>"],
+  "responseType": "TEXT_ONLY" | "LINK_SCENE" | "NEW_FORK",
+  "reasoning": "<one sentence explaining your choice>",
+  "optionText": "<clean, polished version for display>",
+  "aliases": ["<player's input>", "<other phrasings>"],
   "narrative": ["<line 1>", "<line 2>", ...],
-  "jump": "<scene label to jump to, or null to loop back, or 'END' if this ends the story>"
+  
+  // For LINK_SCENE only:
+  "targetScene": "<existing scene label to jump to>",
+  
+  // For NEW_FORK only:
+  "newScene": {
+    "label": "<NEW_SCENE_LABEL in CAPS>",
+    "content": ["<narrative line 1>", "<narrative line 2>", ...]
+  }
 }
 
-For aliases: include the player's exact input plus 1-2 short alternative phrasings (e.g., if input is "what", aliases might be ["what", "huh", "ask"]).
-
-Keep narrative punchy and in the author's voice.`,
+Guidelines:
+- For TEXT_ONLY: provide 1-2 lines of narrative, no jump
+- For LINK_SCENE: verify the target exists in the scene list
+- For NEW_FORK: create a memorable scene label and 2-4 lines of content
+- Match the author's tone and style
+- Keep narrative punchy and evocative`,
       },
     ],
   });
@@ -110,23 +162,29 @@ Keep narrative punchy and in the author's voice.`,
     if (!jsonMatch) {
       return Response.json({
         success: false,
+        type: "TEXT_ONLY",
         generatedOption: null,
         error: "Failed to parse generation response",
       } satisfies GenerateResponse);
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
+    const responseType = (parsed.responseType || "TEXT_ONLY") as GenerationType;
 
-    // Build the "then" block in the authoring format
+    // Build the "then" block based on response type
     const thenLines: string[] = [];
-    
+
     if (parsed.narrative && Array.isArray(parsed.narrative)) {
       thenLines.push(...parsed.narrative);
     }
-    
-    if (parsed.jump) {
-      thenLines.push(`> ${parsed.jump}`);
+
+    // Add jump based on response type
+    if (responseType === "LINK_SCENE" && parsed.targetScene) {
+      thenLines.push(`> ${parsed.targetScene}`);
+    } else if (responseType === "NEW_FORK" && parsed.newScene?.label) {
+      thenLines.push(`> ${parsed.newScene.label}`);
     }
+    // TEXT_ONLY has no jump - loops back to current decision point
 
     // Build aliases array, always including the original input
     const aliases: string[] = [];
@@ -137,17 +195,29 @@ Keep narrative punchy and in the author's voice.`,
       aliases.unshift(userInput);
     }
 
+    // Build new scene content for NEW_FORK
+    let newScene: { label: string; content: string[] } | undefined;
+    if (responseType === "NEW_FORK" && parsed.newScene) {
+      newScene = {
+        label: parsed.newScene.label,
+        content: parsed.newScene.content || [],
+      };
+    }
+
     return Response.json({
       success: true,
+      type: responseType,
       generatedOption: {
         text: parsed.optionText || userInput,
         aliases,
         then: thenLines,
+        newScene,
       },
     } satisfies GenerateResponse);
   } catch {
     return Response.json({
       success: false,
+      type: "TEXT_ONLY",
       generatedOption: null,
       error: "Failed to generate content",
     } satisfies GenerateResponse);

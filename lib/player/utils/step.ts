@@ -15,9 +15,72 @@ function makeErrorLine(errorType: string, message: string): Line {
 }
 
 /**
+ * Build a linear sequence of positions in a scene.
+ * Each position is either a narrative or a decision point (where options exist).
+ *
+ * For a scene like:
+ *   narrative 0
+ *   option A
+ *   option B
+ *   narrative 1
+ *
+ * The positions are:
+ *   0: narrative 0
+ *   1: decision point (options before narrative 1)
+ *   2: narrative 1
+ *   3: decision point (end of scene, implicit loop)
+ */
+interface ScenePosition {
+  type: 'narrative' | 'wait';
+  narrativeIdx?: number;
+  text?: string;
+}
+
+function buildScenePositions(schema: Schema, scanStart: number): ScenePosition[] {
+  const positions: ScenePosition[] = [];
+  let pendingOptions = false;
+
+  for (let i = scanStart; i < schema.length; i++) {
+    const entry = schema[i];
+    if (entry.type === EntryType.SCENE) break;
+
+    if (entry.type === EntryType.NARRATIVE) {
+      // If there were options before this narrative, add a decision point
+      if (pendingOptions) {
+        positions.push({ type: 'wait' });
+        pendingOptions = false;
+      }
+      positions.push({
+        type: 'narrative',
+        narrativeIdx: positions.filter((p) => p.type === 'narrative').length,
+        text: entry.text,
+      });
+    } else if (entry.type === EntryType.OPTION) {
+      pendingOptions = true;
+    } else if (entry.type === EntryType.JUMP) {
+      // Jump ends the scene traversal for positions
+      break;
+    }
+  }
+
+  // If there are pending options at the end, add a final decision point
+  if (pendingOptions) {
+    positions.push({ type: 'wait' });
+  }
+
+  return positions;
+}
+
+/**
  * Find the next step in the game.
  * Returns the type of step ('continue', 'wait', 'end', 'error') and the line if applicable.
- * The line includes the NEW scene and lineIdx after following any jumps.
+ *
+ * lineIdx counts positions in the scene, where positions include both narratives
+ * and decision points (where options exist).
+ *
+ * Decision points occur:
+ * 1. When options are encountered between narratives
+ * 2. At the end of a scene with options (implicit loop)
  */
 export function step({
   schema,
@@ -68,55 +131,46 @@ export function step({
       };
     }
 
-    let narrativeCount = 0;
-    let didJump = false;
-
     const scanStart = getScanStart(schema, sceneStart);
-    for (let i = scanStart; i < schema.length; i++) {
-      const entry = schema[i];
+    const positions = buildScenePositions(schema, scanStart);
 
-      // Stop if we hit another scene
-      if (entry.type === EntryType.SCENE) {
-        break;
+    // Check if the position exists
+    if (currentLineIdx < positions.length) {
+      const pos = positions[currentLineIdx];
+      if (pos.type === 'wait') {
+        return { type: 'wait' };
       }
-
-      if (entry.type === EntryType.NARRATIVE) {
-        // If this is the line we're looking for, return it
-        if (narrativeCount === currentLineIdx) {
-          return {
-            type: 'continue',
-            line: {
-              id: makeLineId(currentScene, narrativeCount),
-              sender: Sender.NARRATOR,
-              text: entry.text,
-            },
-          };
-        }
-        narrativeCount++;
-      } else if (entry.type === EntryType.JUMP) {
-        // If we encounter a jump before finding the target line, follow it
-        if (narrativeCount <= currentLineIdx) {
-          const jumpEntry = entry as JumpEntry;
-          if (jumpEntry.target === 'END') {
-            return {
-              type: 'end',
-            };
-          }
-          // Follow the jump to the target scene, starting at line 0
-          currentScene = jumpEntry.target.trim();
-          currentLineIdx = 0;
-          didJump = true;
-          break;
-        }
-      }
-      // Skip options (they don't count as lines)
+      return {
+        type: 'continue',
+        line: {
+          id: makeLineId(currentScene, currentLineIdx),
+          sender: Sender.NARRATOR,
+          text: pos.text!,
+        },
+      };
     }
 
-    // If we didn't jump and didn't find a next narrative, there's no next line (wait for options)
+    // Past the end of positions - check for jumps or wait at end
+    let didJump = false;
+    for (let i = scanStart; i < schema.length; i++) {
+      const entry = schema[i];
+      if (entry.type === EntryType.SCENE) break;
+
+      if (entry.type === EntryType.JUMP) {
+        const jumpEntry = entry as JumpEntry;
+        if (jumpEntry.target === 'END') {
+          return { type: 'end' };
+        }
+        currentScene = jumpEntry.target.trim();
+        currentLineIdx = 0;
+        didJump = true;
+        break;
+      }
+    }
+
     if (!didJump) {
-      return {
-        type: 'wait',
-      };
+      // No more positions and no jump - wait at end of scene (implicit loop)
+      return { type: 'wait' };
     }
   }
 }

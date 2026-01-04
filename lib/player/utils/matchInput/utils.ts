@@ -59,7 +59,11 @@ function countMatchingKeywordsWithAliases(input: string, option: OptionEntry): K
 }
 
 /**
- * Get available options at the current position in the scene
+ * Get available options at the current position in the scene.
+ *
+ * Options are available when:
+ * 1. They appear after the current narrative position (immediate decision point)
+ * 2. The player is at the end of the scene (implicit loop back to all scene options)
  */
 export function getOptionsAtPosition({
   schema,
@@ -78,6 +82,7 @@ export function getOptionsAtPosition({
 
   let narrativeCount = 0;
   const options: OptionEntry[] = [];
+  const allSceneOptions: OptionEntry[] = [];
 
   for (let i = scanStart; i < schema.length; i++) {
     const entry = schema[i];
@@ -87,7 +92,9 @@ export function getOptionsAtPosition({
     if (entry.type === EntryType.NARRATIVE) {
       narrativeCount++;
     } else if (entry.type === EntryType.OPTION) {
-      // Options after the current lineIdx are available
+      // Collect all options in the scene for potential implicit loop
+      allSceneOptions.push(entry);
+      // Options after the current lineIdx are immediately available
       if (narrativeCount >= lineIdx) {
         options.push(entry);
       }
@@ -97,6 +104,11 @@ export function getOptionsAtPosition({
         break;
       }
     }
+  }
+
+  // If lineIdx is past all narratives (end of scene), return all scene options (implicit loop)
+  if (options.length === 0 && lineIdx > narrativeCount && allSceneOptions.length > 0) {
+    return allSceneOptions;
   }
 
   return options;

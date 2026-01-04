@@ -209,6 +209,7 @@ export default function usePlayer() {
               existingOptions,
               projectLines: project.script,
               guidebook,
+              existingScenes: Object.keys(sceneMap),
             } satisfies GenerateRequest),
           });
 
