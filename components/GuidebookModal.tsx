@@ -20,9 +20,12 @@ export default function GuidebookModal({
 }: GuidebookModalProps) {
   const [value, setValue] = useState(guidebook);
 
+  // Reset to saved guidebook when modal opens or guidebook changes
   useEffect(() => {
-    setValue(guidebook);
-  }, [guidebook]);
+    if (isOpen) {
+      setValue(guidebook);
+    }
+  }, [isOpen, guidebook]);
 
   if (!isOpen) return null;
 
