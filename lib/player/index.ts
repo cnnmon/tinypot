@@ -233,13 +233,13 @@ export default function usePlayer() {
           const data: GenerateResponse = await response.json();
 
           if (data.success && data.generatedOption) {
-            const { text: optionText, aliases, then: thenLines } = data.generatedOption;
+            const { text: optionText, aliases, then: thenLines, newScene } = data.generatedOption;
 
             // Capture base schema before applying generation
             const baseSchema = parseIntoSchema(project.script);
 
             // Update the script with the new option
-            const updatedScript = addGeneratedOptionToScript(
+            let updatedScript = addGeneratedOptionToScript(
               project.script,
               currentSceneId,
               optionText,
@@ -247,9 +247,19 @@ export default function usePlayer() {
               thenLines,
             );
 
+            // If there's a new scene, add it to the script
+            if (newScene) {
+              updatedScript = [...updatedScript, `# ${newScene.label}`, ...newScene.content];
+            }
+
             // Parse generated schema and create branch
             const generatedSchema = parseIntoSchema(updatedScript);
-            const branch = createBranch(playthrough.id, baseSchema, generatedSchema);
+            const branch = createBranch(
+              playthrough.id,
+              baseSchema,
+              generatedSchema,
+              project.script,
+            );
 
             // Only create/merge branch if there are actual changes
             if (branch.sceneIds.length > 0) {

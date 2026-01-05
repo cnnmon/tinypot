@@ -195,11 +195,26 @@ Guidelines:
 
     // Build new scene content for NEW_FORK
     let newScene: { label: string; content: string[] } | undefined;
-    if (responseType === 'NEW_FORK' && parsed.newScene) {
-      newScene = {
-        label: parsed.newScene.label,
-        content: parsed.newScene.content || [],
-      };
+    if (responseType === 'NEW_FORK') {
+      // Extract scene label from either newScene object or from the jump target in thenLines
+      const sceneLabel =
+        parsed.newScene?.label ||
+        thenLines
+          .find((l: string) => l.startsWith('>'))
+          ?.slice(1)
+          .trim();
+
+      if (sceneLabel) {
+        // Get content from newScene or generate minimal content from narrative
+        const sceneContent =
+          parsed.newScene?.content ||
+          (parsed.narrative?.length ? parsed.narrative : ['You find yourself somewhere new.']);
+
+        newScene = {
+          label: sceneLabel,
+          content: sceneContent,
+        };
+      }
     }
 
     return Response.json({

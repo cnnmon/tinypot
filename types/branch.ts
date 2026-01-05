@@ -21,6 +21,9 @@ export interface Branch {
   generated: Record<SceneId, Scene>; // AI generated off of base
   authored?: Record<SceneId, Scene>; // author's edits (captured on closure)
 
+  // Full script backup for easy revert (optional for backwards compat with old branches)
+  baseScript?: string[]; // original script before any generation
+
   // After resolution
   approved?: boolean; // true = approved, false = rejected, undefined = unresolved
   metalearning?: string; // metalearning notes

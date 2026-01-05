@@ -179,6 +179,7 @@ export function createBranch(
   playthroughId: string,
   baseSchema: Schema,
   generatedSchema: Schema,
+  baseScript: string[],
 ): Branch {
   const { base, generated, affectedSceneIds } = computeSchemaDiff(baseSchema, generatedSchema);
 
@@ -189,6 +190,7 @@ export function createBranch(
     sceneIds: affectedSceneIds,
     base,
     generated,
+    baseScript,
     createdAt: Date.now(),
   };
 }

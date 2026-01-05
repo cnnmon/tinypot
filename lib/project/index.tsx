@@ -141,6 +141,7 @@ export function ProjectProvider({
       base: b.base as Branch['base'],
       generated: b.generated as Branch['generated'],
       authored: b.authored as Branch['authored'],
+      baseScript: b.baseScript,
       approved: b.approved,
       metalearning: b.metalearning,
       createdAt: b.createdAt,
@@ -219,6 +220,7 @@ export function ProjectProvider({
           sceneIds: branch.sceneIds,
           base: branch.base,
           generated: branch.generated,
+          baseScript: branch.baseScript,
           createdAt: branch.createdAt,
         }).then((newBranch) => {
           if (newBranch) {
@@ -252,20 +254,15 @@ export function ProjectProvider({
     [branches, schema, updateBranchMutation, startMetalearningJob]
   );
 
-  // Reject branch - optionally revert to base scenes
+  // Reject branch - optionally revert to base script
   const rejectBranch = useCallback(
     (branchId: string, shouldRevert: boolean) => {
       const branch = branches.find((b) => b.id === branchId);
       if (!branch) return;
 
-      if (shouldRevert) {
-        // Revert script to base scenes
-        const updatedScript = [...project.script];
-        for (const sceneId of branch.sceneIds) {
-          const baseScene = branch.base[sceneId];
-          console.log('Reverting scene', sceneId, 'to base:', baseScene);
-        }
-        setProject({ script: updatedScript });
+      if (shouldRevert && branch.baseScript) {
+        // Revert to original script before generation
+        setProject({ script: branch.baseScript });
       }
 
       const authored = shouldRevert ? { ...branch.base } : captureAuthoredScenes(branch, schema);
@@ -281,7 +278,7 @@ export function ProjectProvider({
       // Kick off metalearning
       startMetalearningJob({ ...branch, authored, approved: false });
     },
-    [branches, project.script, schema, setProject, updateBranchMutation, startMetalearningJob]
+    [branches, schema, setProject, updateBranchMutation, startMetalearningJob]
   );
 
   // Show loading state while project data is loading

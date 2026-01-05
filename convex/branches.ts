@@ -37,6 +37,7 @@ export const create = mutation({
     base: v.any(),
     generated: v.any(),
     authored: v.optional(v.any()),
+    baseScript: v.optional(v.array(v.string())),
     approved: v.optional(v.boolean()),
     metalearning: v.optional(v.string()),
     createdAt: v.number(),
