@@ -38,7 +38,7 @@
 }
 
 .bordered {
-  border: 2.5px solid black;
+  border: 2px solid black;
 }
 
 .outlined {
@@ -65,9 +65,7 @@ button:disabled {
 }
 
 input {
-  border: 1px solid black;
   padding: 5px;
-  border-radius: 5px;
   font-size: 16px;
   width: 100%;
   box-sizing: border-box;

@@ -41,6 +41,15 @@ export default function Player() {
 
   return (
     <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between">
+        <b>Player</b>
+
+        <div className="w-full justify-end flex gap-1 text-neutral-400">
+          <button onClick={handleJumpBack}>Back</button>
+          <button onClick={handleRestart}>Restart</button>
+        </div>
+      </div>
+
       <div className="space-y-2 py-2 h-[calc(100%-50px)] overflow-auto">
         {lines.map((line, i) => {
           const isPlayer = line.sender === Sender.PLAYER;
@@ -48,8 +57,8 @@ export default function Player() {
             <motion.p
               key={i}
               className={twMerge(
-                line.sender === Sender.SYSTEM && 'italic',
-                isPlayer && 'text-right',
+                line.sender === Sender.SYSTEM && 'italic text-neutral-400',
+                isPlayer && 'text-[#468D52]',
               )}
               initial={isPlayer ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -68,11 +77,6 @@ export default function Player() {
         >
           {renderStatus()}
         </motion.div>
-
-        <div className="w-full justify-end flex gap-1 text-neutral-400 text-sm">
-          <button onClick={handleJumpBack}>Back</button>
-          <button onClick={handleRestart}>Restart</button>
-        </div>
 
         <div ref={endRef} />
       </div>

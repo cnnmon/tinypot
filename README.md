@@ -41,9 +41,10 @@ That's cool!
 Learn to sail
 [END]
 
-each scene is denoted by a (#) and will loop its option (*) selection until you go to (>) another scene or END.
+each scene is denoted by a (#) and will loop its option (\*) selection until you go to (>) another scene or END.
 
-versioning:
 there is an authorial intent burden in working with creative tools. in an existing creative project, authors reprompt llms again and again. unlike with human collaborators, there is no shared convergence of understanding. things get lost, misplaced. the idea of branches in bonsai/tinypot is to converge human creative work -- which tends to be temporal -- into formats llms can understand -- pairwise , and vice versa.
 
 each playthrough should be capable of creating a new BRANCH. the playthrough should be reactive to edits in the editor, but any already committed lines to history should not be changed -- only future lines/options if you're currently perusing them.
+
+though we have "accept/reject" features in the branch bar, each branch is permanent at time of generation. however, we want to encoruage authorial editing.

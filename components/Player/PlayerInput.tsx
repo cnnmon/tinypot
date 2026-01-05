@@ -25,7 +25,7 @@ export default function PlayerInput({
         placeholder="What do you want to do?"
         onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
         disabled={isSubmitting}
-        className="pb-10!"
+        className="pb-10! bordered"
       />
       <button
         disabled={input.length === 0 || isSubmitting}

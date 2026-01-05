@@ -24,7 +24,10 @@ function Body({ branch }: { branch: Branch }) {
 
   return (
     <div className="space-y-2 relative h-full flex-1 flex">
-      <p className="text-neutral-400">Review the changes in the editor, then accept or reject.</p>
+      <p className="text-neutral-500">
+        Edit the changes until you're happy with them, then accept when you&apos;re done. Or reject
+        if you want to delete these changes.
+      </p>
       <div className="absolute bottom-0 left-0 flex gap-2">
         <button className="bg-[#b7dcbd]!" onClick={() => approveBranch(branch.id)}>
           Accept

@@ -82,7 +82,6 @@ export default function Home() {
           className="w-2 cursor-col-resize hover:bg-gray-300 transition-colors shrink-0"
         />
         <Box style={{ width: `${100 - leftWidth}%` }}>
-          <b>Player</b>
           <Player />
         </Box>
       </div>
