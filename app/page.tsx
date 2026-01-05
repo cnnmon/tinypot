@@ -64,7 +64,7 @@ export default function Home() {
           <p className="line-clamp-4">{guidebook || 'Author is making a game about...'}</p>
         </Box>
 
-        <Box className="max-h-45 overflow-auto">
+        <Box className="max-h-45 overflow-auto select-none">
           <Branchbar />
         </Box>
       </div>
@@ -74,6 +74,7 @@ export default function Home() {
         className="flex flex-row min-h-[calc(100%-210px)] h-[calc(100%-210px)] pb-5"
       >
         <Box style={{ width: `${leftWidth}%` }}>
+          <b>Editor</b>
           <Editor />
         </Box>
         <div
@@ -81,6 +82,7 @@ export default function Home() {
           className="w-2 cursor-col-resize hover:bg-gray-300 transition-colors shrink-0"
         />
         <Box style={{ width: `${100 - leftWidth}%` }}>
+          <b>Player</b>
           <Player />
         </Box>
       </div>

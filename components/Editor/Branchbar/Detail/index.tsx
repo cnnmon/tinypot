@@ -1,0 +1,56 @@
+'use client';
+
+import { getBranchStatus, isResolved } from '@/lib/branch';
+import { timeAgo } from '@/lib/player/utils/time';
+import { useProject } from '@/lib/project';
+import { Branch } from '@/types/branch';
+import { twMerge } from 'tailwind-merge';
+
+function Body({ branch }: { branch: Branch }) {
+  const { approveBranch, rejectBranch } = useProject();
+  const resolved = isResolved(branch);
+  const status = getBranchStatus(branch);
+
+  if (resolved) {
+    return (
+      <div className="text-neutral-500">
+        <span className={twMerge(status === 'Approved' ? 'text-emerald-600' : 'text-neutral-400')}>
+          {status}
+        </span>
+        , viewing read-only changes in editor
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 relative h-full flex-1 flex">
+      <p className="text-neutral-400">Review the changes in the editor, then accept or reject.</p>
+      <div className="absolute bottom-0 left-0 flex gap-2">
+        <button className="bg-[#b7dcbd]!" onClick={() => approveBranch(branch.id)}>
+          Accept
+        </button>
+        <p>or</p>
+        <button className="bg-[#F7C7DD]!" onClick={() => rejectBranch(branch.id, true)}>
+          Reject
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function Detail({ branch }: { branch: Branch }) {
+  const { setSelectedBranchId } = useProject();
+
+  return (
+    <div className="space-y-2 flex h-full flex-1 flex-col">
+      <div className="flex gap-2 items-center">
+        <button onClick={() => setSelectedBranchId(null)} className="bg-transparent! no-underline!">
+          ←
+        </button>
+        <h3 className="font-medium leading-tight">{branch.title}</h3>
+        <p className="text-neutral-400 text-sm">{timeAgo(branch.createdAt)} ago</p>
+      </div>
+      <Body branch={branch} />
+    </div>
+  );
+}

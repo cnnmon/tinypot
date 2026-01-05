@@ -1,6 +1,6 @@
 import { EntryType, NarrativeEntry, OptionEntry, Schema } from '@/types/schema';
 import { getScanStart } from '../getScanStart';
-import { MatchInfo } from './types';
+import { HandleInputResult, MatchInfo, MatchOptionResult } from './types';
 
 /**
  * Extract keywords from text (lowercase, split by whitespace/punctuation)
@@ -32,16 +32,17 @@ function countMatchingKeywords(input: string, optionText: string): number {
   return matches;
 }
 
-interface KeywordMatchResult {
-  score: number;
-  matchedAlias?: string; // The alias that matched, if any
-}
-
 /**
  * Count matching keywords for an option including its aliases
  * Returns the best score and which alias matched (if any)
  */
-function countMatchingKeywordsWithAliases(input: string, option: OptionEntry): KeywordMatchResult {
+function countMatchingKeywordsWithAliases(
+  input: string,
+  option: OptionEntry,
+): {
+  score: number;
+  matchedAlias?: string; // The alias that matched, if any
+} {
   let bestScore = countMatchingKeywords(input, option.text);
   let matchedAlias: string | undefined;
 
@@ -112,11 +113,6 @@ export function getOptionsAtPosition({
   }
 
   return options;
-}
-
-export interface MatchOptionResult {
-  option: OptionEntry;
-  matchedAlias?: string; // The cached alias that matched, if any
 }
 
 /**
@@ -200,23 +196,6 @@ function processOptionThen(option: OptionEntry): {
   }
 
   return { narratives, target };
-}
-
-export interface HandleInputResult {
-  matched: boolean;
-  sceneId?: string;
-  lineIdx?: number;
-  optionText?: string;
-  narratives?: NarrativeEntry[];
-  // Fuzzy match info (when AI matching was used)
-  fuzzyMatch?: {
-    confidence: number;
-    suggestedAlias: string;
-  };
-  // Cached match info (when matched via a saved alias)
-  cachedMatch?: {
-    matchedAlias: string;
-  };
 }
 
 /**

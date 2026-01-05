@@ -8,7 +8,7 @@ import { twMerge } from 'tailwind-merge';
 import PlayerInput from './PlayerInput';
 
 export default function Player() {
-  const { lines, status, handleNext, handleSubmit, handleRestart } = usePlayer();
+  const { lines, status, handleNext, handleSubmit, handleRestart, handleJumpBack } = usePlayer();
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,10 +41,6 @@ export default function Player() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex gap-2 justify-between border-b pb-2">
-        <button onClick={handleRestart}>Restart?</button>
-      </div>
-
       <div className="space-y-2 py-2 h-[calc(100%-50px)] overflow-auto">
         {lines.map((line, i) => {
           const isPlayer = line.sender === Sender.PLAYER;
@@ -64,6 +60,7 @@ export default function Player() {
             </motion.p>
           );
         })}
+
         <motion.div
           id={lines.length.toString()}
           initial={{ opacity: 0, y: 10 }}
@@ -71,6 +68,12 @@ export default function Player() {
         >
           {renderStatus()}
         </motion.div>
+
+        <div className="w-full justify-end flex gap-1 text-neutral-400 text-sm">
+          <button onClick={handleJumpBack}>Back</button>
+          <button onClick={handleRestart}>Restart</button>
+        </div>
+
         <div ref={endRef} />
       </div>
     </div>

@@ -143,8 +143,8 @@ export default function Editor() {
     <div className="h-full overflow-scroll relative">
       <div ref={editorRef} className="h-full" />
       {isViewingResolved && (
-        <div className="absolute top-2 right-2 px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
-          View only (resolved branch)
+        <div className="absolute top-0 right-0 px-2 py-1 text-sm bg-neutral-100 text-neutral-400 rounded">
+          Read only (resolved branch)
         </div>
       )}
     </div>

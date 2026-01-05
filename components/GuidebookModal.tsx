@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { twMerge } from 'tailwind-merge';
 
 type GuidebookModalProps = {
   isOpen: boolean;
@@ -52,26 +53,17 @@ export default function GuidebookModal({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           disabled={isUpdating}
-          className={`w-full h-64 p-2 bordered resize-none focus:outline-none ${
-            isUpdating ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''
-          }`}
+          className={twMerge(
+            'w-full h-64 p-2 border',
+            isUpdating && 'bg-gray-50 text-gray-500 cursor-not-allowed',
+          )}
           placeholder="Write notes about your game..."
         />
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1 bordered hover:bg-gray-100">
-            {isUpdating ? 'Close' : 'Cancel'}
-          </button>
-          {!isUpdating && (
-            <button
-              onClick={handleSave}
-              className="px-3 py-1 bordered bg-[#EBF7D2] hover:bg-[#d9edb5]"
-            >
-              Save
-            </button>
-          )}
+          <button onClick={onClose}>{isUpdating ? 'Close' : 'Cancel'}</button>
+          {!isUpdating && <button onClick={handleSave}>Save</button>}
         </div>
       </div>
     </div>
   );
 }
-

@@ -7,10 +7,10 @@
  * - Green: Lines that differ from generated (human edits)
  */
 
-import { StateEffect, StateField } from '@codemirror/state';
-import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import { Branch, Scene } from '@/types/branch';
 import { EntryType, SchemaEntry } from '@/types/schema';
+import { StateEffect, StateField } from '@codemirror/state';
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
 
 // Convert schema entry to text for comparison
 function entryToText(entry: SchemaEntry): string {
@@ -153,14 +153,14 @@ export const branchHighlightPlugin = ViewPlugin.fromClass(
 export const branchHighlightTheme = EditorView.theme({
   // Gray - affected scene background
   '.cm-branch-scene': {
-    backgroundColor: 'rgba(156, 163, 175, 0.1)', // gray-400 at 10%
+    backgroundColor: '#D7DFE34E', // gray-400 at 10%
   },
   // Yellow - AI generated, unchanged
   '.cm-branch-generated': {
-    backgroundColor: 'rgba(251, 191, 36, 0.2)', // amber-400 at 20%
+    backgroundColor: '#FFFBE3', // amber-400 at 20%
   },
   // Green - human edited
   '.cm-branch-edited': {
-    backgroundColor: 'rgba(34, 197, 94, 0.2)', // green-500 at 20%
+    backgroundColor: '#dcebcd', // green-500 at 20%
   },
 });

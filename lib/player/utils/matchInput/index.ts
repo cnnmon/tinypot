@@ -1,9 +1,8 @@
 import { Schema } from '@/types/schema';
-import { MatchInfo } from './types';
+import { HandleInputResult, MatchInfo } from './types';
 import {
   buildResultFromOption,
   getOptionsAtPosition,
-  HandleInputResult,
   matchOption,
   matchOptionFuzzy,
 } from './utils';

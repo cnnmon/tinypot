@@ -319,11 +319,49 @@ export default function usePlayer() {
     });
   }
 
+  // Jump to a specific point in history, slicing lines from there
+  function handleJumpTo(historyIdx: number) {
+    const slicedLines = playthrough.lines.slice(0, historyIdx);
+    setPlaythrough((prev) => ({
+      ...prev,
+      lines: slicedLines,
+    }));
+
+    // Recompute scene/line position from sliced lines
+    const newPosition = getSceneAndLineIdx({ lines: slicedLines, sceneMap });
+    setState({
+      ...newPosition,
+      status: Status.RUNNING,
+    });
+  }
+
+  // Jump back to just before the last player decision
+  function handleJumpBack() {
+    // Find the last player line
+    let lastPlayerIdx = -1;
+    for (let i = playthrough.lines.length - 1; i >= 0; i--) {
+      if (playthrough.lines[i].sender === Sender.PLAYER) {
+        lastPlayerIdx = i;
+        break;
+      }
+    }
+
+    if (lastPlayerIdx > 0) {
+      handleJumpTo(lastPlayerIdx);
+    } else if (lastPlayerIdx === 0) {
+      // If the first line is a player line, just restart
+      handleRestart();
+    }
+    // If no player lines, do nothing
+  }
+
   return {
     status,
     lines: playthrough.lines,
     handleNext,
     handleSubmit,
     handleRestart,
+    handleJumpTo,
+    handleJumpBack,
   };
 }

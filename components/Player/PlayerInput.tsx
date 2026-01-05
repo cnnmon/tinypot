@@ -29,7 +29,7 @@ export default function PlayerInput({
       />
       <button
         disabled={input.length === 0 || isSubmitting}
-        className="absolute bottom-0 right-0 pr-2 pb-1"
+        className="absolute bottom-0 right-0 pr-2 pb-1 bg-transparent!"
         onClick={onSubmit}
       >
         {isSubmitting ? '...' : 'Submit'}
