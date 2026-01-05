@@ -3,7 +3,7 @@
 import { GenerateRequest, GenerateResponse } from '@/app/api/generate/route';
 import { createBranch } from '@/lib/branch';
 import { Line, Playthrough, Sender } from '@/types/playthrough';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProject } from '../project';
 import { addAliasToOption, addGeneratedOptionToScript, parseIntoSchema } from '../project/parser';
 import {
@@ -28,7 +28,7 @@ export default function usePlayer() {
   const { projectId, schema, project, setProject, addOrMergeBranch, guidebook } = useProject();
   const [playthrough, setPlaythrough] = useState<Playthrough>({
     id: 'abcdef',
-    projectId,
+    projectId: projectId,
     snapshot: JSON.parse(JSON.stringify(schema)), // Copy
     lines: [],
     createdAt: Date.now(),
@@ -46,6 +46,9 @@ export default function usePlayer() {
   });
 
   const { currentSceneId, currentLineIdx, status } = state;
+
+  // Ref to prevent double execution during React strict mode or rapid state changes
+  const isSteppingRef = useRef(false);
 
   useEffect(() => {
     // Accept any valid changes
@@ -79,6 +82,10 @@ export default function usePlayer() {
   );
 
   const handleNext = useCallback(() => {
+    // Prevent double execution
+    if (isSteppingRef.current) return;
+    isSteppingRef.current = true;
+
     const nextMove = step({
       schema: playthrough.snapshot,
       sceneMap,
@@ -91,20 +98,28 @@ export default function usePlayer() {
         ...state,
         status: Status.WAITING,
       });
+      isSteppingRef.current = false;
     } else if (nextMove.type === 'end') {
       setState({
         ...state,
         status: Status.ENDED,
       });
+      isSteppingRef.current = false;
     }
 
     if (nextMove.line) {
       addLine(nextMove.line);
+      // Allow next step after a microtask to let React finish updating
+      queueMicrotask(() => {
+        isSteppingRef.current = false;
+      });
+    } else {
+      isSteppingRef.current = false;
     }
   }, [state, currentSceneId, currentLineIdx, sceneMap, addLine, playthrough.snapshot]);
 
   useEffect(() => {
-    if (status === Status.RUNNING) {
+    if (status === Status.RUNNING && !isSteppingRef.current) {
       handleNext();
     }
   }, [status, handleNext]);
@@ -141,7 +156,7 @@ export default function usePlayer() {
             result.optionText,
             result.fuzzyMatch.suggestedAlias,
           );
-          setProject({ ...project, script: updatedScript });
+          setProject({ script: updatedScript });
 
           // Add a narrator line showing the fuzzy match info
           addLine({
@@ -241,7 +256,7 @@ export default function usePlayer() {
               addOrMergeBranch(branch, baseSchema, generatedSchema);
             }
 
-            setProject({ ...project, script: updatedScript });
+            setProject({ script: updatedScript });
 
             // Show generation info
             addLine({

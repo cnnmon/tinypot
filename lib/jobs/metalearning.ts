@@ -3,7 +3,6 @@
  */
 
 import { MetalearningRequest, MetalearningResponse } from '@/app/api/metalearning/route';
-import { updateBranch } from '@/lib/db/branches';
 import { Branch, Scene, SceneId } from '@/types/branch';
 
 export interface MetalearningResult {
@@ -55,19 +54,16 @@ async function analyzeChanges(branch: Branch): Promise<string> {
 
 /**
  * Run metalearning for a resolved branch.
- * Saves to branch and returns the metalearning text.
+ * Returns the metalearning text - caller handles persistence.
  */
 export async function runMetalearning(
-  projectId: string,
+  branchId: string,
   branch: Branch,
 ): Promise<MetalearningResult> {
   const metalearning = await analyzeChanges(branch);
-  
-  // Save to branch
-  updateBranch(projectId, branch.id, { metalearning });
-  
+
   return {
-    branchId: branch.id,
+    branchId,
     metalearning,
   };
 }

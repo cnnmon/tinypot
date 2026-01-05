@@ -12,10 +12,7 @@ export default function useEditor() {
   }, [project.script]);
 
   function setScript(newScript: string[]) {
-    setProject({
-      ...project,
-      script: newScript,
-    });
+    setProject({ script: newScript });
   }
 
   return {

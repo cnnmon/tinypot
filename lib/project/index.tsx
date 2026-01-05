@@ -4,40 +4,50 @@
 
 'use client';
 
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
 import {
   captureAuthoredScenes,
   computeSceneToBranchMap,
   isResolved,
   mergeBranchChanges,
 } from '@/lib/branch';
-import { SceneId } from '@/types/branch';
-import { addBranch, loadBranches, saveBranches, updateBranch } from '@/lib/db/branches';
-import { updateProject } from '@/lib/db/projects';
 import { runJob } from '@/lib/jobs';
 import { runMetalearning } from '@/lib/jobs/metalearning';
-import { Branch } from '@/types/branch';
-import { Project } from '@/types/project';
+import { Branch, SceneId } from '@/types/branch';
 import { Schema } from '@/types/schema';
+import { useMutation, useQuery } from 'convex/react';
 import {
   createContext,
   ReactNode,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
 } from 'react';
 import { DEFAULT_LINES } from './constants';
 import { parseIntoSchema } from './parser';
 
+// Branch with Convex ID
+interface ConvexBranch extends Branch {
+  _id: Id<'branches'>;
+}
+
 interface ProjectContextValue {
-  projectId: string;
-  project: Project;
-  setProject: (project: Project) => void;
+  projectId: Id<'projects'>;
+  project: {
+    id: string;
+    authorId: string;
+    name: string;
+    description: string;
+    script: string[];
+    guidebook: string;
+  };
+  setProject: (updates: { script?: string[]; guidebook?: string }) => void;
   schema: Schema;
   // Branch state
-  branches: Branch[];
-  unresolvedBranches: Branch[];
+  branches: ConvexBranch[];
+  unresolvedBranches: ConvexBranch[];
   selectedBranchId: string | null;
   setSelectedBranchId: (id: string | null) => void;
   sceneToBranchMap: Record<SceneId, string>;
@@ -58,73 +68,84 @@ export function ProjectProvider({
   projectId,
 }: {
   children: ReactNode;
-  projectId: string;
+  projectId: Id<'projects'>;
 }) {
-  const [project, setProject] = useState<Project>({
-    id: projectId,
-    authorId: 'abcdef',
-    name: 'project',
-    description: 'blah',
-    script: DEFAULT_LINES,
-    guidebook: '',
-  });
-
-  const [branches, setBranches] = useState<Branch[]>(() => loadBranches(projectId));
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
-  const [guidebook, setGuidebookState] = useState('');
   const [isGuidebookUpdating, setIsGuidebookUpdating] = useState(false);
 
-  // Guidebook setter that also persists
+  // Convex mutations
+  const updateProjectMutation = useMutation(api.projects.update);
+  const createBranchMutation = useMutation(api.branches.create);
+  const updateBranchMutation = useMutation(api.branches.update);
+
+  // Convex queries
+  const convexProject = useQuery(api.projects.get, { projectId });
+  const convexBranches = useQuery(api.branches.list, { projectId });
+
+  // Local state for optimistic updates
+  const [localScript, setLocalScript] = useState<string[] | null>(null);
+  const [localGuidebook, setLocalGuidebook] = useState<string | null>(null);
+
+  // Derive project from Convex data or defaults
+  const project = useMemo(() => {
+    return {
+      id: projectId,
+      authorId: convexProject?.authorId ?? 'default-author',
+      name: convexProject?.name ?? 'My Project',
+      description: convexProject?.description ?? '',
+      script: localScript ?? convexProject?.script ?? DEFAULT_LINES,
+      guidebook: localGuidebook ?? convexProject?.guidebook ?? '',
+    };
+  }, [convexProject, projectId, localScript, localGuidebook]);
+
+  const guidebook = project.guidebook;
+
+  // Update project (script or guidebook)
+  const setProject = useCallback(
+    (updates: { script?: string[]; guidebook?: string }) => {
+      // Optimistic update
+      if (updates.script) setLocalScript(updates.script);
+      if (updates.guidebook) setLocalGuidebook(updates.guidebook);
+
+      // Persist to Convex
+      updateProjectMutation({
+        projectId,
+        ...updates,
+      });
+    },
+    [projectId, updateProjectMutation]
+  );
+
+  // Guidebook setter
   const setGuidebook = useCallback(
     (newGuidebook: string) => {
-      setGuidebookState(newGuidebook);
-      updateProject(projectId, { guidebook: newGuidebook });
+      setProject({ guidebook: newGuidebook });
     },
-    [projectId],
+    [setProject]
   );
 
-  // Kick off metalearning job after branch resolution
-  const startMetalearningJob = useCallback(
-    (resolvedBranch: Branch) => {
-      setIsGuidebookUpdating(true);
-
-      runJob(
-        `metalearning-${resolvedBranch.id}`,
-        () => runMetalearning(projectId, resolvedBranch),
-        {
-          onComplete: (result) => {
-            // Append metalearning to guidebook
-            setGuidebookState((prev) => {
-              const entry = prev ? `${prev}\n${result.metalearning}` : result.metalearning;
-              updateProject(projectId, { guidebook: entry });
-              return entry;
-            });
-            // Update branch in state with metalearning
-            setBranches((prev) =>
-              prev.map((b) =>
-                b.id === resolvedBranch.id ? { ...b, metalearning: result.metalearning } : b,
-              ),
-            );
-            setIsGuidebookUpdating(false);
-          },
-          onError: (error) => {
-            console.error('Metalearning failed:', error);
-            setIsGuidebookUpdating(false);
-          },
-        },
-      );
-    },
-    [projectId],
-  );
-
+  // Schema from project script
   const schema = useMemo(() => {
     return parseIntoSchema(project.script);
   }, [project.script]);
 
-  // Update branches if projectId changes
-  useEffect(() => {
-    setBranches(loadBranches(projectId));
-  }, [projectId]);
+  // Convert Convex branches to our Branch type
+  const branches: ConvexBranch[] = useMemo(() => {
+    if (!convexBranches) return [];
+    return convexBranches.map((b) => ({
+      _id: b._id,
+      id: b._id, // Use Convex ID as the branch ID
+      title: b.title,
+      playthroughId: b.playthroughId,
+      sceneIds: b.sceneIds,
+      base: b.base as Branch['base'],
+      generated: b.generated as Branch['generated'],
+      authored: b.authored as Branch['authored'],
+      approved: b.approved,
+      metalearning: b.metalearning,
+      createdAt: b.createdAt,
+    }));
+  }, [convexBranches]);
 
   // Compute unresolved branches
   const unresolvedBranches = useMemo(() => {
@@ -136,51 +157,99 @@ export function ProjectProvider({
     return computeSceneToBranchMap(unresolvedBranches);
   }, [unresolvedBranches]);
 
+  // Kick off metalearning job after branch resolution
+  const startMetalearningJob = useCallback(
+    (resolvedBranch: ConvexBranch) => {
+      setIsGuidebookUpdating(true);
+
+      runJob(
+        `metalearning-${resolvedBranch.id}`,
+        () => runMetalearning(resolvedBranch._id, resolvedBranch),
+        {
+          onComplete: (result) => {
+            // Append metalearning to guidebook
+            const newGuidebook = guidebook
+              ? `${guidebook}\n${result.metalearning}`
+              : result.metalearning;
+            setProject({ guidebook: newGuidebook });
+
+            // Update branch with metalearning
+            updateBranchMutation({
+              branchId: resolvedBranch._id,
+              metalearning: result.metalearning,
+            });
+
+            setIsGuidebookUpdating(false);
+          },
+          onError: (error) => {
+            console.error('Metalearning failed:', error);
+            setIsGuidebookUpdating(false);
+          },
+        }
+      );
+    },
+    [guidebook, setProject, updateBranchMutation]
+  );
+
   // Add or merge branch - one branch per playthrough
   const addOrMergeBranch = useCallback(
     (branch: Branch, baseSchema: Schema, generatedSchema: Schema) => {
       // Check if there's already an unresolved branch for this playthrough
       const existingBranch = branches.find(
-        (b) => b.playthroughId === branch.playthroughId && !isResolved(b),
+        (b) => b.playthroughId === branch.playthroughId && !isResolved(b)
       );
 
       if (existingBranch) {
         // Merge new changes into existing branch
         const mergedBranch = mergeBranchChanges(existingBranch, baseSchema, generatedSchema);
-        updateBranch(projectId, existingBranch.id, mergedBranch);
-        setBranches((prev) => prev.map((b) => (b.id === existingBranch.id ? mergedBranch : b)));
+        updateBranchMutation({
+          branchId: existingBranch._id,
+          title: mergedBranch.title,
+          sceneIds: mergedBranch.sceneIds,
+          base: mergedBranch.base,
+          generated: mergedBranch.generated,
+        });
         setSelectedBranchId(existingBranch.id);
       } else {
         // Create new branch
-        addBranch(projectId, branch);
-        setBranches((prev) => [...prev, branch]);
-        setSelectedBranchId(branch.id);
+        createBranchMutation({
+          projectId,
+          playthroughId: branch.playthroughId,
+          title: branch.title,
+          sceneIds: branch.sceneIds,
+          base: branch.base,
+          generated: branch.generated,
+          createdAt: branch.createdAt,
+        }).then((newBranch) => {
+          if (newBranch) {
+            setSelectedBranchId(newBranch._id);
+          }
+        });
       }
     },
-    [projectId, branches],
+    [projectId, branches, updateBranchMutation, createBranchMutation]
   );
 
   // Approve branch - capture authored scenes and mark as approved
   const approveBranch = useCallback(
     (branchId: string) => {
-      let resolvedBranch: Branch | null = null;
-      setBranches((prev) => {
-        const updated = prev.map((b) => {
-          if (b.id !== branchId) return b;
-          const authored = captureAuthoredScenes(b, schema);
-          resolvedBranch = { ...b, authored, approved: true };
-          return resolvedBranch;
-        });
-        saveBranches(projectId, updated);
-        return updated;
+      const branch = branches.find((b) => b.id === branchId);
+      if (!branch) return;
+
+      const authored = captureAuthoredScenes(branch, schema);
+
+      updateBranchMutation({
+        branchId: branch._id,
+        authored,
+        approved: true,
       });
+
       setSelectedBranchId(null);
-      // Kick off metalearning
-      if (resolvedBranch) {
-        startMetalearningJob(resolvedBranch);
-      }
+
+      // Kick off metalearning with the resolved branch data
+      startMetalearningJob({ ...branch, authored, approved: true });
     },
-    [projectId, schema, startMetalearningJob],
+    [branches, schema, updateBranchMutation, startMetalearningJob]
   );
 
   // Reject branch - optionally revert to base scenes
@@ -191,44 +260,43 @@ export function ProjectProvider({
 
       if (shouldRevert) {
         // Revert script to base scenes
-        // This is a simplified approach - reconstruct affected lines
         const updatedScript = [...project.script];
-
         for (const sceneId of branch.sceneIds) {
           const baseScene = branch.base[sceneId];
-          // Find scene in script and replace its content
-          // For now, just mark as rejected without full revert
-          // (Full revert requires reconstructing script from schema)
           console.log('Reverting scene', sceneId, 'to base:', baseScene);
         }
-
-        setProject({ ...project, script: updatedScript });
+        setProject({ script: updatedScript });
       }
 
-      let resolvedBranch: Branch | null = null;
-      setBranches((prev) => {
-        const updated = prev.map((b) => {
-          if (b.id !== branchId) return b;
-          const authored = shouldRevert ? { ...b.base } : captureAuthoredScenes(b, schema);
-          resolvedBranch = { ...b, authored, approved: false };
-          return resolvedBranch;
-        });
-        saveBranches(projectId, updated);
-        return updated;
+      const authored = shouldRevert ? { ...branch.base } : captureAuthoredScenes(branch, schema);
+
+      updateBranchMutation({
+        branchId: branch._id,
+        authored,
+        approved: false,
       });
+
       setSelectedBranchId(null);
+
       // Kick off metalearning
-      if (resolvedBranch) {
-        startMetalearningJob(resolvedBranch);
-      }
+      startMetalearningJob({ ...branch, authored, approved: false });
     },
-    [branches, project, projectId, schema, setProject, startMetalearningJob],
+    [branches, project.script, schema, setProject, updateBranchMutation, startMetalearningJob]
   );
+
+  // Show loading state while project data is loading
+  if (!convexProject) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <p className="text-neutral-400">Loading project...</p>
+      </div>
+    );
+  }
 
   return (
     <ProjectContext.Provider
       value={{
-        projectId: project.id,
+        projectId,
         project,
         setProject,
         schema,

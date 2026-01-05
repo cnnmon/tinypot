@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic();
 
@@ -19,7 +19,7 @@ export interface GenerateRequest {
  * 2. LINK_SCENE - Jump to an existing scene (player wants to return/explore existing content)
  * 3. NEW_FORK - Create a new scene with generated content (player takes a new path)
  */
-export type GenerationType = "TEXT_ONLY" | "LINK_SCENE" | "NEW_FORK";
+export type GenerationType = 'TEXT_ONLY' | 'LINK_SCENE' | 'NEW_FORK';
 
 export interface GenerateResponse {
   success: boolean;
@@ -60,36 +60,34 @@ export async function POST(req: Request) {
   if (!userInput) {
     return Response.json({
       success: false,
-      type: "TEXT_ONLY",
+      type: 'TEXT_ONLY',
       generatedOption: null,
-      error: "No input provided",
+      error: 'No input provided',
     } satisfies GenerateResponse);
   }
 
   // Build context from project
-  const projectContext = projectLines.join("\n");
-  const historyContext = history.slice(-10).join("\n"); // Last 10 entries for context
+  const projectContext = projectLines.join('\n');
+  const historyContext = history.slice(-10).join('\n'); // Last 10 entries for context
   const existingOptionsContext = existingOptions.length
-    ? `Existing options at this decision point: ${existingOptions.join(", ")}`
-    : "No existing options yet.";
+    ? `Existing options at this decision point: ${existingOptions.join(', ')}`
+    : 'No existing options yet.';
   const existingScenesContext = existingScenes.length
-    ? `All scenes in the project: ${existingScenes.join(", ")}`
-    : "No scenes defined yet.";
+    ? `All scenes in the project: ${existingScenes.join(', ')}`
+    : 'No scenes defined yet.';
 
-  const worldContext = worldBible
-    ? `\nWorld/Style Guide:\n${worldBible}\n`
-    : "";
+  const worldContext = worldBible ? `\nWorld/Style Guide:\n${worldBible}\n` : '';
 
   const guidebookContext = guidebook
     ? `\nAUTHOR PREFERENCES (follow these closely):\n${guidebook}\n`
-    : "";
+    : '';
 
   const response = await anthropic.messages.create({
-    model: "claude-3-5-haiku-latest",
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 768,
     messages: [
       {
-        role: "user",
+        role: 'user',
         content: `You are a collaborative interactive fiction author. A player has typed something that doesn't match existing options. Determine the best response type and generate appropriate content.
 
 ${worldContext}${guidebookContext}
@@ -98,12 +96,12 @@ FULL PROJECT (for style reference):
 ${projectContext}
 \`\`\`
 
-CURRENT SCENE: ${currentScene || "(opening)"}
+CURRENT SCENE: ${currentScene || '(opening)'}
 ${existingScenesContext}
 ${existingOptionsContext}
 
 RECENT HISTORY:
-${historyContext || "(start of game)"}
+${historyContext || '(start of game)'}
 
 PLAYER'S INPUT: "${userInput}"
 
@@ -155,21 +153,21 @@ Guidelines:
     ],
   });
 
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
+  const text = response.content[0].type === 'text' ? response.content[0].text : '';
 
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return Response.json({
         success: false,
-        type: "TEXT_ONLY",
+        type: 'TEXT_ONLY',
         generatedOption: null,
-        error: "Failed to parse generation response",
+        error: 'Failed to parse generation response',
       } satisfies GenerateResponse);
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
-    const responseType = (parsed.responseType || "TEXT_ONLY") as GenerationType;
+    const responseType = (parsed.responseType || 'TEXT_ONLY') as GenerationType;
 
     // Build the "then" block based on response type
     const thenLines: string[] = [];
@@ -179,9 +177,9 @@ Guidelines:
     }
 
     // Add jump based on response type
-    if (responseType === "LINK_SCENE" && parsed.targetScene) {
+    if (responseType === 'LINK_SCENE' && parsed.targetScene) {
       thenLines.push(`> ${parsed.targetScene}`);
-    } else if (responseType === "NEW_FORK" && parsed.newScene?.label) {
+    } else if (responseType === 'NEW_FORK' && parsed.newScene?.label) {
       thenLines.push(`> ${parsed.newScene.label}`);
     }
     // TEXT_ONLY has no jump - loops back to current decision point
@@ -197,7 +195,7 @@ Guidelines:
 
     // Build new scene content for NEW_FORK
     let newScene: { label: string; content: string[] } | undefined;
-    if (responseType === "NEW_FORK" && parsed.newScene) {
+    if (responseType === 'NEW_FORK' && parsed.newScene) {
       newScene = {
         label: parsed.newScene.label,
         content: parsed.newScene.content || [],
@@ -217,11 +215,9 @@ Guidelines:
   } catch {
     return Response.json({
       success: false,
-      type: "TEXT_ONLY",
+      type: 'TEXT_ONLY',
       generatedOption: null,
-      error: "Failed to generate content",
+      error: 'Failed to generate content',
     } satisfies GenerateResponse);
   }
 }
-
-
