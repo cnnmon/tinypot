@@ -43,7 +43,7 @@ interface ProjectContextValue {
     script: string[];
     guidebook: string;
   };
-  setProject: (updates: { script?: string[]; guidebook?: string }) => void;
+  setProject: (updates: { name?: string; script?: string[]; guidebook?: string }) => void;
   schema: Schema;
   // Branch state
   branches: ConvexBranch[];
@@ -100,10 +100,10 @@ export function ProjectProvider({
 
   const guidebook = project.guidebook;
 
-  // Update project (script or guidebook)
+  // Update project (name, script, or guidebook)
   const setProject = useCallback(
-    (updates: { script?: string[]; guidebook?: string }) => {
-      // Optimistic update
+    (updates: { name?: string; script?: string[]; guidebook?: string }) => {
+      // Optimistic update for script and guidebook
       if (updates.script) setLocalScript(updates.script);
       if (updates.guidebook) setLocalGuidebook(updates.guidebook);
 

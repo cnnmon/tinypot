@@ -6,13 +6,14 @@ import Branchbar from '@/components/Editor/Branchbar';
 import GuidebookModal from '@/components/GuidebookModal';
 import Header from '@/components/Header';
 import Player from '@/components/Player';
+import ShareButton from '@/components/ShareButton';
 import { Id } from '@/convex/_generated/dataModel';
 import { ProjectProvider, useProject } from '@/lib/project';
 import { useParams } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 
 function ProjectContent() {
-  const { guidebook, setGuidebook, isGuidebookUpdating } = useProject();
+  const { project, setProject, guidebook, setGuidebook, isGuidebookUpdating } = useProject();
   const [leftWidth, setLeftWidth] = useState(50);
   const [guidebookOpen, setGuidebookOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,7 +45,14 @@ function ProjectContent() {
 
   return (
     <div className="h-screen p-4 gap-2 flex flex-col">
-      <Header />
+      <div className="flex items-center justify-between">
+        <Header
+          projectId={project.id}
+          projectName={project.name}
+          onUpdateName={(name) => setProject({ name })}
+        />
+        <ShareButton />
+      </div>
       <GuidebookModal
         isOpen={guidebookOpen}
         onClose={() => setGuidebookOpen(false)}
