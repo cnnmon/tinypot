@@ -4,7 +4,9 @@ import Item from './Item';
 
 export default function List() {
   const { branches, unresolvedBranches, selectedBranchId, setSelectedBranchId } = useProject();
-  const resolvedBranches = branches.filter((b) => isResolved(b));
+  const resolvedBranches = branches
+    .filter((b) => isResolved(b))
+    .sort((a, b) => b.createdAt - a.createdAt); // Recent first
 
   return (
     <div className="space-y-2">
