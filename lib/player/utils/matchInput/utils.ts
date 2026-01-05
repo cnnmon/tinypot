@@ -120,7 +120,6 @@ export function getOptionsAtPosition({
  */
 export function matchOption(input: string, options: OptionEntry[]): MatchOptionResult | null {
   if (options.length === 0) return null;
-  if (options.length === 1) return { option: options[0] };
 
   let bestMatch: OptionEntry | null = null;
   let bestScore = 0;
@@ -135,8 +134,8 @@ export function matchOption(input: string, options: OptionEntry[]): MatchOptionR
     }
   }
 
-  // If no keywords matched, return null
-  if (!bestMatch) return null;
+  // If no keywords matched, return null (will fall back to fuzzy matching or generation)
+  if (!bestMatch || bestScore === 0) return null;
   return { option: bestMatch, matchedAlias: bestMatchedAlias };
 }
 
