@@ -134,9 +134,42 @@ export function parseIntoSchema(entries: string[]): Schema {
 }
 
 /**
+ * Normalize text for comparison (lowercase, trim, collapse whitespace)
+ */
+function normalizeForComparison(text: string): string {
+  return text.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * Check if two strings are too similar to warrant adding as separate aliases.
+ * Returns true if they're redundant (shouldn't add the new alias).
+ */
+function isRedundantAlias(existing: string, newAlias: string): boolean {
+  const normExisting = normalizeForComparison(existing);
+  const normNew = normalizeForComparison(newAlias);
+
+  // Exact match after normalization
+  if (normExisting === normNew) return true;
+
+  // One contains the other (e.g., "run" vs "run away" or "running" vs "run")
+  if (normExisting.includes(normNew) || normNew.includes(normExisting)) return true;
+
+  // Check if they share the same root words (simple stemming)
+  const existingWords = new Set(normExisting.split(' '));
+  const newWords = normNew.split(' ');
+  const sharedWords = newWords.filter((w) => existingWords.has(w));
+
+  // If most words are shared, it's redundant
+  if (sharedWords.length >= Math.max(newWords.length, existingWords.size) * 0.8) return true;
+
+  return false;
+}
+
+/**
  * Add an alias to an option in the script lines.
  * Transforms "* Ride a bike" to "* [Ride a bike, Cycle]"
  * or "* [Ride a bike, Cycle]" to "* [Ride a bike, Cycle, Pedal]"
+ * Avoids adding redundant aliases that are too similar to existing ones.
  */
 export function addAliasToOption(
   lines: string[],
@@ -154,8 +187,11 @@ export function addAliasToOption(
     // Check if this is the option we're looking for
     if (text !== optionText) return line;
 
-    // Check if alias already exists
-    if (aliases?.includes(newAlias)) return line;
+    // Check if alias is redundant with the option text itself
+    if (isRedundantAlias(text, newAlias)) return line;
+
+    // Check if alias is redundant with any existing alias
+    if (aliases?.some((existing) => isRedundantAlias(existing, newAlias))) return line;
 
     // Build new option line with alias
     const allAliases = aliases ? [...aliases, newAlias] : [newAlias];
