@@ -25,7 +25,7 @@ export interface Playthrough {
   id: string;
   projectId: string;
   lines: Line[];
-  createdAt: Date;
+  createdAt: number; // timestamp
   /**
    * When playthrough first starts, snapshot the schema.
    * Do not let any changes pass in for now!

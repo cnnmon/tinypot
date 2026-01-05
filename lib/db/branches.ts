@@ -1,70 +1,20 @@
 /**
  * Branch storage using localStorage.
- * Handles Map serialization/deserialization.
+ * Will be replaced by Convex.
  */
 
 import { Branch } from '@/types/branch';
-import { SchemaEntry } from '@/types/schema';
 
 const STORAGE_KEY = 'bonsai_branches';
 
-type SceneId = string;
-type Scene = SchemaEntry[];
-
-interface SerializedBranch {
-  id: string;
-  title: string;
-  playthroughId: string;
-  sceneIds: string[];
-  base: Record<string, Scene>;
-  generated: Record<string, Scene>;
-  authored?: Record<string, Scene>;
-  approved?: boolean;
-  metalearning?: string;
-  createdAt: string;
-}
-
 interface BranchStorage {
-  [projectId: string]: SerializedBranch[];
-}
-
-function serializeBranch(branch: Branch): SerializedBranch {
-  return {
-    id: branch.id,
-    title: branch.title,
-    playthroughId: branch.playthroughId,
-    sceneIds: branch.sceneIds,
-    base: Object.fromEntries(branch.base),
-    generated: Object.fromEntries(branch.generated),
-    authored: branch.authored ? Object.fromEntries(branch.authored) : undefined,
-    approved: branch.approved,
-    metalearning: branch.metalearning,
-    createdAt: branch.createdAt.toISOString(),
-  };
-}
-
-function deserializeBranch(data: SerializedBranch): Branch {
-  return {
-    id: data.id,
-    title: data.title,
-    playthroughId: data.playthroughId,
-    sceneIds: data.sceneIds,
-    base: new Map(Object.entries(data.base)) as Map<SceneId, Scene>,
-    generated: new Map(Object.entries(data.generated)) as Map<SceneId, Scene>,
-    authored: data.authored
-      ? (new Map(Object.entries(data.authored)) as Map<SceneId, Scene>)
-      : undefined,
-    approved: data.approved,
-    metalearning: data.metalearning,
-    createdAt: new Date(data.createdAt),
-  };
+  [projectId: string]: Branch[];
 }
 
 function getStorage(): BranchStorage {
   if (typeof window === 'undefined') return {};
   const data = localStorage.getItem(STORAGE_KEY);
-  //return data ? JSON.parse(data) : {};
-  return {};
+  return data ? JSON.parse(data) : {};
 }
 
 function setStorage(storage: BranchStorage): void {
@@ -74,13 +24,12 @@ function setStorage(storage: BranchStorage): void {
 
 export function loadBranches(projectId: string): Branch[] {
   const storage = getStorage();
-  const serialized = storage[projectId] || [];
-  return serialized.map(deserializeBranch);
+  return storage[projectId] || [];
 }
 
 export function saveBranches(projectId: string, branches: Branch[]): void {
   const storage = getStorage();
-  storage[projectId] = branches.map(serializeBranch);
+  storage[projectId] = branches;
   setStorage(storage);
 }
 

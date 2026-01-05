@@ -50,7 +50,7 @@ export default function Editor() {
       }
 
       // Auto-select branch when cursor moves to a branch scene
-      if (update.selectionSet && sceneToBranchMap.size > 0) {
+      if (update.selectionSet && Object.keys(sceneToBranchMap).length > 0) {
         const pos = update.state.selection.main.head;
         const line = update.state.doc.lineAt(pos);
 
@@ -66,7 +66,7 @@ export default function Editor() {
 
         // Check if scene belongs to a branch
         if (currentScene) {
-          const branchId = sceneToBranchMap.get(currentScene);
+          const branchId = sceneToBranchMap[currentScene];
           if (branchId && branchId !== selectedBranchId) {
             setSelectedBranchId(branchId);
           }

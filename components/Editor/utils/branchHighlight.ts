@@ -7,7 +7,7 @@
  * - Green: Lines that differ from generated (human edits)
  */
 
-import { Branch, Scene } from '@/types/branch';
+import { Branch, Scene, SceneId } from '@/types/branch';
 import { EntryType, SchemaEntry } from '@/types/schema';
 import { StateEffect, StateField } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
@@ -35,17 +35,17 @@ function sceneToTextLines(scene: Scene): string[] {
 
 // State effect to update branch highlight state
 export const setBranchHighlight = StateEffect.define<{
-  sceneToBranchMap: Map<string, string>;
+  sceneToBranchMap: Record<SceneId, string>;
   selectedBranch: Branch | null;
 }>();
 
 // State field to hold branch highlight state
 export const branchHighlightState = StateField.define<{
-  sceneToBranchMap: Map<string, string>;
+  sceneToBranchMap: Record<SceneId, string>;
   selectedBranch: Branch | null;
 }>({
   create() {
-    return { sceneToBranchMap: new Map(), selectedBranch: null };
+    return { sceneToBranchMap: {}, selectedBranch: null };
   },
   update(value, tr) {
     for (const e of tr.effects) {
@@ -90,8 +90,8 @@ function buildBranchDecorations(view: EditorView): DecorationSet {
     // Check if current scene is affected by the selected branch
     if (currentSceneId && affectedScenes.has(currentSceneId)) {
       // Get both base and generated scenes for comparison
-      const baseScene = selectedBranch.base.get(currentSceneId);
-      const generatedScene = selectedBranch.generated.get(currentSceneId);
+      const baseScene = selectedBranch.base[currentSceneId];
+      const generatedScene = selectedBranch.generated[currentSceneId];
 
       const baseLines = baseScene ? sceneToTextLines(baseScene) : [];
       const generatedLines = generatedScene ? sceneToTextLines(generatedScene) : [];

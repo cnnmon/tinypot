@@ -14,9 +14,10 @@ export interface MetalearningResult {
 /**
  * Format scenes for the API.
  */
-function formatScenes(scenes: Map<SceneId, Scene>): string {
+function formatScenes(scenes: Record<SceneId, Scene>): string {
   const parts: string[] = [];
-  for (const [sceneId, scene] of scenes) {
+  for (const sceneId of Object.keys(scenes)) {
+    const scene = scenes[sceneId];
     const content = scene.map((e) => JSON.stringify(e)).join('\n');
     parts.push(`[Scene: ${sceneId}]\n${content}`);
   }
@@ -70,4 +71,3 @@ export async function runMetalearning(
     metalearning,
   };
 }
-

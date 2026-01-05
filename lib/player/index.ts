@@ -31,7 +31,7 @@ export default function usePlayer() {
     projectId,
     snapshot: JSON.parse(JSON.stringify(schema)), // Copy
     lines: [],
-    createdAt: new Date(),
+    createdAt: Date.now(),
   });
 
   /* Dynamic states */
@@ -310,7 +310,7 @@ export default function usePlayer() {
       ...playthrough,
       snapshot: JSON.parse(JSON.stringify(schema)),
       lines: [],
-      createdAt: new Date(),
+      createdAt: Date.now(),
     });
     setState({
       status: Status.RUNNING,

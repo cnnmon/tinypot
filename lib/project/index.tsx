@@ -9,10 +9,10 @@ import {
   computeSceneToBranchMap,
   isResolved,
   mergeBranchChanges,
-  SceneId,
 } from '@/lib/branch';
+import { SceneId } from '@/types/branch';
 import { addBranch, loadBranches, saveBranches, updateBranch } from '@/lib/db/branches';
-import { updateGuidebook as saveGuidebook } from '@/lib/db/projects';
+import { updateProject } from '@/lib/db/projects';
 import { runJob } from '@/lib/jobs';
 import { runMetalearning } from '@/lib/jobs/metalearning';
 import { Branch } from '@/types/branch';
@@ -40,7 +40,7 @@ interface ProjectContextValue {
   unresolvedBranches: Branch[];
   selectedBranchId: string | null;
   setSelectedBranchId: (id: string | null) => void;
-  sceneToBranchMap: Map<SceneId, string>;
+  sceneToBranchMap: Record<SceneId, string>;
   // Branch actions
   addOrMergeBranch: (branch: Branch, baseSchema: Schema, generatedSchema: Schema) => void;
   approveBranch: (branchId: string) => void;
@@ -78,7 +78,7 @@ export function ProjectProvider({
   const setGuidebook = useCallback(
     (newGuidebook: string) => {
       setGuidebookState(newGuidebook);
-      saveGuidebook(projectId, newGuidebook);
+      updateProject(projectId, { guidebook: newGuidebook });
     },
     [projectId],
   );
@@ -96,7 +96,7 @@ export function ProjectProvider({
             // Append metalearning to guidebook
             setGuidebookState((prev) => {
               const entry = prev ? `${prev}\n${result.metalearning}` : result.metalearning;
-              saveGuidebook(projectId, entry);
+              updateProject(projectId, { guidebook: entry });
               return entry;
             });
             // Update branch in state with metalearning
@@ -195,7 +195,7 @@ export function ProjectProvider({
         const updatedScript = [...project.script];
 
         for (const sceneId of branch.sceneIds) {
-          const baseScene = branch.base.get(sceneId);
+          const baseScene = branch.base[sceneId];
           // Find scene in script and replace its content
           // For now, just mark as rejected without full revert
           // (Full revert requires reconstructing script from schema)
@@ -209,7 +209,7 @@ export function ProjectProvider({
       setBranches((prev) => {
         const updated = prev.map((b) => {
           if (b.id !== branchId) return b;
-          const authored = shouldRevert ? new Map(b.base) : captureAuthoredScenes(b, schema);
+          const authored = shouldRevert ? { ...b.base } : captureAuthoredScenes(b, schema);
           resolvedBranch = { ...b, authored, approved: false };
           return resolvedBranch;
         });

@@ -1,6 +1,6 @@
 /**
  * Mock database operations for Playthroughs using localStorage.
- * Replace with actual API calls when ready.
+ * Will be replaced by Convex.
  */
 
 import { Playthrough } from '@/types/playthrough';
@@ -10,8 +10,7 @@ const PLAYTHROUGHS_KEY = 'bonsai_playthroughs';
 function getPlaythroughsFromStorage(): Playthrough[] {
   if (typeof window === 'undefined') return [];
   const data = localStorage.getItem(PLAYTHROUGHS_KEY);
-  //return data ? JSON.parse(data) : [];
-  return [];
+  return data ? JSON.parse(data) : [];
 }
 
 function savePlaythroughsToStorage(playthroughs: Playthrough[]): void {
@@ -36,7 +35,7 @@ export async function createPlaythrough(projectId: string): Promise<Playthrough>
     projectId,
     lines: [],
     snapshot: [],
-    createdAt: new Date(),
+    createdAt: Date.now(),
   };
   playthroughs.push(newPlaythrough);
   savePlaythroughsToStorage(playthroughs);

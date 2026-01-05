@@ -13,13 +13,13 @@ export interface Branch {
   id: string;
   title: string;
   playthroughId: string;
-  createdAt: Date;
+  createdAt: number; // timestamp
 
   // Track entire scenes, not individual lines
   sceneIds: string[]; // ["FIRE", "BIKE"]
-  base: Map<SceneId, Scene>; // scene snapshotted before generation
-  generated: Map<SceneId, Scene>; // AI generated off of base
-  authored?: Map<SceneId, Scene>; // author's edits (captured on closure)
+  base: Record<SceneId, Scene>; // scene snapshotted before generation
+  generated: Record<SceneId, Scene>; // AI generated off of base
+  authored?: Record<SceneId, Scene>; // author's edits (captured on closure)
 
   // After resolution
   approved?: boolean; // true = approved, false = rejected, undefined = unresolved

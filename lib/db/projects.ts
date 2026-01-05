@@ -1,6 +1,6 @@
 /**
  * Mock database operations for Projects using localStorage.
- * Replace with actual API calls when ready.
+ * Will be replaced by Convex.
  */
 
 import { Project } from '@/types/project';
@@ -10,8 +10,7 @@ const GAMES_KEY = 'bonsai_projects';
 function getProjectsFromStorage(): Project[] {
   if (typeof window === 'undefined') return [];
   const data = localStorage.getItem(GAMES_KEY);
-  // return data ? JSON.parse(data) : [];
-  return [];
+  return data ? JSON.parse(data) : [];
 }
 
 function saveProjectsToStorage(projects: Project[]): void {
@@ -84,11 +83,4 @@ export async function deleteProject(projectId: string): Promise<boolean> {
   if (filtered.length === projects.length) return false;
   saveProjectsToStorage(filtered);
   return true;
-}
-
-export async function updateGuidebook(
-  projectId: string,
-  guidebook: string,
-): Promise<Project | null> {
-  return updateProject(projectId, { guidebook });
 }

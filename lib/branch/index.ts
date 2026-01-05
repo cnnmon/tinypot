@@ -20,13 +20,14 @@ export function scenesEqual(a: Scene, b: Scene): boolean {
 }
 
 /**
- * Deep compare two Maps of scenes.
+ * Deep compare two Records of scenes.
  */
-function mapsEqual(a: Map<SceneId, Scene>, b: Map<SceneId, Scene>): boolean {
-  if (a.size !== b.size) return false;
-  for (const [key, val] of a) {
-    const other = b.get(key);
-    if (!other || !scenesEqual(val, other)) return false;
+function recordsEqual(a: Record<SceneId, Scene>, b: Record<SceneId, Scene>): boolean {
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!b[key] || !scenesEqual(a[key], b[key])) return false;
   }
   return true;
 }
@@ -38,8 +39,8 @@ export function getBranchStatus(branch: Branch): BranchStatus {
   if (branch.approved === true) return 'Approved';
   if (branch.approved === false) return 'Rejected';
   if (!branch.authored) return 'Unresolved';
-  if (mapsEqual(branch.authored, branch.generated)) return 'Approved';
-  if (mapsEqual(branch.authored, branch.base)) return 'Rejected';
+  if (recordsEqual(branch.authored, branch.generated)) return 'Approved';
+  if (recordsEqual(branch.authored, branch.base)) return 'Rejected';
   return 'Edited';
 }
 
@@ -82,11 +83,11 @@ export function flattenEntries(entries: SchemaEntry[]): SchemaEntry[] {
 }
 
 /**
- * Extract scenes from a schema as a Map.
- * Returns Map<SceneId, Scene> where Scene includes flattened entries (including nested then blocks).
+ * Extract scenes from a schema as a Record.
+ * Returns Record<SceneId, Scene> where Scene includes flattened entries (including nested then blocks).
  */
-export function extractScenesFromSchema(schema: Schema): Map<SceneId, Scene> {
-  const scenes = new Map<SceneId, Scene>();
+export function extractScenesFromSchema(schema: Schema): Record<SceneId, Scene> {
+  const scenes: Record<SceneId, Scene> = {};
   let currentSceneId: string | null = null;
   let currentScene: Scene = [];
 
@@ -94,7 +95,7 @@ export function extractScenesFromSchema(schema: Schema): Map<SceneId, Scene> {
     if (entry.type === EntryType.SCENE) {
       // Save previous scene (flattened)
       if (currentSceneId !== null) {
-        scenes.set(currentSceneId, flattenEntries(currentScene));
+        scenes[currentSceneId] = flattenEntries(currentScene);
       }
       // Start new scene
       currentSceneId = entry.label;
@@ -106,7 +107,7 @@ export function extractScenesFromSchema(schema: Schema): Map<SceneId, Scene> {
 
   // Save last scene (flattened)
   if (currentSceneId !== null) {
-    scenes.set(currentSceneId, flattenEntries(currentScene));
+    scenes[currentSceneId] = flattenEntries(currentScene);
   }
 
   return scenes;
@@ -129,40 +130,41 @@ function computeSchemaDiff(
   baseSchema: Schema,
   generatedSchema: Schema,
 ): {
-  base: Map<SceneId, Scene>;
-  generated: Map<SceneId, Scene>;
+  base: Record<SceneId, Scene>;
+  generated: Record<SceneId, Scene>;
   affectedSceneIds: string[];
 } {
   const baseScenes = extractScenesFromSchema(baseSchema);
   const generatedScenes = extractScenesFromSchema(generatedSchema);
 
-  const base = new Map<SceneId, Scene>();
-  const generated = new Map<SceneId, Scene>();
+  const base: Record<SceneId, Scene> = {};
+  const generated: Record<SceneId, Scene> = {};
   const affectedSceneIds: string[] = [];
 
   // Check all scenes in generated schema
-  for (const [sceneId, genScene] of generatedScenes) {
-    const baseScene = baseScenes.get(sceneId);
+  for (const sceneId of Object.keys(generatedScenes)) {
+    const genScene = generatedScenes[sceneId];
+    const baseScene = baseScenes[sceneId];
 
     if (!baseScene) {
       // New scene - didn't exist in base
       affectedSceneIds.push(sceneId);
-      base.set(sceneId, []);
-      generated.set(sceneId, cloneScene(genScene));
+      base[sceneId] = [];
+      generated[sceneId] = cloneScene(genScene);
     } else if (!scenesEqual(baseScene, genScene)) {
       // Modified scene
       affectedSceneIds.push(sceneId);
-      base.set(sceneId, cloneScene(baseScene));
-      generated.set(sceneId, cloneScene(genScene));
+      base[sceneId] = cloneScene(baseScene);
+      generated[sceneId] = cloneScene(genScene);
     }
   }
 
   // Check for deleted scenes (in base but not in generated)
-  for (const [sceneId, baseScene] of baseScenes) {
-    if (!generatedScenes.has(sceneId)) {
+  for (const sceneId of Object.keys(baseScenes)) {
+    if (!generatedScenes[sceneId]) {
       affectedSceneIds.push(sceneId);
-      base.set(sceneId, cloneScene(baseScene));
-      generated.set(sceneId, []);
+      base[sceneId] = cloneScene(baseScenes[sceneId]);
+      generated[sceneId] = [];
     }
   }
 
@@ -187,7 +189,7 @@ export function createBranch(
     sceneIds: affectedSceneIds,
     base,
     generated,
-    createdAt: new Date(),
+    createdAt: Date.now(),
   };
 }
 
@@ -207,17 +209,17 @@ export function mergeBranchChanges(
   } = computeSchemaDiff(baseSchema, generatedSchema);
 
   // Merge into existing branch
-  const updatedBase = new Map(existingBranch.base);
-  const updatedGenerated = new Map(existingBranch.generated);
+  const updatedBase = { ...existingBranch.base };
+  const updatedGenerated = { ...existingBranch.generated };
   const updatedSceneIds = [...existingBranch.sceneIds];
 
   for (const sceneId of newAffectedIds) {
     // Only add to base if this scene wasn't already tracked
-    if (!updatedBase.has(sceneId)) {
-      updatedBase.set(sceneId, newBase.get(sceneId)!);
+    if (!updatedBase[sceneId]) {
+      updatedBase[sceneId] = newBase[sceneId];
     }
     // Always update generated to latest
-    updatedGenerated.set(sceneId, newGenerated.get(sceneId)!);
+    updatedGenerated[sceneId] = newGenerated[sceneId];
     // Add to sceneIds if not already there
     if (!updatedSceneIds.includes(sceneId)) {
       updatedSceneIds.push(sceneId);
@@ -238,19 +240,19 @@ export function mergeBranchChanges(
  */
 export function getStaleScenes(branch: Branch, currentSchema: Schema): string[] {
   const currentScenes = extractScenesFromSchema(currentSchema);
-  return branch.sceneIds.filter((sceneId) => !currentScenes.has(sceneId));
+  return branch.sceneIds.filter((sceneId) => !currentScenes[sceneId]);
 }
 
 /**
  * Compute scene-to-branch mapping for editor highlighting.
- * Returns Map<SceneId, BranchId> for quick lookup.
+ * Returns Record<SceneId, BranchId> for quick lookup.
  */
-export function computeSceneToBranchMap(unresolvedBranches: Branch[]): Map<SceneId, string> {
-  const map = new Map<SceneId, string>();
+export function computeSceneToBranchMap(unresolvedBranches: Branch[]): Record<SceneId, string> {
+  const map: Record<SceneId, string> = {};
 
   for (const branch of unresolvedBranches) {
     for (const sceneId of branch.sceneIds) {
-      map.set(sceneId, branch.id);
+      map[sceneId] = branch.id;
     }
   }
 
@@ -260,13 +262,13 @@ export function computeSceneToBranchMap(unresolvedBranches: Branch[]): Map<Scene
 /**
  * Capture current scene states from schema for branch closure.
  */
-export function captureAuthoredScenes(branch: Branch, currentSchema: Schema): Map<SceneId, Scene> {
+export function captureAuthoredScenes(branch: Branch, currentSchema: Schema): Record<SceneId, Scene> {
   const currentScenes = extractScenesFromSchema(currentSchema);
-  const authored = new Map<SceneId, Scene>();
+  const authored: Record<SceneId, Scene> = {};
 
   for (const sceneId of branch.sceneIds) {
-    const scene = currentScenes.get(sceneId);
-    authored.set(sceneId, scene ? cloneScene(scene) : []);
+    const scene = currentScenes[sceneId];
+    authored[sceneId] = scene ? cloneScene(scene) : [];
   }
 
   return authored;
