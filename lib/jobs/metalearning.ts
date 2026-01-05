@@ -7,7 +7,8 @@ import { Branch, Scene, SceneId } from '@/types/branch';
 
 export interface MetalearningResult {
   branchId: string;
-  metalearning: string;
+  updatedGuidebook: string;
+  newRule: string | null;
 }
 
 /**
@@ -26,7 +27,10 @@ function formatScenes(scenes: Record<SceneId, Scene>): string {
 /**
  * Call the metalearning API to analyze author changes.
  */
-async function analyzeChanges(branch: Branch): Promise<string> {
+async function analyzeChanges(
+  branch: Branch,
+  existingGuidebook: string,
+): Promise<{ updatedGuidebook: string; newRule: string | null }> {
   const generated = formatScenes(branch.generated);
   const authored = branch.authored ? formatScenes(branch.authored) : generated;
 
@@ -37,6 +41,7 @@ async function analyzeChanges(branch: Branch): Promise<string> {
       generated,
       authored,
       approved: branch.approved ?? false,
+      existingGuidebook,
     } satisfies MetalearningRequest),
   });
 
@@ -45,25 +50,30 @@ async function analyzeChanges(branch: Branch): Promise<string> {
   }
 
   const data: MetalearningResponse = await response.json();
-  if (!data.success || !data.metalearning) {
+  if (!data.success) {
     throw new Error(data.error || 'Metalearning failed');
   }
 
-  return data.metalearning;
+  return {
+    updatedGuidebook: data.updatedGuidebook || existingGuidebook,
+    newRule: data.newRule,
+  };
 }
 
 /**
  * Run metalearning for a resolved branch.
- * Returns the metalearning text - caller handles persistence.
+ * Returns the updated guidebook and the new/updated rule.
  */
 export async function runMetalearning(
   branchId: string,
   branch: Branch,
+  existingGuidebook: string,
 ): Promise<MetalearningResult> {
-  const metalearning = await analyzeChanges(branch);
+  const { updatedGuidebook, newRule } = await analyzeChanges(branch, existingGuidebook);
 
   return {
     branchId,
-    metalearning,
+    updatedGuidebook,
+    newRule,
   };
 }

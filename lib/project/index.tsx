@@ -165,19 +165,16 @@ export function ProjectProvider({
 
       runJob(
         `metalearning-${resolvedBranch.id}`,
-        () => runMetalearning(resolvedBranch._id, resolvedBranch),
+        () => runMetalearning(resolvedBranch._id, resolvedBranch, guidebook),
         {
           onComplete: (result) => {
-            // Append metalearning to guidebook
-            const newGuidebook = guidebook
-              ? `${guidebook}\n${result.metalearning}`
-              : result.metalearning;
-            setProject({ guidebook: newGuidebook });
+            // Use the intelligently updated guidebook
+            setProject({ guidebook: result.updatedGuidebook });
 
-            // Update branch with metalearning
+            // Update branch with the new rule (for display)
             updateBranchMutation({
               branchId: resolvedBranch._id,
-              metalearning: result.metalearning,
+              metalearning: result.newRule || '',
             });
 
             setIsGuidebookUpdating(false);
