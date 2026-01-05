@@ -25,11 +25,6 @@ export default function List() {
         />
       ))}
 
-      {resolvedBranches.length > 0 && unresolvedBranches.length > 0 && (
-        <div className="h-px bg-neutral-100 my-2" />
-      )}
-
-      {resolvedBranches.length > 0 && <div className="text-neutral-400 text-sm">Resolved</div>}
       {resolvedBranches.map((branch) => (
         <Item
           key={branch.id}
