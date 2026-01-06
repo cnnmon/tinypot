@@ -104,8 +104,8 @@ export function ProjectProvider({
   const setProject = useCallback(
     (updates: { name?: string; script?: string[]; guidebook?: string }) => {
       // Optimistic update for script and guidebook
-      if (updates.script) setLocalScript(updates.script);
-      if (updates.guidebook) setLocalGuidebook(updates.guidebook);
+      if (updates.script !== undefined) setLocalScript(updates.script);
+      if (updates.guidebook !== undefined) setLocalGuidebook(updates.guidebook);
 
       // Persist to Convex
       updateProjectMutation({

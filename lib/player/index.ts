@@ -161,7 +161,7 @@ export default function usePlayer() {
           // Add a narrator line showing the fuzzy match info
           addLine({
             id: 'fuzzy-match-info',
-            sender: Sender.NARRATOR,
+            sender: Sender.SYSTEM,
             text: `(Matched "${input}" to "${result.optionText}" with ${Math.round(result.fuzzyMatch.confidence * 100)}% confidence)`,
           });
         }
@@ -170,7 +170,7 @@ export default function usePlayer() {
         if (result.cachedMatch && result.optionText) {
           addLine({
             id: 'cached-match-info',
-            sender: Sender.NARRATOR,
+            sender: Sender.SYSTEM,
             text: `(Matched to "${result.optionText}" from cached alias "${result.cachedMatch.matchedAlias}")`,
           });
         }

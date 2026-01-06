@@ -54,7 +54,9 @@ export async function POST(req: Request) {
     messages: [
       {
         role: 'user',
-        content: `Analyze this author's edit to AI-generated content and update the guidebook.
+        content: `You are helping an interactive fiction author refine their AI collaborator's style.
+
+The author edited AI-generated game content. Analyze WHAT they changed about the STORY, not formatting.
 
 BEFORE (AI generated):
 ${generated}
@@ -64,24 +66,27 @@ ${authored}
 
 ${approved ? 'Author ACCEPTED with edits.' : 'Author REJECTED.'}
 ${existingRulesContext}
-Your task:
-1. Determine what preference this edit reveals (if any)
-2. If a similar rule already exists, UPDATE that rule to be more comprehensive
-3. If this is a novel preference, ADD a new rule
-4. If no clear preference is shown, return action: "none"
+Focus ONLY on creative/narrative preferences like:
+- Writing style (tone, voice, sentence length)
+- Story direction (pacing, tension, player freedom)
+- World rules (what players can/cannot do)
+- Character voice or dialogue style
+
+IGNORE: formatting, punctuation, capitalization, technical structure.
 
 Respond in JSON only:
 {
   "action": "update" | "add" | "none",
   "ruleIndex": <number, 1-indexed, only if action is "update">,
-  "rule": "<the new or updated rule, max 20 words>",
+  "rule": "<creative directive, max 15 words>",
   "reasoning": "<brief explanation>"
 }
 
-Rules should be actionable directives like:
-- "Use simple, direct language"
-- "Keep narrative beats under 2 sentences"
-- "Don't let players escape the current scene easily"
+Example rules:
+- "Use short, punchy sentences"
+- "Don't let players escape easily"
+- "Add sensory details to descriptions"
+- "Keep options to 2-3 choices max"
 
 JSON response:`,
       },

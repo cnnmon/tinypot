@@ -12,14 +12,34 @@ export interface MetalearningResult {
 }
 
 /**
- * Format scenes for the API.
+ * Format a single entry as human-readable text.
+ */
+function formatEntry(entry: Scene[number], indent = ''): string {
+  switch (entry.type) {
+    case 'narrative':
+      return `${indent}${entry.text}`;
+    case 'scene':
+      return `${indent}# ${entry.label}`;
+    case 'goto':
+      return `${indent}> ${entry.target}`;
+    case 'option':
+      const optionLine = `${indent}* ${entry.text}`;
+      const thenLines = entry.then.map((e) => formatEntry(e, indent + '  ')).join('\n');
+      return thenLines ? `${optionLine}\n${thenLines}` : optionLine;
+    default:
+      return '';
+  }
+}
+
+/**
+ * Format scenes as human-readable script (not JSON).
  */
 function formatScenes(scenes: Record<SceneId, Scene>): string {
   const parts: string[] = [];
   for (const sceneId of Object.keys(scenes)) {
     const scene = scenes[sceneId];
-    const content = scene.map((e) => JSON.stringify(e)).join('\n');
-    parts.push(`[Scene: ${sceneId}]\n${content}`);
+    const content = scene.map((e) => formatEntry(e)).filter(Boolean).join('\n');
+    parts.push(`# ${sceneId}\n${content}`);
   }
   return parts.join('\n\n');
 }
