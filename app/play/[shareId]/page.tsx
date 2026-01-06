@@ -1,10 +1,13 @@
 'use client';
 
+import BranchDesign from '@/components/Editor/Branchbar/BranchDesign';
 import Player from '@/components/Player';
 import { Id } from '@/convex/_generated/dataModel';
 import { ProjectProvider } from '@/lib/project';
 import { decodeShareId } from '@/lib/share';
+import Image from 'next/image';
 import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function PlayPage() {
   const params = useParams();
@@ -27,17 +30,35 @@ export default function PlayPage() {
 }
 
 function PlayContent() {
+  const [randomNumber, setRandomNumber] = useState(0);
+
+  useEffect(() => {
+    setRandomNumber(Math.floor(Math.random() * 1000000));
+  }, []);
+
   return (
-    <div className="h-screen flex flex-col bg-neutral-50">
-      <header className="p-4 border-b border-neutral-200 bg-white">
-        <h1 className="text-lg font-medium">Play</h1>
-      </header>
-      <main className="flex-1 p-4 overflow-auto">
-        <div className="max-w-2xl mx-auto h-full">
-          <Player />
+    <div className="h-screen p-4 gap-2 flex flex-col text-center">
+      <div className="flex items-center justify-between">
+        <p className="cursor-pointer" onClick={() => (window.location.href = '/')}>
+          tinypot
+        </p>
+        <div className="relative flex justify-center items-center mb-1">
+          <BranchDesign seed={randomNumber} width={25} height={25} />
+          <Image
+            alt="plantpot"
+            src="/icons/PlantPot.svg"
+            width={15}
+            height={15}
+            className="absolute top-[12px]"
+          />
+        </div>{' '}
+      </div>
+
+      <div className="flex-1 flex items-center justify-center">
+        <div className="max-w-2xl mx-auto w-full h-full text-left">
+          <Player showTitle={false} />
         </div>
-      </main>
+      </div>
     </div>
   );
 }
-

@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react';
 import { twMerge } from 'tailwind-merge';
 import PlayerInput from './PlayerInput';
 
-export default function Player() {
+export default function Player({ showTitle = true }: { showTitle?: boolean }) {
   const { lines, status, handleNext, handleSubmit, handleRestart, handleJumpBack } = usePlayer();
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -42,7 +42,7 @@ export default function Player() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between">
-        <b>Player</b>
+        {showTitle && <b>Player</b>}
 
         <div className="w-full justify-end flex gap-1 text-neutral-400">
           <button onClick={handleJumpBack}>Back</button>
