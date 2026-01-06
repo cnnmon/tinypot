@@ -26,9 +26,9 @@ export default function Player({ showTitle = true }: { showTitle?: boolean }) {
       case Status.WAITING:
         return <PlayerInput handleSubmit={handleSubmit} />;
       case Status.MATCHING:
-        return <p className="italic">(Matching...)</p>;
+        return <p className="italic text-neutral-400">(Matching...)</p>;
       case Status.GENERATING:
-        return <p className="italic">(Generating...)</p>;
+        return <p className="italic text-neutral-400">(Generating...)</p>;
       case Status.ENDED:
         return (
           <div className="flex gap-2">

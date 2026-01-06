@@ -173,7 +173,11 @@ Guidelines:
     const thenLines: string[] = [];
 
     if (parsed.narrative && Array.isArray(parsed.narrative)) {
-      thenLines.push(...parsed.narrative);
+      // Clean up: remove newlines and empty lines
+      const cleanedNarrative = parsed.narrative
+        .map((line: string) => line.replace(/\n/g, ' ').trim())
+        .filter((line: string) => line.length > 0);
+      thenLines.push(...cleanedNarrative);
     }
 
     // Add jump based on response type
@@ -206,9 +210,14 @@ Guidelines:
 
       if (sceneLabel) {
         // Get content from newScene or generate minimal content from narrative
-        const sceneContent =
+        const rawContent =
           parsed.newScene?.content ||
           (parsed.narrative?.length ? parsed.narrative : ['You find yourself somewhere new.']);
+
+        // Clean up: remove newlines from scene content
+        const sceneContent = rawContent
+          .map((line: string) => line.replace(/\n/g, ' ').trim())
+          .filter((line: string) => line.length > 0);
 
         newScene = {
           label: sceneLabel,

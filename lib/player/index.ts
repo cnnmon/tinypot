@@ -268,6 +268,12 @@ export default function usePlayer() {
 
             setProject({ script: updatedScript });
 
+            // Update playthrough snapshot immediately so new scenes are available
+            setPlaythrough((prev) => ({
+              ...prev,
+              snapshot: generatedSchema,
+            }));
+
             // Show generation info
             addLine({
               id: 'generated-info',

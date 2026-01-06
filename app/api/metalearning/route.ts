@@ -54,39 +54,37 @@ export async function POST(req: Request) {
     messages: [
       {
         role: 'user',
-        content: `You are helping an interactive fiction author refine their AI collaborator's style.
+        content: `You help a game author teach their AI what kind of stories to write.
 
-The author edited AI-generated game content. Analyze WHAT they changed about the STORY, not formatting.
+The author edited AI-generated text. What does this reveal about their CREATIVE VISION?
 
-BEFORE (AI generated):
+BEFORE:
 ${generated}
 
-AFTER (author's version):
+AFTER:
 ${authored}
 
 ${approved ? 'Author ACCEPTED with edits.' : 'Author REJECTED.'}
 ${existingRulesContext}
-Focus ONLY on creative/narrative preferences like:
-- Writing style (tone, voice, sentence length)
-- Story direction (pacing, tension, player freedom)
-- World rules (what players can/cannot do)
-- Character voice or dialogue style
+Think like a game designer. Good rules describe:
+- TONE: "Write with dark humor" or "Keep it lighthearted"
+- PACING: "Make encounters feel urgent" or "Let moments breathe"
+- PLAYER AGENCY: "Don't let players escape easily" or "Reward creative thinking"
+- WORLD RULES: "Magic has consequences" or "NPCs remember past actions"
+- PROSE STYLE: "Use punchy sentences" or "Be poetic and evocative"
 
-IGNORE: formatting, punctuation, capitalization, technical structure.
+BAD rules (never output these):
+- Anything about markup, formatting, symbols, or structure
+- "Place X before/after Y" - this is about format, not story
+- Anything about how scenes or options are organized
 
 Respond in JSON only:
 {
   "action": "update" | "add" | "none",
   "ruleIndex": <number, 1-indexed, only if action is "update">,
-  "rule": "<creative directive, max 15 words>",
+  "rule": "<game design directive, max 12 words>",
   "reasoning": "<brief explanation>"
 }
-
-Example rules:
-- "Use short, punchy sentences"
-- "Don't let players escape easily"
-- "Add sensory details to descriptions"
-- "Keep options to 2-3 choices max"
 
 JSON response:`,
       },
