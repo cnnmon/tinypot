@@ -74,7 +74,7 @@ function ProjectContent() {
           <p className="line-clamp-4">{guidebook || 'Author is making a game about...'}</p>
         </Box>
 
-        <Box className="max-h-45 overflow-auto select-none">
+        <Box className="max-h-45 overflow-auto select-none bg-[var(--sunflower)]">
           <Branchbar />
         </Box>
       </div>

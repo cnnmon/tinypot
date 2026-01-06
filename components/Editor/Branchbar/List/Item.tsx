@@ -19,7 +19,7 @@ export default function Item({
     <button
       onClick={onClick}
       className={twMerge(
-        'group w-full text-left rounded-sm transition-all bg-transparent! no-underline! hover:bg-neutral-50',
+        'group w-full text-left transition-all bg-transparent! no-underline! hover:bg-neutral-700/20!',
         resolved && 'opacity-40',
       )}
     >

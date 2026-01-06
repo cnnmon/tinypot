@@ -189,12 +189,25 @@ Guidelines:
     // TEXT_ONLY has no jump - loops back to current decision point
 
     // Build aliases array, always including the original input
+    // Deduplicate using normalized comparison (case-insensitive, trimmed)
+    const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+    const seenNormalized = new Set<string>();
     const aliases: string[] = [];
+
+    // Add user input first
+    const normUserInput = normalize(userInput);
+    seenNormalized.add(normUserInput);
+    aliases.push(userInput);
+
+    // Add LLM-generated aliases, skipping duplicates
     if (parsed.aliases && Array.isArray(parsed.aliases)) {
-      aliases.push(...parsed.aliases);
-    }
-    if (!aliases.includes(userInput)) {
-      aliases.unshift(userInput);
+      for (const alias of parsed.aliases) {
+        const normAlias = normalize(alias);
+        if (!seenNormalized.has(normAlias)) {
+          seenNormalized.add(normAlias);
+          aliases.push(alias);
+        }
+      }
     }
 
     // Build new scene content for NEW_FORK
