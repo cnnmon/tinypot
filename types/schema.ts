@@ -8,6 +8,7 @@ export enum EntryType {
   JUMP = 'goto',
   OPTION = 'option',
   SCENE = 'scene',
+  IMAGE = 'image',
 }
 
 export interface NarrativeEntry {
@@ -32,5 +33,10 @@ export interface OptionEntry {
   then: SchemaEntry[]; // What happens when this option is chosen
 }
 
-export type SchemaEntry = NarrativeEntry | OptionEntry | JumpEntry | SceneEntry;
+export interface ImageEntry {
+  type: EntryType.IMAGE;
+  url: string;
+}
+
+export type SchemaEntry = NarrativeEntry | OptionEntry | JumpEntry | SceneEntry | ImageEntry;
 export type Schema = SchemaEntry[];

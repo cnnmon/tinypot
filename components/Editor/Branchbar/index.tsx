@@ -13,8 +13,13 @@ export default function Branchbar() {
   }
 
   if (branches.length === 0) {
-    return <p className="text-neutral-400">Play to generate branches.</p>;
+    return <p className="text-neutral-800/40">Play to generate branches.</p>;
   }
 
-  return <List />;
+  return (
+    <>
+      <h1>Branches</h1>
+      <List />
+    </>
+  );
 }

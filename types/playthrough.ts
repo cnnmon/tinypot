@@ -19,6 +19,7 @@ export interface Line {
   id: string; // SCENE-lineIdx
   sender: Sender;
   text: string;
+  type?: 'text' | 'image'; // optional for backwards compat
 }
 
 export interface Playthrough {

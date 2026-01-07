@@ -1,4 +1,5 @@
 import ConvexClientProvider from '@/components/ConvexClientProvider';
+import { ProjectKeysProvider } from '@/lib/project/ProjectKeysProvider';
 import type { Metadata } from 'next';
 import './globals.css';
 
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <ConvexClientProvider>{children}</ConvexClientProvider>
+        <ConvexClientProvider>
+          <ProjectKeysProvider>{children}</ProjectKeysProvider>
+        </ConvexClientProvider>
       </body>
     </html>
   );

@@ -11,6 +11,7 @@ import { Id } from '@/convex/_generated/dataModel';
 import { ProjectProvider, useProject } from '@/lib/project';
 import { useParams } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
+import { twMerge } from 'tailwind-merge';
 
 function ProjectContent() {
   const { project, setProject, guidebook, setGuidebook, isGuidebookUpdating } = useProject();
@@ -46,13 +47,10 @@ function ProjectContent() {
   return (
     <div className="h-screen p-4 gap-2 flex flex-col">
       <div className="flex items-center justify-between">
-        <Header
-          projectId={project.id}
-          projectName={project.name}
-          onUpdateName={(name) => setProject({ name })}
-        />
+        <Header showProjects={true} />
         <ShareButton />
       </div>
+
       <GuidebookModal
         isOpen={guidebookOpen}
         onClose={() => setGuidebookOpen(false)}
@@ -63,13 +61,15 @@ function ProjectContent() {
 
       <div className="flex gap-2">
         <Box
-          className="bg-gradient-to-b from-[#EBF7D2] via-[#B7DCBD] to-white min-h-45 w-5 cursor-pointer hover:opacity-90"
+          className={twMerge(
+            'bg-gradient-to-b from-[#EBF7D2] via-[#B7DCBD] to-white min-h-45 w-5 cursor-pointer hover:opacity-90',
+            isGuidebookUpdating &&
+              'bg-gradient-to-b via-[var(--orange)] from-[var(--rose)] to-white',
+          )}
           onClick={() => setGuidebookOpen(true)}
         >
           {isGuidebookUpdating && (
-            <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full animate-pulse self-start">
-              Updating...
-            </span>
+            <span className="text-neutral-800/40 animate-pulse">(Updating guidebook...)</span>
           )}
           <p className="line-clamp-4">{guidebook || 'Author is making a game about...'}</p>
         </Box>
@@ -109,7 +109,7 @@ export default function ProjectPage() {
   if (!isValidId) {
     return (
       <div className="h-screen p-4 gap-2 flex flex-col">
-        <Header />
+        <Header showProjects={true} />
         <div className="flex-1 flex items-center justify-center">
           <p className="text-neutral-400">
             Invalid project ID. Please select a project from the dropdown.

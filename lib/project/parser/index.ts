@@ -122,6 +122,24 @@ export function parseIntoSchema(entries: string[]): Schema {
       continue;
     }
 
+    // Image directive: [image="url"]
+    const imageMatch = trimmed.match(/^\[image="(.+?)"\]$/);
+    if (imageMatch) {
+      const url = imageMatch[1];
+      const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+      const isValidImage = validExtensions.some(ext => 
+        url.toLowerCase().endsWith(ext) || url.toLowerCase().includes(ext + '?')
+      );
+      
+      if (isValidImage) {
+        schema.push({ type: EntryType.IMAGE, url });
+      } else {
+        schema.push({ type: EntryType.NARRATIVE, text: `[Invalid image URL: ${url}]` });
+      }
+      i++;
+      continue;
+    }
+
     // Default: narrative text
     schema.push({
       type: EntryType.NARRATIVE,

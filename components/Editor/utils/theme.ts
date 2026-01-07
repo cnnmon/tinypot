@@ -100,6 +100,10 @@ export const bonsaiSyntaxTheme = EditorView.theme({
   '.cm-bonsai-indent': {
     color: '#6b7280',
   },
+  '.cm-bonsai-image': {
+    color: '#d97706',
+    fontStyle: 'italic',
+  },
 });
 
 // Custom highlighter that applies styles based on line content
@@ -146,6 +150,8 @@ function bonsaiLineHighlighter(view: EditorView) {
       }
     } else if (trimmed.startsWith('*')) {
       className = 'cm-bonsai-option';
+    } else if (/^\[image="[^"]+"\]$/.test(trimmed)) {
+      className = 'cm-bonsai-image';
     } else if (text.startsWith('   ') || text.startsWith('\t')) {
       className = 'cm-bonsai-indent';
     }

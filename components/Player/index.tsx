@@ -53,6 +53,22 @@ export default function Player({ showTitle = true }: { showTitle?: boolean }) {
       <div className="space-y-2 py-2 h-[calc(100%-50px)] overflow-auto">
         {lines.map((line, i) => {
           const isPlayer = line.sender === Sender.PLAYER;
+          const isImage = line.type === 'image';
+
+          if (isImage) {
+            return (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2, ease: 'easeInOut' }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={line.text} alt="" className="max-w-full max-h-64 rounded" />
+              </motion.div>
+            );
+          }
+
           return (
             <motion.p
               key={i}

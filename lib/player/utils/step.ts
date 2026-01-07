@@ -1,5 +1,5 @@
 import { Line, Sender } from '@/types/playthrough';
-import { EntryType, JumpEntry, Schema } from '@/types/schema';
+import { EntryType, ImageEntry, JumpEntry, NarrativeEntry, Schema } from '@/types/schema';
 import { getScanStart } from './getScanStart';
 
 function makeLineId(sceneId: string, lineIdx: number): string {
@@ -31,7 +31,7 @@ function makeErrorLine(errorType: string, message: string): Line {
  *   3: decision point (end of scene, implicit loop)
  */
 interface ScenePosition {
-  type: 'narrative' | 'wait';
+  type: 'narrative' | 'image' | 'wait';
   narrativeIdx?: number;
   text?: string;
 }
@@ -44,16 +44,17 @@ function buildScenePositions(schema: Schema, scanStart: number): ScenePosition[]
     const entry = schema[i];
     if (entry.type === EntryType.SCENE) break;
 
-    if (entry.type === EntryType.NARRATIVE) {
-      // If there were options before this narrative, add a decision point
+    if (entry.type === EntryType.NARRATIVE || entry.type === EntryType.IMAGE) {
+      // If there were options before this narrative/image, add a decision point
       if (pendingOptions) {
         positions.push({ type: 'wait' });
         pendingOptions = false;
       }
+      const isImage = entry.type === EntryType.IMAGE;
       positions.push({
-        type: 'narrative',
-        narrativeIdx: positions.filter((p) => p.type === 'narrative').length,
-        text: entry.text,
+        type: isImage ? 'image' : 'narrative',
+        narrativeIdx: positions.filter((p) => p.type === 'narrative' || p.type === 'image').length,
+        text: isImage ? (entry as ImageEntry).url : (entry as NarrativeEntry).text,
       });
     } else if (entry.type === EntryType.OPTION) {
       pendingOptions = true;
@@ -146,6 +147,7 @@ export function step({
           id: makeLineId(currentScene, currentLineIdx),
           sender: Sender.NARRATOR,
           text: pos.text!,
+          ...(pos.type === 'image' && { type: 'image' as const }),
         },
       };
     }

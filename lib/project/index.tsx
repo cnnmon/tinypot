@@ -319,3 +319,7 @@ export function useProject() {
   }
   return context;
 }
+
+export function useProjectOptional() {
+  return useContext(ProjectContext);
+}
