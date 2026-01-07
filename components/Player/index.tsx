@@ -47,8 +47,8 @@ export default function Player({
 
   return (
     <div className="h-full flex flex-col">
-      {header}
       <div className={twMerge('space-y-2 py-2 flex flex-col relative justify-between h-full')}>
+        {header}
         <div className="flex flex-col gap-2 pb-20 overflow-scroll">
           {lines.map((line, i) => {
             const isPlayer = line.sender === Sender.PLAYER;
