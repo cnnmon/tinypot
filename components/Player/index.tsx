@@ -7,7 +7,13 @@ import { useEffect, useRef } from 'react';
 import { twMerge } from 'tailwind-merge';
 import PlayerInput from './PlayerInput';
 
-export default function Player({ className }: { className?: string }) {
+export default function Player({
+  header,
+  className,
+}: {
+  header?: React.ReactNode;
+  className?: string;
+}) {
   const { lines, status, handleNext, handleSubmit, handleRestart } = usePlayerContext();
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -41,12 +47,9 @@ export default function Player({ className }: { className?: string }) {
 
   return (
     <div className="h-full flex flex-col">
-      <div
-        className={twMerge(
-          'space-y-2 py-2 flex flex-1 flex-col overflow-scroll relative justify-between',
-        )}
-      >
-        <div className="flex flex-col gap-2 pb-20">
+      {header}
+      <div className={twMerge('space-y-2 py-2 flex flex-col relative justify-between h-full')}>
+        <div className="flex flex-col gap-2 pb-20 overflow-scroll">
           {lines.map((line, i) => {
             const isPlayer = line.sender === Sender.PLAYER;
             const isImage = line.type === 'image';
@@ -88,7 +91,7 @@ export default function Player({ className }: { className?: string }) {
           id={lines.length.toString()}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={twMerge('w-full', className)}
+          className={twMerge('w-full absolute bottom-0', className)}
         >
           {renderStatus()}
         </motion.div>

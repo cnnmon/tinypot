@@ -104,20 +104,23 @@ function ProjectContent() {
           className="w-2 cursor-col-resize hover:bg-gray-300 transition-colors shrink-0"
         />
         <Box style={{ width: `${100 - leftWidth}%` }}>
-          <div>
-            <div className="flex items-center justify-between">
-              <h1>Player</h1>
-              <div className="w-full justify-end flex gap-1 text-neutral-400">
-                <button onClick={handleJumpBack} className="p-1 rounded">
-                  <ArrowLeftIcon width={14} height={14} />
-                </button>
-                <button onClick={handleRestart} className="p-1 rounded">
-                  <ArrowPathIcon width={14} height={14} />
-                </button>
+          <Player
+            header={
+              <div>
+                <div className="flex items-center justify-between">
+                  <h1>Player</h1>
+                  <div className="w-full justify-end flex gap-1 text-neutral-400">
+                    <button onClick={handleJumpBack} className="p-1 rounded">
+                      <ArrowLeftIcon width={14} height={14} />
+                    </button>
+                    <button onClick={handleRestart} className="p-1 rounded">
+                      <ArrowPathIcon width={14} height={14} />
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <Player />
+            }
+          />
         </Box>
       </div>
     </div>

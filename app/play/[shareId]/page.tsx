@@ -36,7 +36,7 @@ function PlayContent() {
 
   return (
     <div className="h-full p-4 gap-2 flex flex-col text-center">
-      <div className="flex items-center justify-between">
+      <div className="fixed flex p-2 px-4 bg-white top-0 left-0 w-full items-center justify-between z-[1]">
         <Header showProjects={false} />
         <div className="flex gap-1">
           <button onClick={handleJumpBack} className="p-1 rounded">
