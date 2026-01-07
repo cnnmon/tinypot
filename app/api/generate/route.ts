@@ -130,7 +130,7 @@ Respond in JSON format only:
   "responseType": "TEXT_ONLY" | "LINK_SCENE" | "NEW_FORK",
   "reasoning": "<one sentence explaining your choice>",
   "optionText": "<clean, polished version for display>",
-  "aliases": ["<player's input>", "<other phrasings>"],
+  "aliases": ["<alternative phrasings players might use>"],
   "narrative": ["<line 1>", "<line 2>", ...],
   
   // For LINK_SCENE only:
@@ -188,18 +188,15 @@ Guidelines:
     }
     // TEXT_ONLY has no jump - loops back to current decision point
 
-    // Build aliases array, always including the original input
-    // Deduplicate using normalized comparison (case-insensitive, trimmed)
+    // Build aliases array from LLM response only (LLM already includes user input in its aliases)
+    // Deduplicate and exclude aliases that match the optionText
     const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
-    const seenNormalized = new Set<string>();
+    const optionText = parsed.optionText || userInput;
+    const normOptionText = normalize(optionText);
+    const seenNormalized = new Set<string>([normOptionText]); // Exclude optionText itself
     const aliases: string[] = [];
 
-    // Add user input first
-    const normUserInput = normalize(userInput);
-    seenNormalized.add(normUserInput);
-    aliases.push(userInput);
-
-    // Add LLM-generated aliases, skipping duplicates
+    // Add LLM-generated aliases, skipping duplicates and optionText matches
     if (parsed.aliases && Array.isArray(parsed.aliases)) {
       for (const alias of parsed.aliases) {
         const normAlias = normalize(alias);

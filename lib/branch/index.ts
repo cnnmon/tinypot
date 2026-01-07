@@ -85,28 +85,29 @@ export function flattenEntries(entries: SchemaEntry[]): SchemaEntry[] {
 /**
  * Extract scenes from a schema as a Record.
  * Returns Record<SceneId, Scene> where Scene includes flattened entries (including nested then blocks).
+ * Content before the first scene marker is assigned to "START".
  */
 export function extractScenesFromSchema(schema: Schema): Record<SceneId, Scene> {
   const scenes: Record<SceneId, Scene> = {};
-  let currentSceneId: string | null = null;
+  let currentSceneId: string = 'START'; // Default to START for content before first scene
   let currentScene: Scene = [];
 
   for (const entry of schema) {
     if (entry.type === EntryType.SCENE) {
-      // Save previous scene (flattened)
-      if (currentSceneId !== null) {
+      // Save previous scene (flattened) if it has content
+      if (currentScene.length > 0) {
         scenes[currentSceneId] = flattenEntries(currentScene);
       }
       // Start new scene
       currentSceneId = entry.label;
       currentScene = [];
-    } else if (currentSceneId !== null) {
+    } else {
       currentScene.push(entry);
     }
   }
 
-  // Save last scene (flattened)
-  if (currentSceneId !== null) {
+  // Save last scene (flattened) if it has content
+  if (currentScene.length > 0) {
     scenes[currentSceneId] = flattenEntries(currentScene);
   }
 
@@ -197,7 +198,8 @@ export function createBranch(
 
 /**
  * Merge new changes into an existing branch.
- * Updates the generated scenes with new changes while preserving original base.
+ * Uses the CURRENT state (before this generation) as the new base,
+ * so only the latest changes are highlighted as "new".
  */
 export function mergeBranchChanges(
   existingBranch: Branch,
@@ -210,27 +212,29 @@ export function mergeBranchChanges(
     affectedSceneIds: newAffectedIds,
   } = computeSchemaDiff(baseSchema, generatedSchema);
 
-  // Merge into existing branch
-  const updatedBase = { ...existingBranch.base };
-  const updatedGenerated = { ...existingBranch.generated };
-  const updatedSceneIds = [...existingBranch.sceneIds];
+  // Use the new base for all scenes - this represents the state BEFORE this generation
+  // This ensures only the LATEST changes are highlighted as yellow
+  const updatedBase = { ...newBase };
+  const updatedGenerated = { ...newGenerated };
+  const updatedSceneIds = [...newAffectedIds];
 
-  for (const sceneId of newAffectedIds) {
-    // Only add to base if this scene wasn't already tracked
-    if (!updatedBase[sceneId]) {
-      updatedBase[sceneId] = newBase[sceneId];
-    }
-    // Always update generated to latest
-    updatedGenerated[sceneId] = newGenerated[sceneId];
-    // Add to sceneIds if not already there
+  // Keep track of scenes that were in the previous branch but not affected by this merge
+  // (These are resolved/unchanged scenes from previous generations)
+  for (const sceneId of existingBranch.sceneIds) {
     if (!updatedSceneIds.includes(sceneId)) {
-      updatedSceneIds.push(sceneId);
+      // Scene was in previous branch but not changed in this generation
+      // Keep the previous generated state as both base and generated (no diff)
+      if (existingBranch.generated[sceneId]) {
+        updatedBase[sceneId] = existingBranch.generated[sceneId];
+        updatedGenerated[sceneId] = existingBranch.generated[sceneId];
+        updatedSceneIds.push(sceneId);
+      }
     }
   }
 
   return {
     ...existingBranch,
-    title: generateBranchTitle(updatedSceneIds),
+    title: generateBranchTitle(newAffectedIds), // Title reflects only NEW changes
     sceneIds: updatedSceneIds,
     base: updatedBase,
     generated: updatedGenerated,
@@ -264,7 +268,10 @@ export function computeSceneToBranchMap(unresolvedBranches: Branch[]): Record<Sc
 /**
  * Capture current scene states from schema for branch closure.
  */
-export function captureAuthoredScenes(branch: Branch, currentSchema: Schema): Record<SceneId, Scene> {
+export function captureAuthoredScenes(
+  branch: Branch,
+  currentSchema: Schema,
+): Record<SceneId, Scene> {
   const currentScenes = extractScenesFromSchema(currentSchema);
   const authored: Record<SceneId, Scene> = {};
 

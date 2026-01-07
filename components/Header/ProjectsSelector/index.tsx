@@ -5,7 +5,12 @@ import { Id } from '@/convex/_generated/dataModel';
 import { useProjectOptional } from '@/lib/project';
 import { DEFAULT_LINES } from '@/lib/project/constants';
 import { useProjectKeys } from '@/lib/project/ProjectKeysProvider';
-import { ChevronDownIcon, ChevronUpIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  PencilSquareIcon,
+  TrashIcon,
+} from '@heroicons/react/24/outline';
 import { useMutation } from 'convex/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -15,7 +20,7 @@ export default function ProjectsSelector() {
   const projectContext = useProjectOptional();
   const project = projectContext?.project;
   const setProject = projectContext?.setProject;
-  const { projectKeys, addKey, removeKey } = useProjectKeys();
+  const { projects, addKey, removeKey } = useProjectKeys();
 
   const router = useRouter();
   const [editName, setEditName] = useState(project?.name || '');
@@ -123,7 +128,7 @@ export default function ProjectsSelector() {
             onChange={(e) => setEditName(e.target.value)}
             onBlur={handleSaveEdit}
             onKeyDown={handleKeyDown}
-            className="px-1 py-0.5 border border-neutral-300 rounded text-sm w-40"
+            className="px-1 py-0.5 border border-neutral-300 rounded w-40"
           />
         ) : (
           <>
@@ -140,17 +145,13 @@ export default function ProjectsSelector() {
             </button>
             {project && (
               <>
-                <button
-                  onClick={handleStartEdit}
-                  className="p-1 hover:bg-neutral-100 rounded"
-                  title="Edit project name"
-                >
-                  <PencilIcon width={14} height={14} />
+                <button onClick={handleStartEdit} className="p-1 rounded" title="Edit project name">
+                  <PencilSquareIcon width={14} height={14} />
                 </button>
                 <button
                   onClick={handleDelete}
                   disabled={isDeleting}
-                  className="p-1 hover:bg-red-50 rounded text-neutral-500 hover:text-red-600"
+                  className="p-1 rounded"
                   title="Delete project"
                 >
                   <TrashIcon width={14} height={14} />
@@ -171,21 +172,19 @@ export default function ProjectsSelector() {
             {isCreating ? 'Creating...' : '+ New project'}
           </button>
 
-          {projectKeys.length > 0 && (
+          {projects.length > 0 && (
             <div className="max-h-[300px] overflow-auto">
-              {projectKeys.map((projectId) => (
+              {projects.map((p) => (
                 <ProjectItem
-                  key={projectId}
-                  projectId={projectId as Id<'projects'>}
+                  key={p._id}
+                  project={{ id: p._id, ...p }}
                   onSelect={handleSelectProject}
                 />
               ))}
             </div>
           )}
 
-          {projectKeys.length === 0 && (
-            <p className="p-3 text-neutral-400 text-sm">No projects yet</p>
-          )}
+          {projects.length === 0 && <p className="p-3 text-neutral-400">No projects yet</p>}
         </div>
       )}
     </div>

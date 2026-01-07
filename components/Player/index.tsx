@@ -1,14 +1,14 @@
 'use client';
 
-import usePlayer, { Status } from '@/lib/player';
+import { Status, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { Sender } from '@/types/playthrough';
 import { motion } from 'motion/react';
 import { useEffect, useRef } from 'react';
 import { twMerge } from 'tailwind-merge';
 import PlayerInput from './PlayerInput';
 
-export default function Player({ showTitle = true }: { showTitle?: boolean }) {
-  const { lines, status, handleNext, handleSubmit, handleRestart, handleJumpBack } = usePlayer();
+export default function Player({ className }: { className?: string }) {
+  const { lines, status, handleNext, handleSubmit, handleRestart } = usePlayerContext();
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,60 +41,57 @@ export default function Player({ showTitle = true }: { showTitle?: boolean }) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between">
-        {showTitle && <b>Player</b>}
+      <div
+        className={twMerge(
+          'space-y-2 py-2 flex flex-1 flex-col overflow-scroll relative justify-between',
+        )}
+      >
+        <div className="flex flex-col gap-2 pb-20">
+          {lines.map((line, i) => {
+            const isPlayer = line.sender === Sender.PLAYER;
+            const isImage = line.type === 'image';
 
-        <div className="w-full justify-end flex gap-1 text-neutral-400">
-          <button onClick={handleJumpBack}>Back</button>
-          <button onClick={handleRestart}>Restart</button>
-        </div>
-      </div>
+            if (isImage) {
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2, ease: 'easeInOut' }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={line.text} alt="" className="max-w-full max-h-64 rounded" />
+                </motion.div>
+              );
+            }
 
-      <div className="space-y-2 py-2 h-[calc(100%-50px)] overflow-auto">
-        {lines.map((line, i) => {
-          const isPlayer = line.sender === Sender.PLAYER;
-          const isImage = line.type === 'image';
-
-          if (isImage) {
             return (
-              <motion.div
+              <motion.p
                 key={i}
-                initial={{ opacity: 0 }}
+                className={twMerge(
+                  line.sender === Sender.SYSTEM && 'italic text-neutral-400',
+                  isPlayer && 'text-[#468D52]',
+                )}
+                initial={isPlayer ? false : { opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.2, ease: 'easeInOut' }}
+                transition={{ duration: 0.1, ease: 'easeInOut' }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={line.text} alt="" className="max-w-full max-h-64 rounded" />
-              </motion.div>
+                {isPlayer ? '> ' : null}
+                {line.text}
+              </motion.p>
             );
-          }
-
-          return (
-            <motion.p
-              key={i}
-              className={twMerge(
-                line.sender === Sender.SYSTEM && 'italic text-neutral-400',
-                isPlayer && 'text-[#468D52]',
-              )}
-              initial={isPlayer ? false : { opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.1, ease: 'easeInOut' }}
-            >
-              {isPlayer ? '> ' : null}
-              {line.text}
-            </motion.p>
-          );
-        })}
+          })}
+          <div ref={endRef} />
+        </div>
 
         <motion.div
           id={lines.length.toString()}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
+          className={twMerge('w-full', className)}
         >
           {renderStatus()}
         </motion.div>
-
-        <div ref={endRef} />
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import usePlayer, { Status } from '@/lib/player';
+import { Status, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { useState } from 'react';
 
 export default function PlayerInput({
@@ -6,7 +6,7 @@ export default function PlayerInput({
 }: {
   handleSubmit: (input: string) => void | Promise<void>;
 }) {
-  const { status } = usePlayer();
+  const { status } = usePlayerContext();
   const [input, setInput] = useState<string>('');
   const isSubmitting = status === Status.MATCHING;
 
@@ -25,7 +25,7 @@ export default function PlayerInput({
         placeholder="What do you want to do?"
         onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
         disabled={isSubmitting}
-        className="pb-10! bordered"
+        className="pb-10! bordered w-full bg-white"
       />
       <button
         disabled={input.length === 0 || isSubmitting}

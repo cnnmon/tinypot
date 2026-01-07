@@ -54,8 +54,8 @@ export default function Editor() {
         const pos = update.state.selection.main.head;
         const line = update.state.doc.lineAt(pos);
 
-        // Find which scene this line is in
-        let currentScene: string | null = null;
+        // Find which scene this line is in (default to START for content before first scene)
+        let currentScene: string = 'START';
         for (let i = 1; i <= line.number; i++) {
           const l = update.state.doc.line(i);
           const trimmed = l.text.trimStart();
@@ -65,11 +65,9 @@ export default function Editor() {
         }
 
         // Check if scene belongs to a branch
-        if (currentScene) {
-          const branchId = sceneToBranchMap[currentScene];
-          if (branchId && branchId !== selectedBranchId) {
-            setSelectedBranchId(branchId);
-          }
+        const branchId = sceneToBranchMap[currentScene];
+        if (branchId && branchId !== selectedBranchId) {
+          setSelectedBranchId(branchId);
         }
       }
     });

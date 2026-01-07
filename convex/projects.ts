@@ -8,6 +8,17 @@ export const get = query({
   },
 });
 
+export const listByIds = query({
+  args: { projectIds: v.array(v.id("projects")) },
+  handler: async (ctx, { projectIds }) => {
+    const projects = await Promise.all(
+      projectIds.map((id) => ctx.db.get(id))
+    );
+    // Filter out null (deleted projects)
+    return projects.filter((p) => p !== null);
+  },
+});
+
 export const getOrCreate = mutation({
   args: {
     authorId: v.string(),

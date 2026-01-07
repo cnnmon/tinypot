@@ -1,22 +1,18 @@
-import { api } from '@/convex/_generated/api';
-import { Id } from '@/convex/_generated/dataModel';
-import { useQuery } from 'convex/react';
+import { Project } from '@/types/project';
 
 export default function ProjectItem({
-  projectId,
+  project,
   onSelect,
 }: {
-  projectId: Id<'projects'>;
+  project: Project;
   onSelect: (id: string) => void;
 }) {
-  const project = useQuery(api.projects.get, { projectId });
-
   return (
     <button
       className="w-full text-left px-3 py-2 hover:bg-neutral-50 bg-transparent! no-underline!"
-      onClick={() => onSelect(projectId)}
+      onClick={() => onSelect(project.id)}
     >
-      <span className="truncate block">{project?.name || 'Loading...'}</span>
+      <span className="truncate block">{project.name}</span>
     </button>
   );
 }

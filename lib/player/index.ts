@@ -25,7 +25,8 @@ export enum Status {
 }
 
 export default function usePlayer() {
-  const { projectId, schema, project, setProject, addOrMergeBranch, guidebook } = useProject();
+  const { projectId, schema, project, setProject, addOrMergeBranch, guidebook, playerResetKey } =
+    useProject();
   const [playthrough, setPlaythrough] = useState<Playthrough>({
     id: 'abcdef',
     projectId: projectId,
@@ -33,6 +34,9 @@ export default function usePlayer() {
     lines: [],
     createdAt: Date.now(),
   });
+
+  // Track previous reset key to detect changes
+  const prevResetKeyRef = useRef(playerResetKey);
 
   /* Dynamic states */
   const sceneMap = useMemo(
@@ -59,6 +63,25 @@ export default function usePlayer() {
       }));
     }
   }, [schema, playthrough.snapshot]);
+
+  // Reset player when playerResetKey changes (e.g., after branch rejection)
+  useEffect(() => {
+    if (playerResetKey !== prevResetKeyRef.current) {
+      prevResetKeyRef.current = playerResetKey;
+      // Reset the player
+      setPlaythrough((prev) => ({
+        ...prev,
+        snapshot: JSON.parse(JSON.stringify(schema)),
+        lines: [],
+        createdAt: Date.now(),
+      }));
+      setState({
+        status: Status.RUNNING,
+        currentSceneId: 'START',
+        currentLineIdx: 0,
+      });
+    }
+  }, [playerResetKey, schema]);
 
   // Automatically go next until you can't
   const addLine = useCallback(

@@ -12,25 +12,60 @@ import { EntryType, SchemaEntry } from '@/types/schema';
 import { StateEffect, StateField } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
 
-// Convert schema entry to text for comparison
-function entryToText(entry: SchemaEntry): string {
+// Extract the primary identifier from a schema entry for comparison
+// For options, this is just the option text (ignoring aliases)
+function entryToComparisonKey(entry: SchemaEntry): string {
   switch (entry.type) {
     case EntryType.NARRATIVE:
-      return entry.text;
+      return `narrative:${entry.text}`;
     case EntryType.OPTION:
-      return `* ${entry.text}`;
+      // Compare by primary option text only, ignoring aliases
+      return `option:${entry.text}`;
     case EntryType.JUMP:
-      return `> ${entry.target}`;
+      return `jump:${entry.target}`;
     case EntryType.SCENE:
-      return `# ${entry.label}`;
+      return `scene:${entry.label}`;
+    case EntryType.IMAGE:
+      return `image:${entry.url}`;
     default:
       return '';
   }
 }
 
-// Convert scene to normalized text lines for comparison
-function sceneToTextLines(scene: Scene): string[] {
-  return scene.map((entry) => entryToText(entry).trim().toLowerCase());
+// Convert scene to comparison keys for lookup
+function sceneToComparisonKeys(scene: Scene): Set<string> {
+  return new Set(scene.map((entry) => entryToComparisonKey(entry).toLowerCase()));
+}
+
+// Parse a line from the editor and return its comparison key
+function lineToComparisonKey(line: string): string {
+  const trimmed = line.trim();
+
+  // Option line: * text or * [text, alias1, alias2]
+  if (trimmed.startsWith('*')) {
+    const optionPart = trimmed.slice(1).trim();
+    // Extract primary text from bracket format or plain format
+    if (optionPart.startsWith('[') && optionPart.includes(']')) {
+      const inner = optionPart.slice(1, optionPart.indexOf(']'));
+      const primaryText = inner.split(',')[0].trim();
+      return `option:${primaryText}`;
+    }
+    return `option:${optionPart}`;
+  }
+
+  // Jump line: > target
+  if (trimmed.startsWith('>')) {
+    return `jump:${trimmed.slice(1).trim()}`;
+  }
+
+  // Image directive: [image="url"]
+  const imageMatch = trimmed.match(/^\[image="(.+?)"\]$/);
+  if (imageMatch) {
+    return `image:${imageMatch[1]}`;
+  }
+
+  // Default: narrative
+  return `narrative:${trimmed}`;
 }
 
 // State effect to update branch highlight state
@@ -72,7 +107,7 @@ function buildBranchDecorations(view: EditorView): DecorationSet {
 
   const decorations: { from: number; deco: Decoration }[] = [];
   const doc = view.state.doc;
-  let currentSceneId: string | null = null;
+  let currentSceneId: string = 'START'; // Default to START for content before first scene
 
   // Parse document to find scenes and apply decorations
   for (let i = 1; i <= doc.lines; i++) {
@@ -88,23 +123,23 @@ function buildBranchDecorations(view: EditorView): DecorationSet {
     const isEmptyLine = trimmed === '';
 
     // Check if current scene is affected by the selected branch
-    if (currentSceneId && affectedScenes.has(currentSceneId)) {
+    if (affectedScenes.has(currentSceneId)) {
       // Get both base and generated scenes for comparison
       const baseScene = selectedBranch.base[currentSceneId];
       const generatedScene = selectedBranch.generated[currentSceneId];
 
-      const baseLines = baseScene ? sceneToTextLines(baseScene) : [];
-      const generatedLines = generatedScene ? sceneToTextLines(generatedScene) : [];
-
-      // Normalize current line for comparison
-      const currentLineNormalized = trimmed.toLowerCase();
+      const baseKeys = baseScene ? sceneToComparisonKeys(baseScene) : new Set<string>();
+      const generatedKeys = generatedScene
+        ? sceneToComparisonKeys(generatedScene)
+        : new Set<string>();
 
       // Determine line type based on presence in base vs generated
       let lineClass = 'cm-branch-scene'; // Default: gray (affected scene)
 
       if (!isEmptyLine) {
-        const inBase = baseLines.includes(currentLineNormalized);
-        const inGenerated = generatedLines.includes(currentLineNormalized);
+        const lineKey = lineToComparisonKey(trimmed).toLowerCase();
+        const inBase = baseKeys.has(lineKey);
+        const inGenerated = generatedKeys.has(lineKey);
 
         if (inGenerated && !inBase) {
           // Line exists in generated but NOT in base = AI-added

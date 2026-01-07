@@ -17,14 +17,7 @@ import { runMetalearning } from '@/lib/jobs/metalearning';
 import { Branch, SceneId } from '@/types/branch';
 import { Schema } from '@/types/schema';
 import { useMutation, useQuery } from 'convex/react';
-import {
-  createContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from 'react';
+import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 import { DEFAULT_LINES } from './constants';
 import { parseIntoSchema } from './parser';
 
@@ -45,20 +38,22 @@ interface ProjectContextValue {
   };
   setProject: (updates: { name?: string; script?: string[]; guidebook?: string }) => void;
   schema: Schema;
+
   // Branch state
   branches: ConvexBranch[];
   unresolvedBranches: ConvexBranch[];
   selectedBranchId: string | null;
   setSelectedBranchId: (id: string | null) => void;
   sceneToBranchMap: Record<SceneId, string>;
+
   // Branch actions
   addOrMergeBranch: (branch: Branch, baseSchema: Schema, generatedSchema: Schema) => void;
   approveBranch: (branchId: string) => void;
   rejectBranch: (branchId: string, shouldRevert: boolean) => void;
-  // Guidebook state
-  guidebook: string;
-  setGuidebook: (guidebook: string) => void;
-  isGuidebookUpdating: boolean;
+  isMetalearning: boolean;
+
+  // Player reset trigger - changes when player should reset
+  playerResetKey: number;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -71,7 +66,8 @@ export function ProjectProvider({
   projectId: Id<'projects'>;
 }) {
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
-  const [isGuidebookUpdating, setIsGuidebookUpdating] = useState(false);
+  const [isMetalearning, setIsMetalearning] = useState(false);
+  const [playerResetKey, setPlayerResetKey] = useState(0);
 
   // Convex mutations
   const updateProjectMutation = useMutation(api.projects.update);
@@ -113,15 +109,7 @@ export function ProjectProvider({
         ...updates,
       });
     },
-    [projectId, updateProjectMutation]
-  );
-
-  // Guidebook setter
-  const setGuidebook = useCallback(
-    (newGuidebook: string) => {
-      setProject({ guidebook: newGuidebook });
-    },
-    [setProject]
+    [projectId, updateProjectMutation],
   );
 
   // Schema from project script
@@ -161,7 +149,7 @@ export function ProjectProvider({
   // Kick off metalearning job after branch resolution
   const startMetalearningJob = useCallback(
     (resolvedBranch: ConvexBranch) => {
-      setIsGuidebookUpdating(true);
+      setIsMetalearning(true);
 
       runJob(
         `metalearning-${resolvedBranch.id}`,
@@ -177,16 +165,16 @@ export function ProjectProvider({
               metalearning: result.newRule || '',
             });
 
-            setIsGuidebookUpdating(false);
+            setIsMetalearning(false);
           },
           onError: (error) => {
             console.error('Metalearning failed:', error);
-            setIsGuidebookUpdating(false);
+            setIsMetalearning(false);
           },
-        }
+        },
       );
     },
-    [guidebook, setProject, updateBranchMutation]
+    [guidebook, setProject, updateBranchMutation],
   );
 
   // Add or merge branch - one branch per playthrough
@@ -194,7 +182,7 @@ export function ProjectProvider({
     (branch: Branch, baseSchema: Schema, generatedSchema: Schema) => {
       // Check if there's already an unresolved branch for this playthrough
       const existingBranch = branches.find(
-        (b) => b.playthroughId === branch.playthroughId && !isResolved(b)
+        (b) => b.playthroughId === branch.playthroughId && !isResolved(b),
       );
 
       if (existingBranch) {
@@ -226,7 +214,7 @@ export function ProjectProvider({
         });
       }
     },
-    [projectId, branches, updateBranchMutation, createBranchMutation]
+    [projectId, branches, updateBranchMutation, createBranchMutation],
   );
 
   // Approve branch - capture authored scenes and mark as approved
@@ -248,7 +236,7 @@ export function ProjectProvider({
       // Kick off metalearning with the resolved branch data
       startMetalearningJob({ ...branch, authored, approved: true });
     },
-    [branches, schema, updateBranchMutation, startMetalearningJob]
+    [branches, schema, updateBranchMutation, startMetalearningJob],
   );
 
   // Reject branch - optionally revert to base script
@@ -272,10 +260,13 @@ export function ProjectProvider({
 
       setSelectedBranchId(null);
 
+      // Reset the player
+      setPlayerResetKey((k) => k + 1);
+
       // Kick off metalearning
       startMetalearningJob({ ...branch, authored, approved: false });
     },
-    [branches, schema, setProject, updateBranchMutation, startMetalearningJob]
+    [branches, schema, setProject, updateBranchMutation, startMetalearningJob],
   );
 
   // Show loading state while project data is loading
@@ -302,9 +293,8 @@ export function ProjectProvider({
         addOrMergeBranch,
         approveBranch,
         rejectBranch,
-        guidebook,
-        setGuidebook,
-        isGuidebookUpdating,
+        isMetalearning,
+        playerResetKey,
       }}
     >
       {children}

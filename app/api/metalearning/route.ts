@@ -73,10 +73,17 @@ Think like a game designer. Good rules describe:
 - WORLD RULES: "Magic has consequences" or "NPCs remember past actions"
 - PROSE STYLE: "Use punchy sentences" or "Be poetic and evocative"
 
+CRITICAL - when to use "none":
+- If ANY existing rule covers the same concept, use "none"
+- If the insight is about redundancy/repetition and a rule about that exists, use "none"
+- If you can't identify a TRULY NEW insight not already captured, use "none"
+- When in doubt, use "none" - the guidebook should stay minimal
+
 BAD rules (never output these):
 - Anything about markup, formatting, symbols, or structure
 - "Place X before/after Y" - this is about format, not story
 - Anything about how scenes or options are organized
+- Rules similar to ones that already exist (use "none" instead)
 
 Respond in JSON only:
 {
@@ -113,6 +120,31 @@ JSON response:`,
       } satisfies MetalearningResponse);
     }
 
+    // Check if a similar rule already exists (safety net)
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    const newRuleNorm = normalize(parsed.rule);
+    const newRuleWords = new Set(newRuleNorm.split(/\s+/));
+
+    const isSimilarToExisting = existingLines.some((existing) => {
+      const existingNorm = normalize(existing);
+      const existingWords = new Set(existingNorm.split(/\s+/));
+
+      // Check for significant word overlap (>50% of words shared)
+      const sharedWords = [...newRuleWords].filter((w) => existingWords.has(w) && w.length > 3);
+      const overlapRatio = sharedWords.length / Math.max(newRuleWords.size, existingWords.size);
+
+      return overlapRatio > 0.4;
+    });
+
+    // If similar rule exists, don't add
+    if (parsed.action === 'add' && isSimilarToExisting) {
+      return Response.json({
+        success: true,
+        updatedGuidebook: existingGuidebook,
+        newRule: null,
+      } satisfies MetalearningResponse);
+    }
+
     let updatedLines = [...existingLines];
 
     if (parsed.action === 'update' && parsed.ruleIndex) {
@@ -120,10 +152,8 @@ JSON response:`,
       const idx = parsed.ruleIndex - 1;
       if (idx >= 0 && idx < updatedLines.length) {
         updatedLines[idx] = parsed.rule;
-      } else {
-        // Invalid index, just add as new
-        updatedLines.push(parsed.rule);
       }
+      // If invalid index, don't add - just skip
     } else if (parsed.action === 'add') {
       updatedLines.push(parsed.rule);
     }

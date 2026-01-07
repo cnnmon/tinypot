@@ -20,7 +20,7 @@ export default function Header({ showProjects = false }: { showProjects?: boolea
         className="flex items-center justify-center gap-1 cursor-pointer hover:opacity-50 transition-opacity"
         onClick={() => router.push('/')}
       >
-        <p>tinypot</p>
+        <p>bonsai</p>
         <div className="relative flex justify-center items-center mb-1">
           <BranchDesign seed={randomNumber} width={25} height={25} />
           <Image

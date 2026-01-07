@@ -3,22 +3,27 @@
 import Box from '@/components/Box';
 import Editor from '@/components/Editor';
 import Branchbar from '@/components/Editor/Branchbar';
-import GuidebookModal from '@/components/GuidebookModal';
 import Header from '@/components/Header';
 import Player from '@/components/Player';
 import ShareButton from '@/components/ShareButton';
+import { useTooltipTrigger } from '@/components/TooltipProvider';
 import { Id } from '@/convex/_generated/dataModel';
+import { PlayerProvider, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
+import { ArrowLeftIcon, ArrowPathIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { useParams } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 function ProjectContent() {
-  const { project, setProject, guidebook, setGuidebook, isGuidebookUpdating } = useProject();
+  const { project, setProject, isMetalearning } = useProject();
+  const { handleJumpBack, handleRestart } = usePlayerContext();
   const [leftWidth, setLeftWidth] = useState(50);
-  const [guidebookOpen, setGuidebookOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const guidebookTooltip = useTooltipTrigger(
+    'The guidebook helps the AI understand your world and style preferences',
+  );
 
   const handleMouseDown = useCallback(() => {
     isDragging.current = true;
@@ -44,6 +49,12 @@ function ProjectContent() {
     document.addEventListener('mouseup', handleMouseUp);
   }, []);
 
+  const guidebook = project.guidebook;
+
+  const setGuidebook = (guidebook: string) => {
+    setProject({ guidebook });
+  };
+
   return (
     <div className="h-screen p-4 gap-2 flex flex-col">
       <div className="flex items-center justify-between">
@@ -51,27 +62,28 @@ function ProjectContent() {
         <ShareButton />
       </div>
 
-      <GuidebookModal
-        isOpen={guidebookOpen}
-        onClose={() => setGuidebookOpen(false)}
-        guidebook={guidebook}
-        onSave={setGuidebook}
-        isUpdating={isGuidebookUpdating}
-      />
-
       <div className="flex gap-2">
         <Box
           className={twMerge(
-            'bg-gradient-to-b from-[#EBF7D2] via-[#B7DCBD] to-white min-h-45 w-5 cursor-pointer hover:opacity-90',
-            isGuidebookUpdating &&
-              'bg-gradient-to-b via-[var(--orange)] from-[var(--rose)] to-white',
+            'bg-gradient-to-b from-[#EBF7D2] via-[#B7DCBD] to-white min-h-45 w-5 hover:opacity-90',
+            isMetalearning && 'bg-gradient-to-b via-[var(--orange)] from-[var(--rose)] to-white',
           )}
-          onClick={() => setGuidebookOpen(true)}
         >
-          {isGuidebookUpdating && (
+          <div className="flex items-center justify-between gap-1">
+            <h1>Guidebook</h1>
+            <div className="p-1 rounded hover:bg-neutral-100 cursor-help" {...guidebookTooltip}>
+              <InformationCircleIcon width={16} height={16} />
+            </div>
+          </div>
+          {isMetalearning && (
             <span className="text-neutral-800/40 animate-pulse">(Updating guidebook...)</span>
           )}
-          <p className="line-clamp-4">{guidebook || 'Author is making a game about...'}</p>
+          <textarea
+            value={guidebook}
+            placeholder="Author is making a game about..."
+            className="w-full h-full"
+            onChange={(e) => setGuidebook(e.target.value)}
+          />
         </Box>
 
         <Box className="max-h-45 overflow-auto select-none bg-gradient-to-b from-[var(--sunflower)] to-white">
@@ -92,6 +104,19 @@ function ProjectContent() {
           className="w-2 cursor-col-resize hover:bg-gray-300 transition-colors shrink-0"
         />
         <Box style={{ width: `${100 - leftWidth}%` }}>
+          <div>
+            <div className="flex items-center justify-between">
+              <h1>Player</h1>
+              <div className="w-full justify-end flex gap-1 text-neutral-400">
+                <button onClick={handleJumpBack} className="p-1 rounded">
+                  <ArrowLeftIcon width={14} height={14} />
+                </button>
+                <button onClick={handleRestart} className="p-1 rounded">
+                  <ArrowPathIcon width={14} height={14} />
+                </button>
+              </div>
+            </div>
+          </div>
           <Player />
         </Box>
       </div>
@@ -121,7 +146,9 @@ export default function ProjectPage() {
 
   return (
     <ProjectProvider projectId={projectId as Id<'projects'>}>
-      <ProjectContent />
+      <PlayerProvider>
+        <ProjectContent />
+      </PlayerProvider>
     </ProjectProvider>
   );
 }

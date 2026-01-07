@@ -10,13 +10,16 @@ export default function List() {
 
   return (
     <div className="space-y-2">
-      {unresolvedBranches.length > 0 && (
-        <div className="flex items-center gap-1 text-sm">
-          {unresolvedBranches.length} pending branches
-          <span className="text-neutral-400">•</span>
-          <span className="text-neutral-400">{resolvedBranches.length} resolved</span>
-        </div>
-      )}
+      <div className="flex items-center gap-1 justify-between">
+        <h1>Branches</h1>
+        {unresolvedBranches.length > 0 && (
+          <div className="flex items-center gap-1 text-sm">
+            {unresolvedBranches.length} pending branches
+            <span className="text-neutral-400">•</span>
+            <span className="text-neutral-400">{resolvedBranches.length} resolved</span>
+          </div>
+        )}
+      </div>
 
       {unresolvedBranches.map((branch) => (
         <Item

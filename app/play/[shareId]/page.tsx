@@ -1,13 +1,13 @@
 'use client';
 
-import BranchDesign from '@/components/Editor/Branchbar/BranchDesign';
+import Header from '@/components/Header';
 import Player from '@/components/Player';
 import { Id } from '@/convex/_generated/dataModel';
+import { PlayerProvider, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { ProjectProvider } from '@/lib/project';
 import { decodeShareId } from '@/lib/share';
-import Image from 'next/image';
+import { ArrowLeftIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
 
 export default function PlayPage() {
   const params = useParams();
@@ -24,39 +24,33 @@ export default function PlayPage() {
 
   return (
     <ProjectProvider projectId={projectId as Id<'projects'>}>
-      <PlayContent />
+      <PlayerProvider>
+        <PlayContent />
+      </PlayerProvider>
     </ProjectProvider>
   );
 }
 
 function PlayContent() {
-  const [randomNumber, setRandomNumber] = useState(0);
-
-  useEffect(() => {
-    setRandomNumber(Math.floor(Math.random() * 1000000));
-  }, []);
+  const { handleJumpBack, handleRestart } = usePlayerContext();
 
   return (
-    <div className="h-screen p-4 gap-2 flex flex-col text-center">
+    <div className="h-full p-4 gap-2 flex flex-col text-center">
       <div className="flex items-center justify-between">
-        <p className="cursor-pointer" onClick={() => (window.location.href = '/')}>
-          tinypot
-        </p>
-        <div className="relative flex justify-center items-center mb-1">
-          <BranchDesign seed={randomNumber} width={25} height={25} />
-          <Image
-            alt="plantpot"
-            src="/icons/PlantPot.svg"
-            width={15}
-            height={15}
-            className="absolute top-[12px]"
-          />
-        </div>{' '}
+        <Header showProjects={false} />
+        <div className="flex gap-1">
+          <button onClick={handleJumpBack} className="p-1 rounded">
+            <ArrowLeftIcon width={14} height={14} />{' '}
+          </button>
+          <button onClick={handleRestart} className="p-1 rounded">
+            <ArrowPathIcon width={14} height={14} />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 flex items-center justify-center">
-        <div className="max-w-2xl mx-auto w-full h-full text-left">
-          <Player showTitle={false} />
+        <div className="max-w-2xl mx-auto w-full text-left">
+          <Player />
         </div>
       </div>
     </div>

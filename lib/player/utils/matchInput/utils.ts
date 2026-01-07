@@ -81,7 +81,8 @@ export function getOptionsAtPosition({
   if (sceneStart === undefined) return [];
   const scanStart = getScanStart(schema, sceneStart);
 
-  let narrativeCount = 0;
+  // Count positions (narrative + image entries) to match step.ts behavior
+  let positionCount = 0;
   const options: OptionEntry[] = [];
   const allSceneOptions: OptionEntry[] = [];
 
@@ -90,25 +91,25 @@ export function getOptionsAtPosition({
 
     if (entry.type === EntryType.SCENE) break;
 
-    if (entry.type === EntryType.NARRATIVE) {
-      narrativeCount++;
+    if (entry.type === EntryType.NARRATIVE || entry.type === EntryType.IMAGE) {
+      positionCount++;
     } else if (entry.type === EntryType.OPTION) {
       // Collect all options in the scene for potential implicit loop
       allSceneOptions.push(entry);
       // Options after the current lineIdx are immediately available
-      if (narrativeCount >= lineIdx) {
+      if (positionCount >= lineIdx) {
         options.push(entry);
       }
     } else if (entry.type === EntryType.JUMP) {
       // Stop collecting options if we hit a jump before options
-      if (narrativeCount >= lineIdx && options.length === 0) {
+      if (positionCount >= lineIdx && options.length === 0) {
         break;
       }
     }
   }
 
-  // If lineIdx is past all narratives (end of scene), return all scene options (implicit loop)
-  if (options.length === 0 && lineIdx > narrativeCount && allSceneOptions.length > 0) {
+  // If lineIdx is past all content (end of scene), return all scene options (implicit loop)
+  if (options.length === 0 && lineIdx > positionCount && allSceneOptions.length > 0) {
     return allSceneOptions;
   }
 
