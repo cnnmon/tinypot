@@ -25,8 +25,7 @@ export enum Status {
 }
 
 export default function usePlayer() {
-  const { projectId, schema, project, setProject, addOrMergeBranch, guidebook, playerResetKey } =
-    useProject();
+  const { projectId, schema, project, setProject, addOrMergeBranch, playerResetKey } = useProject();
   const [playthrough, setPlaythrough] = useState<Playthrough>({
     id: 'abcdef',
     projectId: projectId,
@@ -246,7 +245,7 @@ export default function usePlayer() {
               history,
               existingOptions,
               projectLines: project.script,
-              guidebook,
+              guidebook: project.guidebook,
               existingScenes: Object.keys(sceneMap),
             } satisfies GenerateRequest),
           });
