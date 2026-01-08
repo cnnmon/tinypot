@@ -14,7 +14,7 @@ export default function Player({
   header?: React.ReactNode;
   className?: string;
 }) {
-  const { lines, status, handleNext, handleSubmit, handleRestart } = usePlayerContext();
+  const { lines, status, handleSubmit, handleRestart } = usePlayerContext();
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,18 +23,8 @@ export default function Player({
 
   function renderStatus() {
     switch (status) {
-      case Status.RUNNING:
-        return (
-          <button disabled={status !== Status.RUNNING} onClick={handleNext}>
-            Next
-          </button>
-        );
       case Status.WAITING:
         return <PlayerInput handleSubmit={handleSubmit} />;
-      case Status.MATCHING:
-        return <p className="italic text-neutral-400">(Matching...)</p>;
-      case Status.GENERATING:
-        return <p className="italic text-neutral-400">(Generating...)</p>;
       case Status.ENDED:
         return (
           <div className="flex gap-2">
@@ -46,10 +36,10 @@ export default function Player({
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className={twMerge('space-y-2 py-2 flex flex-col relative justify-between h-full')}>
+    <div className="flex flex-col h-full">
+      <div className="space-y-2 py-2 flex flex-col relative justify-between h-full">
         {header}
-        <div className="flex flex-col gap-2 pb-20 overflow-scroll">
+        <div className="flex flex-col gap-2 pb-15 h-full overflow-scroll flex-1">
           {lines.map((line, i) => {
             const isPlayer = line.sender === Sender.PLAYER;
             const isImage = line.type === 'image';
@@ -63,7 +53,7 @@ export default function Player({
                   transition={{ duration: 0.2, ease: 'easeInOut' }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={line.text} alt="" className="max-w-full max-h-64 rounded" />
+                  <img src={line.text} alt="" className="max-w-full max-h-40 rounded" />
                 </motion.div>
               );
             }
@@ -84,6 +74,9 @@ export default function Player({
               </motion.p>
             );
           })}
+          {status !== Status.WAITING && (
+            <p className="italic text-neutral-400">({status.toLowerCase()}...)</p>
+          )}
           <div ref={endRef} />
         </div>
 

@@ -281,7 +281,7 @@ export function ProjectProvider({
   if (!convexProject) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <p className="text-neutral-400">Loading project...</p>
+        <p className="text-neutral-400">loading project...</p>
       </div>
     );
   }

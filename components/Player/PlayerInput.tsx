@@ -1,4 +1,5 @@
 import { Status, usePlayerContext } from '@/lib/player/PlayerProvider';
+import { motion } from 'motion/react';
 import { useState } from 'react';
 
 export default function PlayerInput({
@@ -17,7 +18,12 @@ export default function PlayerInput({
   };
 
   return (
-    <div className="relative">
+    <motion.div
+      className="relative"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+    >
       <input
         autoFocus
         value={input}
@@ -34,6 +40,6 @@ export default function PlayerInput({
       >
         {isSubmitting ? '...' : 'Submit'}
       </button>
-    </div>
+    </motion.div>
   );
 }

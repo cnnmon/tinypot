@@ -142,7 +142,11 @@ export default function usePlayer() {
 
   useEffect(() => {
     if (status === Status.RUNNING && !isSteppingRef.current) {
-      handleNext();
+      const timer = setTimeout(() => {
+        handleNext();
+      }, 500); // 1 second stagger
+
+      return () => clearTimeout(timer);
     }
   }, [status, handleNext]);
 

@@ -48,6 +48,10 @@ function countMatchingKeywordsWithAliases(
 
   if (option.aliases) {
     for (const alias of option.aliases) {
+      if (alias.toLowerCase() === input.toLowerCase()) {
+        return { score: 10, matchedAlias: alias };
+      }
+
       const aliasScore = countMatchingKeywords(input, alias);
       if (aliasScore > bestScore) {
         bestScore = aliasScore;
