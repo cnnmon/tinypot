@@ -1,13 +1,12 @@
 'use client';
 
-import { isResolved } from '@/lib/branch';
 import useEditor from '@/lib/editor';
 import { useProject } from '@/lib/project';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
-import { Compartment, EditorState } from '@codemirror/state';
+import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   branchHighlightPlugin,
   branchHighlightState,
@@ -21,20 +20,12 @@ import {
   lineHighlighterPlugin,
 } from './utils/theme';
 
-// Compartment for dynamically toggling read-only mode
-const readOnlyCompartment = new Compartment();
-
 export default function Editor() {
   const { script, setScript } = useEditor();
-  const { branches, sceneToBranchMap, selectedBranchId, setSelectedBranchId } = useProject();
+  const { branches, sceneToBranchMap, selectedBranchId } = useProject();
 
   // Get the selected branch object for detailed highlighting
   const selectedBranch = selectedBranchId ? branches.find((b) => b.id === selectedBranchId) : null;
-
-  // Check if viewing a resolved branch (should be read-only)
-  const isViewingResolved = useMemo(() => {
-    return selectedBranch ? isResolved(selectedBranch) : false;
-  }, [selectedBranch]);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -47,28 +38,6 @@ export default function Editor() {
       if (update.docChanged) {
         const content = update.state.doc.toString();
         setScript(content.split('\n'));
-      }
-
-      // Auto-select branch when cursor moves to a branch scene
-      if (update.selectionSet && Object.keys(sceneToBranchMap).length > 0) {
-        const pos = update.state.selection.main.head;
-        const line = update.state.doc.lineAt(pos);
-
-        // Find which scene this line is in (default to START for content before first scene)
-        let currentScene: string = 'START';
-        for (let i = 1; i <= line.number; i++) {
-          const l = update.state.doc.line(i);
-          const trimmed = l.text.trimStart();
-          if (trimmed.startsWith('#')) {
-            currentScene = trimmed.slice(1).trim();
-          }
-        }
-
-        // Check if scene belongs to a branch
-        const branchId = sceneToBranchMap[currentScene];
-        if (branchId && branchId !== selectedBranchId) {
-          setSelectedBranchId(branchId);
-        }
       }
     });
 
@@ -86,7 +55,6 @@ export default function Editor() {
         syntaxHighlighting(bonsaiHighlighting),
         updateListener,
         EditorView.lineWrapping,
-        readOnlyCompartment.of(EditorState.readOnly.of(false)),
       ],
     });
 
@@ -127,24 +95,9 @@ export default function Editor() {
     });
   }, [sceneToBranchMap, selectedBranch]);
 
-  // Toggle read-only mode when viewing resolved branches
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-
-    view.dispatch({
-      effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(isViewingResolved)),
-    });
-  }, [isViewingResolved]);
-
   return (
     <div className="h-full overflow-scroll relative">
       <div ref={editorRef} className="h-full" />
-      {isViewingResolved && (
-        <div className="absolute top-0 right-0 px-2 py-1 text-sm bg-neutral-100 text-neutral-400 rounded">
-          Read only (resolved branch)
-        </div>
-      )}
     </div>
   );
 }

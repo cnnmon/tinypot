@@ -128,7 +128,7 @@ export function matchOption(input: string, options: OptionEntry[]): MatchOptionR
 
   for (const option of options) {
     const { score, matchedAlias } = countMatchingKeywordsWithAliases(input, option);
-    if (score > bestScore) {
+    if (score > 5 && score > bestScore) {
       bestScore = score;
       bestMatch = option;
       bestMatchedAlias = matchedAlias;

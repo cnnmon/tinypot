@@ -11,6 +11,7 @@ import {
   computeSceneToBranchMap,
   isResolved,
   mergeBranchChanges,
+  recordsEqual,
 } from '@/lib/branch';
 import { runJob } from '@/lib/jobs';
 import { runMetalearning } from '@/lib/jobs/metalearning';
@@ -233,8 +234,11 @@ export function ProjectProvider({
 
       setSelectedBranchId(null);
 
-      // Kick off metalearning with the resolved branch data
-      startMetalearningJob({ ...branch, authored, approved: true });
+      // Only run metalearning if there are meaningful edits (authored differs from generated)
+      const hasMeaningfulEdits = !recordsEqual(authored, branch.generated);
+      if (hasMeaningfulEdits) {
+        startMetalearningJob({ ...branch, authored, approved: true });
+      }
     },
     [branches, schema, updateBranchMutation, startMetalearningJob],
   );
@@ -263,8 +267,12 @@ export function ProjectProvider({
       // Reset the player
       setPlayerResetKey((k) => k + 1);
 
-      // Kick off metalearning
-      startMetalearningJob({ ...branch, authored, approved: false });
+      // Only run metalearning if there are meaningful edits (authored differs from generated)
+      // Pure rejects (revert or no changes) don't trigger metalearning
+      const hasMeaningfulEdits = !recordsEqual(authored, branch.generated);
+      if (hasMeaningfulEdits) {
+        startMetalearningJob({ ...branch, authored, approved: false });
+      }
     },
     [branches, schema, setProject, updateBranchMutation, startMetalearningJob],
   );

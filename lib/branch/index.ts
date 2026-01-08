@@ -22,7 +22,7 @@ export function scenesEqual(a: Scene, b: Scene): boolean {
 /**
  * Deep compare two Records of scenes.
  */
-function recordsEqual(a: Record<SceneId, Scene>, b: Record<SceneId, Scene>): boolean {
+export function recordsEqual(a: Record<SceneId, Scene>, b: Record<SceneId, Scene>): boolean {
   const keysA = Object.keys(a);
   const keysB = Object.keys(b);
   if (keysA.length !== keysB.length) return false;
