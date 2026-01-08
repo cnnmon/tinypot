@@ -1,4 +1,12 @@
-import { EntryType, NarrativeEntry, OptionEntry, Schema } from '@/types/schema';
+import {
+  AllowsConfig,
+  EntryType,
+  MetadataEntry,
+  NarrativeEntry,
+  OptionEntry,
+  parseAllows,
+  Schema,
+} from '@/types/schema';
 import { getScanStart } from '../getScanStart';
 import { HandleInputResult, MatchInfo, MatchOptionResult } from './types';
 
@@ -69,23 +77,26 @@ function countMatchingKeywordsWithAliases(
  * Options are available when:
  * 1. They appear after the current narrative position (immediate decision point)
  * 2. The player is at the end of the scene (implicit loop back to all scene options)
+ * 3. Their requires condition is met (if hasVariable is provided)
  */
 export function getOptionsAtPosition({
   schema,
   sceneMap,
   sceneId,
   lineIdx,
+  hasVariable,
 }: {
   schema: Schema;
   sceneMap: Record<string, number>;
   sceneId: string;
   lineIdx: number;
+  hasVariable?: (variable: string) => boolean;
 }): OptionEntry[] {
   const sceneStart = sceneMap[sceneId];
   if (sceneStart === undefined) return [];
   const scanStart = getScanStart(schema, sceneStart);
 
-  // Count positions (narrative + image entries) to match step.ts behavior
+  // Count positions (narrative + image + metadata entries) to match step.ts behavior
   let positionCount = 0;
   const options: OptionEntry[] = [];
   const allSceneOptions: OptionEntry[] = [];
@@ -97,12 +108,24 @@ export function getOptionsAtPosition({
 
     if (entry.type === EntryType.NARRATIVE || entry.type === EntryType.IMAGE) {
       positionCount++;
+    } else if (entry.type === EntryType.METADATA) {
+      // sets/unsets create positions too
+      const meta = entry as MetadataEntry;
+      if (meta.key === 'sets' || meta.key === 'unsets') {
+        positionCount++;
+      }
     } else if (entry.type === EntryType.OPTION) {
-      // Collect all options in the scene for potential implicit loop
-      allSceneOptions.push(entry);
-      // Options after the current lineIdx are immediately available
-      if (positionCount >= lineIdx) {
-        options.push(entry);
+      // Check if option's requires condition is met
+      const opt = entry as OptionEntry;
+      const meetsCondition = !opt.requires || (hasVariable && hasVariable(opt.requires));
+
+      if (meetsCondition) {
+        // Collect all options in the scene for potential implicit loop
+        allSceneOptions.push(opt);
+        // Options after the current lineIdx are immediately available
+        if (positionCount >= lineIdx) {
+          options.push(opt);
+        }
       }
     } else if (entry.type === EntryType.JUMP) {
       // Stop collecting options if we hit a jump before options
@@ -118,6 +141,40 @@ export function getOptionsAtPosition({
   }
 
   return options;
+}
+
+/**
+ * Get the allows configuration for the current scene.
+ * Returns the most recent [allows: ...] metadata in the scene.
+ */
+export function getAllowsForScene({
+  schema,
+  sceneMap,
+  sceneId,
+}: {
+  schema: Schema;
+  sceneMap: Record<string, number>;
+  sceneId: string;
+}): AllowsConfig {
+  const sceneStart = sceneMap[sceneId];
+  if (sceneStart === undefined) return parseAllows(undefined);
+  const scanStart = getScanStart(schema, sceneStart);
+
+  let allowsValue: string | undefined;
+
+  for (let i = scanStart; i < schema.length; i++) {
+    const entry = schema[i];
+    if (entry.type === EntryType.SCENE) break;
+
+    if (entry.type === EntryType.METADATA) {
+      const meta = entry as MetadataEntry;
+      if (meta.key === 'allows') {
+        allowsValue = meta.value;
+      }
+    }
+  }
+
+  return parseAllows(allowsValue);
 }
 
 /**

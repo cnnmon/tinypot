@@ -19,6 +19,7 @@ export async function matchInput({
   sceneId,
   lineIdx,
   useFuzzyFallback = true,
+  hasVariable,
 }: {
   input: string;
   schema: Schema;
@@ -26,8 +27,9 @@ export async function matchInput({
   sceneId: string;
   lineIdx: number;
   useFuzzyFallback?: boolean;
+  hasVariable?: (variable: string) => boolean;
 }): Promise<HandleInputResult> {
-  const options = getOptionsAtPosition({ schema, sceneMap, sceneId, lineIdx });
+  const options = getOptionsAtPosition({ schema, sceneMap, sceneId, lineIdx, hasVariable });
 
   if (options.length === 0) {
     return { matched: false };

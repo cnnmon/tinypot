@@ -6,6 +6,7 @@ import { Line, Playthrough, Sender } from '@/types/playthrough';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProject } from '../project';
 import { addAliasToOption, addGeneratedOptionToScript, parseIntoSchema } from '../project/parser';
+import { useVariables } from './useVariables';
 import {
   constructSceneMap,
   getSceneAndLineIdx,
@@ -14,7 +15,7 @@ import {
   parseLineId,
   step,
 } from './utils/index';
-import { getOptionsAtPosition } from './utils/matchInput/utils';
+import { getAllowsForScene, getOptionsAtPosition } from './utils/matchInput/utils';
 
 export enum Status {
   RUNNING = 'running',
@@ -26,6 +27,8 @@ export enum Status {
 
 export default function usePlayer() {
   const { projectId, schema, project, setProject, addOrMergeBranch, playerResetKey } = useProject();
+  const variables = useVariables();
+
   const [playthrough, setPlaythrough] = useState<Playthrough>({
     id: 'abcdef',
     projectId: projectId,
@@ -79,8 +82,9 @@ export default function usePlayer() {
         currentSceneId: 'START',
         currentLineIdx: 0,
       });
+      variables.reset();
     }
-  }, [playerResetKey, schema]);
+  }, [playerResetKey, schema, variables]);
 
   // Automatically go next until you can't
   const addLine = useCallback(
@@ -113,6 +117,10 @@ export default function usePlayer() {
       sceneMap,
       sceneId: currentSceneId,
       lineIdx: currentLineIdx,
+      callbacks: {
+        setVariable: variables.set,
+        unsetVariable: variables.unset,
+      },
     });
 
     if (nextMove.type === 'wait') {
@@ -138,7 +146,7 @@ export default function usePlayer() {
     } else {
       isSteppingRef.current = false;
     }
-  }, [state, currentSceneId, currentLineIdx, sceneMap, addLine, playthrough.snapshot]);
+  }, [state, currentSceneId, currentLineIdx, sceneMap, addLine, playthrough.snapshot, variables]);
 
   useEffect(() => {
     if (status === Status.RUNNING && !isSteppingRef.current) {
@@ -170,6 +178,7 @@ export default function usePlayer() {
         sceneMap,
         sceneId: currentSceneId,
         lineIdx: currentLineIdx,
+        hasVariable: variables.has,
       });
 
       if (result.matched) {
@@ -229,6 +238,13 @@ export default function usePlayer() {
         // No match found - generate a new branch
         setState((prev) => ({ ...prev, status: Status.GENERATING }));
 
+        // Get allows configuration for the current scene
+        const allowsConfig = getAllowsForScene({
+          schema: playthrough.snapshot,
+          sceneMap,
+          sceneId: currentSceneId,
+        });
+
         // Get context for generation
         const history = playthrough.lines.map((l) => `${l.sender}: ${l.text}`);
         const options = getOptionsAtPosition({
@@ -236,6 +252,7 @@ export default function usePlayer() {
           sceneMap,
           sceneId: currentSceneId,
           lineIdx: currentLineIdx,
+          hasVariable: variables.has,
         });
         const existingOptions = options.map((o) => o.text);
 
@@ -251,6 +268,8 @@ export default function usePlayer() {
               projectLines: project.script,
               guidebook: project.guidebook,
               existingScenes: Object.keys(sceneMap),
+              allowsConfig,
+              currentVariables: variables.getAll(),
             } satisfies GenerateRequest),
           });
 
@@ -273,9 +292,9 @@ export default function usePlayer() {
               thenLines,
             );
 
-            // If there's a new scene, add it to the script
+            // If there's a new scene, add it to the script (with new @ syntax)
             if (newScene) {
-              updatedScript = [...updatedScript, `# ${newScene.label}`, ...newScene.content];
+              updatedScript = [...updatedScript, `@${newScene.label}`, ...newScene.content];
             }
 
             // Parse generated schema and create branch
@@ -310,15 +329,17 @@ export default function usePlayer() {
             // Play the narrative lines from the generated option
             for (const line of thenLines) {
               const trimmed = line.trim();
-              if (trimmed.startsWith('>')) {
-                // This is a jump - handle navigation
-                const target = trimmed.slice(1).trim();
-                if (target === 'END') {
+              // Handle goto @SCENE syntax
+              if (trimmed.startsWith('goto ')) {
+                const target = trimmed.slice(5).trim();
+                // Remove @ prefix if present
+                const cleanTarget = target.startsWith('@') ? target.slice(1) : target;
+                if (cleanTarget === 'END') {
                   setState((prev) => ({ ...prev, status: Status.ENDED }));
                   return;
                 }
                 setState({
-                  currentSceneId: target,
+                  currentSceneId: cleanTarget,
                   currentLineIdx: 0,
                   status: Status.RUNNING,
                 });
@@ -357,6 +378,7 @@ export default function usePlayer() {
       setProject,
       addOrMergeBranch,
       addLine,
+      variables,
     ],
   );
 
@@ -374,6 +396,7 @@ export default function usePlayer() {
       currentSceneId: 'START',
       currentLineIdx: 0,
     });
+    variables.reset();
   }
 
   // Jump to a specific point in history, slicing lines from there
@@ -415,6 +438,7 @@ export default function usePlayer() {
   return {
     status,
     lines: playthrough.lines,
+    variables: variables.getAll(),
     handleNext,
     handleSubmit,
     handleRestart,

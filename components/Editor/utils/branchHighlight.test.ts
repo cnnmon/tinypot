@@ -16,6 +16,8 @@ function entryToComparisonKey(entry: SchemaEntry): string {
       return `scene:${entry.label}`;
     case EntryType.IMAGE:
       return `image:${entry.url}`;
+    case EntryType.METADATA:
+      return `metadata:${entry.key}:${entry.value}`;
     default:
       return '';
   }
@@ -28,23 +30,37 @@ function sceneToComparisonKeys(scene: Scene): Set<string> {
 function lineToComparisonKey(line: string): string {
   const trimmed = line.trim();
 
-  if (trimmed.startsWith('*')) {
-    const optionPart = trimmed.slice(1).trim();
-    if (optionPart.startsWith('[') && optionPart.includes(']')) {
-      const inner = optionPart.slice(1, optionPart.indexOf(']'));
-      const primaryText = inner.split(',')[0].trim();
-      return `option:${primaryText}`;
+  // Choice line: if text | alias1 | alias2 & [condition]
+  if (trimmed.startsWith('if ')) {
+    let content = trimmed.slice(3).trim();
+    // Remove condition at end: ... & [var]
+    const conditionMatch = content.match(/&\s*\[([^\]]+)\]\s*$/);
+    if (conditionMatch) {
+      content = content.slice(0, content.lastIndexOf('&')).trim();
     }
-    return `option:${optionPart}`;
+    // Extract primary text (before |)
+    const primaryText = content.split('|')[0].trim();
+    return `option:${primaryText}`;
   }
 
-  if (trimmed.startsWith('>')) {
-    return `jump:${trimmed.slice(1).trim()}`;
+  // Jump line: goto @target
+  if (trimmed.startsWith('goto ')) {
+    const target = trimmed.slice(5).trim();
+    // Remove @ prefix if present
+    const cleanTarget = target.startsWith('@') ? target.slice(1) : target;
+    return `jump:${cleanTarget}`;
   }
 
-  const imageMatch = trimmed.match(/^\[image="(.+?)"\]$/);
+  // Image directive: [image: url]
+  const imageMatch = trimmed.match(/^\[image:\s*(.+)\]$/);
   if (imageMatch) {
     return `image:${imageMatch[1]}`;
+  }
+
+  // Other metadata: [key: value]
+  const metadataMatch = trimmed.match(/^\[(\w+):\s*(.+)\]$/);
+  if (metadataMatch) {
+    return `metadata:${metadataMatch[1]}:${metadataMatch[2]}`;
   }
 
   return `narrative:${trimmed}`;
@@ -87,40 +103,47 @@ describe('branchHighlight', () => {
         { type: EntryType.IMAGE, url: 'https://example.com/image.jpg' },
         { type: EntryType.NARRATIVE, text: "you're stuck in the office" },
         { type: EntryType.OPTION, text: 'do nothing', aliases: ['wait'], then: [] },
-        { type: EntryType.OPTION, text: 'ask why you\'re here', aliases: ['why am i here?'], then: [] },
+        {
+          type: EntryType.OPTION,
+          text: "ask why you're here",
+          aliases: ['why am i here?'],
+          then: [],
+        },
       ];
 
-      // Test each line
-      expect(getLineHighlight('[image="https://example.com/image.jpg"]', baseScene, generatedScene))
-        .toBe('gray');
-      
-      expect(getLineHighlight("you're stuck in the office", baseScene, generatedScene))
-        .toBe('gray');
-      
+      // Test each line (using new syntax)
+      expect(
+        getLineHighlight('[image: https://example.com/image.jpg]', baseScene, generatedScene),
+      ).toBe('gray');
+
+      expect(getLineHighlight("you're stuck in the office", baseScene, generatedScene)).toBe(
+        'gray',
+      );
+
       // Original option with MORE aliases now - should still be gray
-      expect(getLineHighlight('* [do nothing, wait, stand still, do nothing at all]', baseScene, generatedScene))
-        .toBe('gray');
-      
+      expect(
+        getLineHighlight('if do nothing | wait | stand still | do nothing at all', baseScene, generatedScene),
+      ).toBe('gray');
+
       // New option - should be yellow
-      expect(getLineHighlight("* [ask why you're here, why am i here?]", baseScene, generatedScene))
-        .toBe('yellow');
+      expect(
+        getLineHighlight("if ask why you're here | why am i here?", baseScene, generatedScene),
+      ).toBe('yellow');
     });
 
-    it('should handle option without bracket format', () => {
-      const baseScene: Scene = [
-        { type: EntryType.OPTION, text: 'run away', then: [] },
-      ];
+    it('should handle option without aliases', () => {
+      const baseScene: Scene = [{ type: EntryType.OPTION, text: 'run away', then: [] }];
       const generatedScene: Scene = [
         { type: EntryType.OPTION, text: 'run away', then: [] },
         { type: EntryType.OPTION, text: 'hide', then: [] },
       ];
 
-      expect(getLineHighlight('* run away', baseScene, generatedScene)).toBe('gray');
-      expect(getLineHighlight('* hide', baseScene, generatedScene)).toBe('yellow');
+      expect(getLineHighlight('if run away', baseScene, generatedScene)).toBe('gray');
+      expect(getLineHighlight('if hide', baseScene, generatedScene)).toBe('yellow');
     });
   });
 
-  describe('explicit scene (with # SCENE marker)', () => {
+  describe('explicit scene (with @SCENE marker)', () => {
     it('should highlight only newly generated content as yellow', () => {
       const baseScene: Scene = [
         { type: EntryType.NARRATIVE, text: 'The forest is dark.' },
@@ -134,16 +157,14 @@ describe('branchHighlight', () => {
       ];
 
       expect(getLineHighlight('The forest is dark.', baseScene, generatedScene)).toBe('gray');
-      expect(getLineHighlight('* go north', baseScene, generatedScene)).toBe('gray');
-      expect(getLineHighlight('* climb a tree', baseScene, generatedScene)).toBe('yellow');
+      expect(getLineHighlight('if go north', baseScene, generatedScene)).toBe('gray');
+      expect(getLineHighlight('if climb a tree', baseScene, generatedScene)).toBe('yellow');
     });
   });
 
   describe('human edits after generation', () => {
     it('should highlight human-edited lines as green', () => {
-      const baseScene: Scene = [
-        { type: EntryType.NARRATIVE, text: 'Original text.' },
-      ];
+      const baseScene: Scene = [{ type: EntryType.NARRATIVE, text: 'Original text.' }];
 
       const generatedScene: Scene = [
         { type: EntryType.NARRATIVE, text: 'Original text.' },
@@ -151,59 +172,91 @@ describe('branchHighlight', () => {
       ];
 
       // Line that was edited by human after generation
-      expect(getLineHighlight('Completely new human text.', baseScene, generatedScene)).toBe('green');
-      
+      expect(getLineHighlight('Completely new human text.', baseScene, generatedScene)).toBe(
+        'green',
+      );
+
       // Original stays gray
       expect(getLineHighlight('Original text.', baseScene, generatedScene)).toBe('gray');
-      
+
       // Generated stays yellow
-      expect(getLineHighlight('* generated option', baseScene, generatedScene)).toBe('yellow');
+      expect(getLineHighlight('if generated option', baseScene, generatedScene)).toBe('yellow');
     });
   });
 
   describe('exact user scenario', () => {
     it('should match the user reported issue', () => {
-      // User's exact scenario:
-      // - Had "do nothing" option with aliases
-      // - Generated "ask why you're here" option
-      // - "do nothing" should be gray, "ask why" should be yellow
-      
-      // NOTE: In real code, scenes are FLATTENED - `then` blocks are expanded into the scene array
-      // This simulates what extractScenesFromSchema + flattenEntries produces
       const baseScene: Scene = [
-        { type: EntryType.IMAGE, url: 'https://i.pinimg.com/1200x/cf/e7/8f/cfe78fdd9f980d84eb8b3d8e479b5985.jpg' },
+        {
+          type: EntryType.IMAGE,
+          url: 'https://i.pinimg.com/1200x/cf/e7/8f/cfe78fdd9f980d84eb8b3d8e479b5985.jpg',
+        },
         { type: EntryType.NARRATIVE, text: "you're stuck in the office, and the door is locked." },
         { type: EntryType.OPTION, text: 'do nothing', aliases: ['wait', 'stand still'], then: [] },
-        { type: EntryType.NARRATIVE, text: 'time ticks away.' }, // Flattened from then block
+        { type: EntryType.NARRATIVE, text: 'time ticks away.' },
       ];
 
       const generatedScene: Scene = [
-        { type: EntryType.IMAGE, url: 'https://i.pinimg.com/1200x/cf/e7/8f/cfe78fdd9f980d84eb8b3d8e479b5985.jpg' },
+        {
+          type: EntryType.IMAGE,
+          url: 'https://i.pinimg.com/1200x/cf/e7/8f/cfe78fdd9f980d84eb8b3d8e479b5985.jpg',
+        },
         { type: EntryType.NARRATIVE, text: "you're stuck in the office, and the door is locked." },
-        { type: EntryType.OPTION, text: 'do nothing', aliases: ['wait', 'stand still', 'do nothing at all'], then: [] },
-        { type: EntryType.NARRATIVE, text: 'time ticks away.' }, // Flattened from then block
-        { type: EntryType.OPTION, text: 'ask why you\'re here', aliases: ['why am i here?', 'what am i doing here?', 'how did i get here?'], then: [] },
-        { type: EntryType.NARRATIVE, text: "you don't remember exactly." }, // Flattened from then block
+        {
+          type: EntryType.OPTION,
+          text: 'do nothing',
+          aliases: ['wait', 'stand still', 'do nothing at all'],
+          then: [],
+        },
+        { type: EntryType.NARRATIVE, text: 'time ticks away.' },
+        {
+          type: EntryType.OPTION,
+          text: "ask why you're here",
+          aliases: ['why am i here?', 'what am i doing here?', 'how did i get here?'],
+          then: [],
+        },
+        { type: EntryType.NARRATIVE, text: "you don't remember exactly." },
       ];
 
       // Image - should be gray (was in base)
-      const imageLine = '[image="https://i.pinimg.com/1200x/cf/e7/8f/cfe78fdd9f980d84eb8b3d8e479b5985.jpg"]';
+      const imageLine =
+        '[image: https://i.pinimg.com/1200x/cf/e7/8f/cfe78fdd9f980d84eb8b3d8e479b5985.jpg]';
       expect(getLineHighlight(imageLine, baseScene, generatedScene)).toBe('gray');
 
       // Narrative - should be gray
-      expect(getLineHighlight("you're stuck in the office, and the door is locked.", baseScene, generatedScene)).toBe('gray');
+      expect(
+        getLineHighlight(
+          "you're stuck in the office, and the door is locked.",
+          baseScene,
+          generatedScene,
+        ),
+      ).toBe('gray');
 
       // ORIGINAL option with MORE aliases - should be gray (was in base)
-      expect(getLineHighlight('* [do nothing, wait, stand still, do nothing at all]', baseScene, generatedScene)).toBe('gray');
-      
+      expect(
+        getLineHighlight(
+          'if do nothing | wait | stand still | do nothing at all',
+          baseScene,
+          generatedScene,
+        ),
+      ).toBe('gray');
+
       // Its then block narrative - should be gray
       expect(getLineHighlight('time ticks away.', baseScene, generatedScene)).toBe('gray');
 
       // NEW option - should be yellow
-      expect(getLineHighlight("* [ask why you're here, why am i here?, what am i doing here?, how did i get here?]", baseScene, generatedScene)).toBe('yellow');
-      
+      expect(
+        getLineHighlight(
+          "if ask why you're here | why am i here? | what am i doing here? | how did i get here?",
+          baseScene,
+          generatedScene,
+        ),
+      ).toBe('yellow');
+
       // Its then block narrative - should be yellow
-      expect(getLineHighlight("you don't remember exactly.", baseScene, generatedScene)).toBe('yellow');
+      expect(getLineHighlight("you don't remember exactly.", baseScene, generatedScene)).toBe(
+        'yellow',
+      );
     });
 
     it('should debug: log comparison keys', () => {
@@ -214,7 +267,7 @@ describe('branchHighlight', () => {
       const baseKeys = sceneToComparisonKeys(baseScene);
       console.log('Base keys:', [...baseKeys]);
 
-      const editorLine = '* [do nothing, wait, stand still, do nothing at all]';
+      const editorLine = 'if do nothing | wait | stand still | do nothing at all';
       const lineKey = lineToComparisonKey(editorLine).toLowerCase();
       console.log('Line key:', lineKey);
       console.log('In base:', baseKeys.has(lineKey));
@@ -223,10 +276,6 @@ describe('branchHighlight', () => {
     });
 
     it('should handle merged branch correctly - only latest changes are yellow', () => {
-      // Scenario: User's FIRST generation created "do nothing"
-      // Now second generation adds "ask why"
-      // With the fix, base is updated to include "do nothing" (from before this generation)
-      
       // Base now reflects state BEFORE the latest generation (includes previous gen)
       const baseScene: Scene = [
         { type: EntryType.OPTION, text: 'do nothing', aliases: ['wait'], then: [] },
@@ -234,44 +283,50 @@ describe('branchHighlight', () => {
 
       const generatedScene: Scene = [
         { type: EntryType.OPTION, text: 'do nothing', aliases: ['wait'], then: [] },
-        { type: EntryType.OPTION, text: 'ask why you\'re here', then: [] },
+        { type: EntryType.OPTION, text: "ask why you're here", then: [] },
       ];
 
       // "do nothing" is now in base, so it's gray
-      expect(getLineHighlight('* [do nothing, wait]', baseScene, generatedScene)).toBe('gray');
+      expect(getLineHighlight('if do nothing | wait', baseScene, generatedScene)).toBe('gray');
       // Only the new option is yellow
-      expect(getLineHighlight("* ask why you're here", baseScene, generatedScene)).toBe('yellow');
+      expect(getLineHighlight("if ask why you're here", baseScene, generatedScene)).toBe('yellow');
     });
   });
 
   describe('lineToComparisonKey parsing', () => {
-    it('should extract primary text from bracketed options', () => {
-      expect(lineToComparisonKey('* [do nothing, wait, stand]'))
-        .toBe('option:do nothing');
-      
-      expect(lineToComparisonKey('* [ask why, why am i here?, how]'))
-        .toBe('option:ask why');
+    it('should extract primary text from choices with aliases', () => {
+      expect(lineToComparisonKey('if do nothing | wait | stand')).toBe('option:do nothing');
+
+      expect(lineToComparisonKey('if ask why | why am i here? | how')).toBe('option:ask why');
     });
 
-    it('should handle plain options', () => {
-      expect(lineToComparisonKey('* run away'))
-        .toBe('option:run away');
+    it('should handle plain choices without aliases', () => {
+      expect(lineToComparisonKey('if run away')).toBe('option:run away');
+    });
+
+    it('should handle conditional choices', () => {
+      expect(lineToComparisonKey('if open the door & [has_key]')).toBe('option:open the door');
+      expect(lineToComparisonKey('if cast spell | use magic & [magic]')).toBe('option:cast spell');
     });
 
     it('should handle images', () => {
-      expect(lineToComparisonKey('[image="https://example.com/pic.jpg"]'))
-        .toBe('image:https://example.com/pic.jpg');
+      expect(lineToComparisonKey('[image: https://example.com/pic.jpg]')).toBe(
+        'image:https://example.com/pic.jpg',
+      );
     });
 
-    it('should handle jumps', () => {
-      expect(lineToComparisonKey('> FOREST'))
-        .toBe('jump:FOREST');
+    it('should handle gotos', () => {
+      expect(lineToComparisonKey('goto @FOREST')).toBe('jump:FOREST');
+      expect(lineToComparisonKey('goto @END')).toBe('jump:END');
+    });
+
+    it('should handle metadata', () => {
+      expect(lineToComparisonKey('[allows: @ROOM, new]')).toBe('metadata:allows:@ROOM, new');
+      expect(lineToComparisonKey('[sets: has_key]')).toBe('metadata:sets:has_key');
     });
 
     it('should handle narratives', () => {
-      expect(lineToComparisonKey('Hello world'))
-        .toBe('narrative:Hello world');
+      expect(lineToComparisonKey('Hello world')).toBe('narrative:Hello world');
     });
   });
 });
-

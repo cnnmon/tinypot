@@ -1,11 +1,13 @@
 import { EntryType, Schema, SchemaEntry } from '@/types/schema';
 
 /**
- * Parser for the game script format:
- * - `#` Scene marker (e.g., "# FIRE")
- * - `>` Jump/goto (e.g., "> FIRE" or "> END")
- * - `*` Option (e.g., "* Ride a bike")
- * - Indented entries after * are the "then" block for that option
+ * Parser for the new game script format (v2):
+ * - `@SCENE_NAME` - Scene declaration
+ * - `goto @SCENE_NAME` - Jump to scene (or `goto @END`)
+ * - `if Choice text | alias1 | alias2` - Choice with optional aliases
+ * - `if [variable] Choice text` - Conditional choice (requires variable)
+ * - Indented lines after `if` are the choice's response/navigation
+ * - `[key: value]` - Metadata (image, allows, sets, unsets, requires)
  * - Regular text is narrative
  */
 
@@ -14,34 +16,46 @@ function getIndentLevel(entry: string): number {
   return match ? match[1].length : 0;
 }
 
-function stripPrefix(entry: string, prefix: string): string {
-  return entry.slice(entry.indexOf(prefix) + prefix.length).trim();
+/**
+ * Parse choice line: if Choice text | alias1 | alias2 & [condition]
+ * The condition comes at the end after & symbol
+ * Returns { text, aliases, requires }
+ */
+function parseChoiceLine(line: string): {
+  text: string;
+  aliases?: string[];
+  requires?: string;
+} {
+  // Remove 'if ' prefix
+  let content = line.slice(3).trim();
+
+  // Check for condition at end: ... & [variable]
+  let requires: string | undefined;
+  const conditionMatch = content.match(/&\s*\[([^\]]+)\]\s*$/);
+  if (conditionMatch) {
+    requires = conditionMatch[1].trim();
+    content = content.slice(0, content.lastIndexOf('&')).trim();
+  }
+
+  // Split by | to get text and aliases
+  const parts = content.split('|').map((p) => p.trim());
+  const text = parts[0];
+  const aliases = parts.length > 1 ? parts.slice(1) : undefined;
+
+  return { text, aliases, requires };
 }
 
 /**
- * Parse option text that may include aliases
- * Formats:
- *   - "Ride a bike" -> { text: "Ride a bike", aliases: undefined }
- *   - "[Ride a bike, Cycle, Pedal]" -> { text: "Ride a bike", aliases: ["Cycle", "Pedal"] }
+ * Parse metadata line: [key: value]
  */
-function parseOptionText(optionText: string): { text: string; aliases?: string[] } {
-  const trimmed = optionText.trim();
-  
-  // Check for bracket format: [Primary, Alias1, Alias2]
-  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-    const inner = trimmed.slice(1, -1);
-    const parts = inner.split(',').map(p => p.trim()).filter(p => p.length > 0);
-    
-    if (parts.length >= 1) {
-      const [text, ...aliases] = parts;
-      return {
-        text,
-        aliases: aliases.length > 0 ? aliases : undefined,
-      };
-    }
+function parseMetadataLine(
+  line: string,
+): { key: string; value: string } | null {
+  const match = line.match(/^\[(\w+):\s*(.+)\]$/);
+  if (match) {
+    return { key: match[1], value: match[2] };
   }
-  
-  return { text: trimmed };
+  return null;
 }
 
 export function parseIntoSchema(entries: string[]): Schema {
@@ -58,34 +72,36 @@ export function parseIntoSchema(entries: string[]): Schema {
       continue;
     }
 
-    // Scene marker: # SCENE_NAME
-    if (trimmed.startsWith('#')) {
+    // Scene declaration: @SCENE_NAME
+    if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
       schema.push({
         type: EntryType.SCENE,
-        label: stripPrefix(trimmed, '#'),
+        label: trimmed.slice(1).trim(),
       });
       i++;
       continue;
     }
 
-    // Jump/goto: > TARGET or > END
-    if (trimmed.startsWith('>')) {
+    // Jump/goto: goto @TARGET or goto @END
+    if (trimmed.startsWith('goto ')) {
+      const target = trimmed.slice(5).trim();
+      // Remove @ prefix if present
+      const cleanTarget = target.startsWith('@') ? target.slice(1) : target;
       schema.push({
         type: EntryType.JUMP,
-        target: stripPrefix(trimmed, '>'),
+        target: cleanTarget,
       });
       i++;
       continue;
     }
 
-    // Option: * Option text or * [Option text, Alias1, Alias2]
-    if (trimmed.startsWith('*')) {
+    // Choice: if Choice text | alias1 | alias2
+    if (trimmed.startsWith('if ')) {
       const optionIndent = getIndentLevel(entry);
-      const optionRaw = stripPrefix(trimmed, '*');
-      const { text: optionText, aliases } = parseOptionText(optionRaw);
+      const { text, aliases, requires } = parseChoiceLine(trimmed);
       const thenBlock: SchemaEntry[] = [];
 
-      // Collect indented entries that follow this option
+      // Collect indented entries that follow this choice
       i++;
       while (i < entries.length) {
         const nextEntry = entries[i];
@@ -99,7 +115,7 @@ export function parseIntoSchema(entries: string[]): Schema {
 
         const nextIndent = getIndentLevel(nextEntry);
 
-        // If next entry is more indented than the option, it's part of the then block
+        // If next entry is more indented than the choice, it's part of the then block
         if (nextIndent > optionIndent) {
           // Parse this entry recursively
           const [parsedEntry] = parseIntoSchema([nextTrimmed]);
@@ -108,34 +124,52 @@ export function parseIntoSchema(entries: string[]): Schema {
           }
           i++;
         } else {
-          // Less or equal indentation means we're done with this option's then block
+          // Less or equal indentation means we're done with this choice's then block
           break;
         }
       }
 
       schema.push({
         type: EntryType.OPTION,
-        text: optionText,
+        text,
         ...(aliases && { aliases }),
+        ...(requires && { requires }),
         then: thenBlock,
       });
       continue;
     }
 
-    // Image directive: [image="url"]
-    const imageMatch = trimmed.match(/^\[image="(.+?)"\]$/);
-    if (imageMatch) {
-      const url = imageMatch[1];
-      const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
-      const isValidImage = validExtensions.some(ext => 
-        url.toLowerCase().endsWith(ext) || url.toLowerCase().includes(ext + '?')
-      );
-      
-      if (isValidImage) {
-        schema.push({ type: EntryType.IMAGE, url });
-      } else {
-        schema.push({ type: EntryType.NARRATIVE, text: `[Invalid image URL: ${url}]` });
+    // Metadata: [key: value]
+    const metadata = parseMetadataLine(trimmed);
+    if (metadata) {
+      const { key, value } = metadata;
+
+      // Special handling for image metadata
+      if (key === 'image') {
+        const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+        const isValidImage = validExtensions.some(
+          (ext) =>
+            value.toLowerCase().endsWith(ext) ||
+            value.toLowerCase().includes(ext + '?'),
+        );
+
+        if (isValidImage) {
+          schema.push({ type: EntryType.IMAGE, url: value });
+        } else {
+          schema.push({
+            type: EntryType.NARRATIVE,
+            text: `[Invalid image URL: ${value}]`,
+          });
+        }
+      } else if (key === 'allows' || key === 'sets' || key === 'unsets') {
+        // Other metadata (allows, sets, unsets)
+        schema.push({
+          type: EntryType.METADATA,
+          key: key as 'allows' | 'sets' | 'unsets',
+          value,
+        });
       }
+      // Unknown metadata keys are ignored
       i++;
       continue;
     }
@@ -170,7 +204,8 @@ function isRedundantAlias(existing: string, newAlias: string): boolean {
   if (normExisting === normNew) return true;
 
   // One contains the other (e.g., "run" vs "run away" or "running" vs "run")
-  if (normExisting.includes(normNew) || normNew.includes(normExisting)) return true;
+  if (normExisting.includes(normNew) || normNew.includes(normExisting))
+    return true;
 
   // Check if they share the same root words (simple stemming)
   const existingWords = new Set(normExisting.split(' '));
@@ -178,15 +213,31 @@ function isRedundantAlias(existing: string, newAlias: string): boolean {
   const sharedWords = newWords.filter((w) => existingWords.has(w));
 
   // If most words are shared, it's redundant
-  if (sharedWords.length >= Math.max(newWords.length, existingWords.size) * 0.8) return true;
+  if (sharedWords.length >= Math.max(newWords.length, existingWords.size) * 0.8)
+    return true;
 
   return false;
 }
 
 /**
- * Add an alias to an option in the script lines.
- * Transforms "* Ride a bike" to "* [Ride a bike, Cycle]"
- * or "* [Ride a bike, Cycle]" to "* [Ride a bike, Cycle, Pedal]"
+ * Parse choice from a script line to extract text and aliases
+ * Format: if [condition] Choice text | alias1 | alias2
+ */
+function parseChoiceFromLine(line: string): {
+  text: string;
+  aliases?: string[];
+} | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('if ')) return null;
+
+  const { text, aliases } = parseChoiceLine(trimmed);
+  return { text, aliases };
+}
+
+/**
+ * Add an alias to a choice in the script lines.
+ * Transforms "if Ride a bike" to "if Ride a bike | Cycle"
+ * or "if Ride a bike | Cycle" to "if Ride a bike | Cycle | Pedal"
  * Avoids adding redundant aliases that are too similar to existing ones.
  */
 export function addAliasToOption(
@@ -196,24 +247,32 @@ export function addAliasToOption(
 ): string[] {
   return lines.map((line) => {
     const trimmed = line.trim();
-    if (!trimmed.startsWith('*')) return line;
+    if (!trimmed.startsWith('if ')) return line;
 
-    const indent = line.match(/^(\s*)/)?.[1] || '';
-    const optionRaw = stripPrefix(trimmed, '*');
-    const { text, aliases } = parseOptionText(optionRaw);
+    const parsed = parseChoiceFromLine(line);
+    if (!parsed) return line;
 
-    // Check if this is the option we're looking for
+    const { text, aliases } = parsed;
+
+    // Check if this is the choice we're looking for
     if (text !== optionText) return line;
 
-    // Check if alias is redundant with the option text itself
+    // Check if alias is redundant with the choice text itself
     if (isRedundantAlias(text, newAlias)) return line;
 
     // Check if alias is redundant with any existing alias
-    if (aliases?.some((existing) => isRedundantAlias(existing, newAlias))) return line;
+    if (aliases?.some((existing) => isRedundantAlias(existing, newAlias)))
+      return line;
 
-    // Build new option line with alias
+    // Build new choice line with alias
+    const indent = line.match(/^(\s*)/)?.[1] || '';
     const allAliases = aliases ? [...aliases, newAlias] : [newAlias];
-    return `${indent}* [${text}, ${allAliases.join(', ')}]`;
+
+    // Preserve condition at end if present: ... & [var]
+    const conditionMatch = trimmed.match(/&\s*\[([^\]]+)\]\s*$/);
+    const condition = conditionMatch ? ` & [${conditionMatch[1]}]` : '';
+
+    return `${indent}if ${text} | ${allAliases.join(' | ')}${condition}`;
   });
 }
 
@@ -239,19 +298,17 @@ export function addPlayerInputLog(
     result.push(line);
 
     // Track scene
-    if (trimmed.startsWith('#')) {
-      const sceneName = stripPrefix(trimmed, '#');
+    if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
+      const sceneName = trimmed.slice(1).trim();
       inTargetScene = sceneName === sceneId;
       continue;
     }
 
-    // Find the matching option in the target scene
-    if (inTargetScene && trimmed.startsWith('*')) {
-      const optionRaw = stripPrefix(trimmed, '*');
-      const { text } = parseOptionText(optionRaw);
-
-      if (text === optionText) {
-        // Add the player log after the option's then block
+    // Find the matching choice in the target scene
+    if (inTargetScene && trimmed.startsWith('if ')) {
+      const parsed = parseChoiceFromLine(line);
+      if (parsed && parsed.text === optionText) {
+        // Add the player log after the choice's then block
         const optionIndent = line.match(/^(\s*)/)?.[1] || '';
         const logIndent = optionIndent + '   ';
         const confidencePercent = Math.round(confidence * 100);
@@ -286,8 +343,8 @@ export function addPlayerInputLog(
 }
 
 /**
- * Add a generated option to the script at the right location.
- * Inserts after existing options in the given scene, or after the last narrative if no options exist.
+ * Add a generated choice to the script at the right location.
+ * Inserts after existing choices in the given scene, or after the last narrative if no choices exist.
  */
 export function addGeneratedOptionToScript(
   lines: string[],
@@ -302,8 +359,8 @@ export function addGeneratedOptionToScript(
     // Find the first scene marker to use as target
     for (const line of lines) {
       const trimmed = line.trim();
-      if (trimmed.startsWith('#')) {
-        targetSceneId = stripPrefix(trimmed, '#');
+      if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
+        targetSceneId = trimmed.slice(1).trim();
         break;
       }
     }
@@ -318,16 +375,16 @@ export function addGeneratedOptionToScript(
     const trimmed = line.trim();
 
     // Track scene changes
-    if (trimmed.startsWith('#')) {
-      const sceneName = stripPrefix(trimmed, '#');
+    if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
+      const sceneName = trimmed.slice(1).trim();
       inTargetScene = sceneName === targetSceneId;
       result.push(line);
       continue;
     }
 
-    // Track last option position in target scene
-    if (inTargetScene && trimmed.startsWith('*')) {
-      // Find end of this option's then block
+    // Track last choice position in target scene
+    if (inTargetScene && trimmed.startsWith('if ')) {
+      // Find end of this choice's then block
       let j = i + 1;
       while (j < lines.length) {
         const nextLine = lines[j];
@@ -341,7 +398,7 @@ export function addGeneratedOptionToScript(
         if (nextIndent <= optionIndent) break;
         j++;
       }
-      // Push option and its then block
+      // Push choice and its then block
       result.push(line);
       for (let k = i + 1; k < j; k++) {
         result.push(lines[k]);
@@ -354,27 +411,28 @@ export function addGeneratedOptionToScript(
     result.push(line);
   }
 
-  // Build the new option block with aliases if present
-  const optionLine = aliases.length > 0
-    ? `* [${optionText}, ${aliases.join(', ')}]`
-    : `* ${optionText}`;
+  // Build the new choice block with aliases if present
+  const optionLine =
+    aliases.length > 0
+      ? `if ${optionText} | ${aliases.join(' | ')}`
+      : `if ${optionText}`;
   const newOptionLines: string[] = [
     optionLine,
     ...thenLines.map((l) => `   ${l}`),
   ];
 
-  // Insert after the last option in the target scene
+  // Insert after the last choice in the target scene
   if (lastOptionEndIdx !== -1) {
     result.splice(lastOptionEndIdx, 0, ...newOptionLines);
   } else {
-    // No options found - find where to insert in the target scene
+    // No choices found - find where to insert in the target scene
     // Insert before the next scene marker or at end of file
     let insertIdx = result.length;
     inTargetScene = false;
     for (let i = 0; i < result.length; i++) {
       const trimmed = result[i].trim();
-      if (trimmed.startsWith('#')) {
-        const sceneName = stripPrefix(trimmed, '#');
+      if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
+        const sceneName = trimmed.slice(1).trim();
         if (sceneName === targetSceneId) {
           inTargetScene = true;
         } else if (inTargetScene) {

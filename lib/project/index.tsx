@@ -244,6 +244,7 @@ export function ProjectProvider({
   );
 
   // Reject branch - optionally revert to base script
+  // Rejects NEVER trigger metalearning (only accept with edits does)
   const rejectBranch = useCallback(
     (branchId: string, shouldRevert: boolean) => {
       const branch = branches.find((b) => b.id === branchId);
@@ -266,15 +267,8 @@ export function ProjectProvider({
 
       // Reset the player
       setPlayerResetKey((k) => k + 1);
-
-      // Only run metalearning if there are meaningful edits (authored differs from generated)
-      // Pure rejects (revert or no changes) don't trigger metalearning
-      const hasMeaningfulEdits = !recordsEqual(authored, branch.generated);
-      if (hasMeaningfulEdits) {
-        startMetalearningJob({ ...branch, authored, approved: false });
-      }
     },
-    [branches, schema, setProject, updateBranchMutation, startMetalearningJob],
+    [branches, schema, setProject, updateBranchMutation],
   );
 
   // Show loading state while project data is loading

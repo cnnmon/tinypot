@@ -1,3 +1,4 @@
+import { AllowsConfig } from '@/types/schema';
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic();
@@ -11,6 +12,8 @@ export interface GenerateRequest {
   projectLines: string[]; // Full project for style/context
   worldBible?: string; // Optional author's world context
   guidebook?: string; // Author preferences learned from metalearning
+  allowsConfig?: AllowsConfig; // What the LLM is allowed to generate
+  currentVariables?: string[]; // Variables currently set in player state
 }
 
 /**
@@ -27,13 +30,58 @@ export interface GenerateResponse {
   generatedOption: {
     text: string; // The option text (normalized from user input)
     aliases: string[]; // Alternative phrasings that should match this option
-    then: string[]; // Lines of narrative/jumps to add
+    then: string[]; // Lines of narrative/jumps to add (using new syntax: goto @SCENE)
     newScene?: {
       label: string; // Scene label for new fork
       content: string[]; // Lines of content for the new scene
     };
   } | null;
   error?: string;
+}
+
+/**
+ * Build constraints string based on allowsConfig
+ */
+function buildConstraintsPrompt(allowsConfig?: AllowsConfig): string {
+  if (!allowsConfig) {
+    // Default: can link to existing scenes, cannot create new
+    return `
+CONSTRAINTS:
+- You MAY link to any existing scene using LINK_SCENE
+- You CANNOT create new scenes (NEW_FORK is NOT allowed)
+- Use TEXT_ONLY for clarification or flavor that loops back`;
+  }
+
+  const { scenes, allowNew, allowAny } = allowsConfig;
+
+  // Check for "none" - only TEXT_ONLY allowed
+  if (!allowAny && scenes.length === 0 && !allowNew) {
+    return `
+CONSTRAINTS:
+- You can ONLY use TEXT_ONLY responses
+- NO scene linking or new scene creation allowed
+- Provide flavor text or clarification that loops back to current scene`;
+  }
+
+  const parts: string[] = ['CONSTRAINTS:'];
+
+  if (allowNew) {
+    parts.push('- You MAY create new scenes (NEW_FORK is allowed)');
+  } else {
+    parts.push('- You CANNOT create new scenes (NEW_FORK is NOT allowed)');
+  }
+
+  if (allowAny) {
+    parts.push('- You MAY link to any existing scene');
+  } else if (scenes.length > 0) {
+    parts.push(`- You may ONLY link to these specific scenes: ${scenes.join(', ')}`);
+  } else {
+    parts.push('- You CANNOT link to other scenes');
+  }
+
+  parts.push('- TEXT_ONLY is always available for clarification/flavor');
+
+  return parts.join('\n');
 }
 
 /**
@@ -55,6 +103,8 @@ export async function POST(req: Request) {
     projectLines,
     worldBible,
     guidebook,
+    allowsConfig,
+    currentVariables,
   }: GenerateRequest = await req.json();
 
   if (!userInput) {
@@ -82,6 +132,13 @@ export async function POST(req: Request) {
     ? `\nAUTHOR PREFERENCES (follow these closely):\n${guidebook}\n`
     : '';
 
+  const constraintsContext = buildConstraintsPrompt(allowsConfig);
+
+  const variablesContext =
+    currentVariables && currentVariables.length > 0
+      ? `\nCURRENT VARIABLES SET: ${currentVariables.join(', ')}`
+      : '';
+
   const response = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 768,
@@ -99,31 +156,42 @@ ${projectContext}
 CURRENT SCENE: ${currentScene || '(opening)'}
 ${existingScenesContext}
 ${existingOptionsContext}
+${variablesContext}
 
 RECENT HISTORY:
 ${historyContext || '(start of game)'}
 
 PLAYER'S INPUT: "${userInput}"
 
-First, decide which response type is most appropriate:
+${constraintsContext}
+
+First, decide which response type is most appropriate (respecting the constraints above):
 
 1. TEXT_ONLY - Use when:
    - Player is asking for clarification ("what?", "help", "look around")
    - Input is flavor/roleplay that doesn't advance the story
    - Input doesn't represent a meaningful choice
    - Response should loop back to same decision point
+   - (Or when LINK_SCENE/NEW_FORK are not allowed by constraints)
 
 2. LINK_SCENE - Use when:
    - Player wants to go somewhere that already exists
    - Input references an existing scene or location
    - Player wants to backtrack or revisit
-   - ONLY use if the target scene exists in the project
+   - ONLY use if the target scene exists AND is allowed by constraints
 
 3. NEW_FORK - Use when:
    - Player is making a genuinely new choice
    - Input represents a meaningful story branch
    - The action would logically lead somewhere new
    - This aligns with the author's style and world
+   - ONLY use if allowed by constraints
+
+SYNTAX RULES (use these exactly):
+- Scene declarations: @SCENE_NAME
+- Navigation: goto @SCENE_NAME (or goto @END)
+- Choices: if Choice text | alias1 | alias2
+- Metadata: [key: value]
 
 Respond in JSON format only:
 {
@@ -145,10 +213,11 @@ Respond in JSON format only:
 
 Guidelines:
 - For TEXT_ONLY: provide 1-2 lines of narrative, no jump
-- For LINK_SCENE: verify the target exists in the scene list
+- For LINK_SCENE: verify the target exists in the scene list AND is allowed
 - For NEW_FORK: create a memorable scene label and 2-4 lines of content
 - Match the author's tone and style
-- Keep narrative punchy and evocative`,
+- Keep narrative punchy and evocative
+- Use "goto @SCENE_NAME" syntax for navigation`,
       },
     ],
   });
@@ -167,7 +236,25 @@ Guidelines:
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
-    const responseType = (parsed.responseType || 'TEXT_ONLY') as GenerationType;
+    let responseType = (parsed.responseType || 'TEXT_ONLY') as GenerationType;
+
+    // Enforce constraints - downgrade if LLM violated them
+    if (allowsConfig) {
+      if (responseType === 'NEW_FORK' && !allowsConfig.allowNew) {
+        responseType = 'TEXT_ONLY';
+      }
+      if (responseType === 'LINK_SCENE') {
+        const targetScene = parsed.targetScene;
+        if (!allowsConfig.allowAny && allowsConfig.scenes.length > 0) {
+          if (!allowsConfig.scenes.includes(targetScene)) {
+            responseType = 'TEXT_ONLY';
+          }
+        }
+        if (!allowsConfig.allowAny && allowsConfig.scenes.length === 0 && !allowsConfig.allowNew) {
+          responseType = 'TEXT_ONLY';
+        }
+      }
+    }
 
     // Build the "then" block based on response type
     const thenLines: string[] = [];
@@ -180,11 +267,14 @@ Guidelines:
       thenLines.push(...cleanedNarrative);
     }
 
-    // Add jump based on response type
+    // Add jump based on response type (using new goto @ syntax)
+    // Clean target by removing any leading @ (LLM might include it)
     if (responseType === 'LINK_SCENE' && parsed.targetScene) {
-      thenLines.push(`> ${parsed.targetScene}`);
+      const cleanTarget = parsed.targetScene.replace(/^@/, '');
+      thenLines.push(`goto @${cleanTarget}`);
     } else if (responseType === 'NEW_FORK' && parsed.newScene?.label) {
-      thenLines.push(`> ${parsed.newScene.label}`);
+      const cleanLabel = parsed.newScene.label.replace(/^@/, '');
+      thenLines.push(`goto @${cleanLabel}`);
     }
     // TEXT_ONLY has no jump - loops back to current decision point
 
@@ -214,8 +304,8 @@ Guidelines:
       const sceneLabel =
         parsed.newScene?.label ||
         thenLines
-          .find((l: string) => l.startsWith('>'))
-          ?.slice(1)
+          .find((l: string) => l.startsWith('goto @'))
+          ?.slice(6)
           .trim();
 
       if (sceneLabel) {

@@ -27,6 +27,8 @@ function entryToComparisonKey(entry: SchemaEntry): string {
       return `scene:${entry.label}`;
     case EntryType.IMAGE:
       return `image:${entry.url}`;
+    case EntryType.METADATA:
+      return `metadata:${entry.key}:${entry.value}`;
     default:
       return '';
   }
@@ -41,27 +43,37 @@ function sceneToComparisonKeys(scene: Scene): Set<string> {
 function lineToComparisonKey(line: string): string {
   const trimmed = line.trim();
 
-  // Option line: * text or * [text, alias1, alias2]
-  if (trimmed.startsWith('*')) {
-    const optionPart = trimmed.slice(1).trim();
-    // Extract primary text from bracket format or plain format
-    if (optionPart.startsWith('[') && optionPart.includes(']')) {
-      const inner = optionPart.slice(1, optionPart.indexOf(']'));
-      const primaryText = inner.split(',')[0].trim();
-      return `option:${primaryText}`;
+  // Choice line: if text | alias1 | alias2 & [condition]
+  if (trimmed.startsWith('if ')) {
+    let content = trimmed.slice(3).trim();
+    // Remove condition at end: ... & [var]
+    const conditionMatch = content.match(/&\s*\[([^\]]+)\]\s*$/);
+    if (conditionMatch) {
+      content = content.slice(0, content.lastIndexOf('&')).trim();
     }
-    return `option:${optionPart}`;
+    // Extract primary text (before |)
+    const primaryText = content.split('|')[0].trim();
+    return `option:${primaryText}`;
   }
 
-  // Jump line: > target
-  if (trimmed.startsWith('>')) {
-    return `jump:${trimmed.slice(1).trim()}`;
+  // Jump line: goto @target
+  if (trimmed.startsWith('goto ')) {
+    const target = trimmed.slice(5).trim();
+    // Remove @ prefix if present
+    const cleanTarget = target.startsWith('@') ? target.slice(1) : target;
+    return `jump:${cleanTarget}`;
   }
 
-  // Image directive: [image="url"]
-  const imageMatch = trimmed.match(/^\[image="(.+?)"\]$/);
+  // Image directive: [image: url]
+  const imageMatch = trimmed.match(/^\[image:\s*(.+)\]$/);
   if (imageMatch) {
     return `image:${imageMatch[1]}`;
+  }
+
+  // Other metadata: [key: value]
+  const metadataMatch = trimmed.match(/^\[(\w+):\s*(.+)\]$/);
+  if (metadataMatch) {
+    return `metadata:${metadataMatch[1]}:${metadataMatch[2]}`;
   }
 
   // Default: narrative
@@ -114,8 +126,8 @@ function buildBranchDecorations(view: EditorView): DecorationSet {
     const line = doc.line(i);
     const trimmed = line.text.trimStart();
 
-    // Track scene boundaries
-    if (trimmed.startsWith('#')) {
+    // Track scene boundaries (new syntax: @SCENE_NAME)
+    if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
       currentSceneId = trimmed.slice(1).trim();
       continue; // Don't highlight the scene header itself
     }

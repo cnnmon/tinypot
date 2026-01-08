@@ -21,20 +21,6 @@ export default function Player({
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [lines]);
 
-  function renderStatus() {
-    switch (status) {
-      case Status.WAITING:
-        return <PlayerInput handleSubmit={handleSubmit} />;
-      case Status.ENDED:
-        return (
-          <div className="flex gap-2">
-            <p>END.</p>
-            <button onClick={handleRestart}>Restart?</button>
-          </div>
-        );
-    }
-  }
-
   return (
     <div className="flex flex-col h-full">
       <div className="space-y-2 py-2 flex flex-col relative justify-between h-full">
@@ -74,20 +60,25 @@ export default function Player({
               </motion.p>
             );
           })}
-          {status !== Status.WAITING && (
-            <p className="italic text-neutral-400">({status.toLowerCase()}...)</p>
-          )}
+          {status !== Status.WAITING &&
+            (status === Status.ENDED ? (
+              <p>END.</p>
+            ) : (
+              <p className="italic text-neutral-400">({status.toLowerCase()}...)</p>
+            ))}
           <div ref={endRef} />
         </div>
 
-        <motion.div
-          id={lines.length.toString()}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={twMerge('w-full absolute bottom-0', className)}
-        >
-          {renderStatus()}
-        </motion.div>
+        {status === Status.WAITING && (
+          <motion.div
+            id={lines.length.toString()}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={twMerge('w-full absolute bottom-0', className)}
+          >
+            <PlayerInput handleSubmit={handleSubmit} />
+          </motion.div>
+        )}
       </div>
     </div>
   );

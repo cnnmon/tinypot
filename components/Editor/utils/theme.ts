@@ -4,10 +4,11 @@ import { tags } from '@lezer/highlight';
 
 // Custom syntax highlighting for bonsai language
 export const bonsaiHighlighting = HighlightStyle.define([
-  { tag: tags.heading, color: '#7c3aed', fontWeight: 'bold' }, // # SCENE
-  { tag: tags.link, color: '#0891b2' }, // > GOTO
-  { tag: tags.list, color: '#059669' }, // * Option
+  { tag: tags.heading, color: '#7c3aed', fontWeight: 'bold' }, // @SCENE
+  { tag: tags.link, color: '#0891b2' }, // goto @SCENE
+  { tag: tags.list, color: '#059669' }, // if Choice
   { tag: tags.string, color: '#6b7280' }, // indented content
+  { tag: tags.meta, color: '#d97706' }, // [key: value] metadata
 ]);
 
 // Theme for the editor
@@ -103,6 +104,10 @@ export const bonsaiSyntaxTheme = EditorView.theme({
     color: '#d97706',
     fontStyle: 'italic',
   },
+  '.cm-bonsai-metadata': {
+    color: '#9333ea',
+    fontStyle: 'italic',
+  },
 });
 
 // Custom highlighter that applies styles based on line content
@@ -112,12 +117,12 @@ function bonsaiLineHighlighter(view: EditorView) {
   // Map<sceneName, hasBeenSeen> - value is true if already encountered in second pass
   const sceneMap = new Map<string, boolean>();
 
-  // First pass: collect all valid scene names
+  // First pass: collect all valid scene names (new syntax: @SCENE_NAME)
   for (let i = 1; i <= doc.lines; i++) {
     const line = doc.line(i);
     const trimmed = line.text.trimStart().toLowerCase();
 
-    if (trimmed.startsWith('#')) {
+    if (trimmed.startsWith('@') && !trimmed.startsWith('@end')) {
       const sceneName = trimmed.slice(1).trim();
       if (!sceneMap.has(sceneName)) sceneMap.set(sceneName, false);
     }
@@ -130,28 +135,43 @@ function bonsaiLineHighlighter(view: EditorView) {
     const trimmed = text.trimStart().toLowerCase();
 
     let className = '';
-    if (trimmed.startsWith('#')) {
+    // Scene declaration: @SCENE_NAME
+    if (trimmed.startsWith('@') && !trimmed.startsWith('@end')) {
       const sceneName = trimmed.slice(1).trim();
-      if (sceneName === 'start' || sceneName === 'end' || sceneMap.get(sceneName)) {
+      if (sceneName === 'start' || sceneMap.get(sceneName)) {
         className = 'cm-bonsai-scene-start';
       } else {
         className = 'cm-bonsai-scene';
         sceneMap.set(sceneName, true);
       }
-    } else if (trimmed.startsWith('>')) {
-      const gotoTarget = trimmed.slice(1).trim();
+    } else if (trimmed.startsWith('@end')) {
+      className = 'cm-bonsai-scene-start'; // END is special
+    } else if (trimmed.startsWith('goto ')) {
+      // Jump: goto @TARGET
+      const gotoTarget = trimmed.slice(5).trim();
+      // Remove @ prefix if present
+      const cleanTarget = gotoTarget.startsWith('@') ? gotoTarget.slice(1) : gotoTarget;
       const isValidTarget =
-        !gotoTarget || sceneMap.has(gotoTarget) || gotoTarget === 'start' || gotoTarget === 'end';
+        !cleanTarget ||
+        sceneMap.has(cleanTarget) ||
+        cleanTarget === 'start' ||
+        cleanTarget === 'end';
       if (!isValidTarget) {
-        className = 'cm-bonsai-scene-start'; // Use red color for invalid GOTO
+        className = 'cm-bonsai-scene-start'; // Use red color for invalid goto
       } else {
         className = 'cm-bonsai-goto';
       }
-    } else if (trimmed.startsWith('*')) {
+    } else if (trimmed.startsWith('if ')) {
+      // Choice: if Choice text | alias
       className = 'cm-bonsai-option';
-    } else if (/^\[image="[^"]+"\]$/.test(trimmed)) {
+    } else if (/^\[image:\s*.+\]$/.test(trimmed)) {
+      // Image metadata: [image: url]
       className = 'cm-bonsai-image';
-    } else if (text.startsWith('   ') || text.startsWith('\t')) {
+    } else if (/^\[\w+:\s*.+\]$/.test(trimmed)) {
+      // Other metadata: [key: value]
+      className = 'cm-bonsai-metadata';
+    } else if (/^\s+/.test(text) && trimmed.length > 0) {
+      // Any leading whitespace (tab, spaces, or mix) = indented content
       className = 'cm-bonsai-indent';
     }
 

@@ -1,5 +1,12 @@
 import { Line, Sender } from '@/types/playthrough';
-import { EntryType, ImageEntry, JumpEntry, NarrativeEntry, Schema } from '@/types/schema';
+import {
+  EntryType,
+  ImageEntry,
+  JumpEntry,
+  MetadataEntry,
+  NarrativeEntry,
+  Schema,
+} from '@/types/schema';
 import { getScanStart } from './getScanStart';
 
 function makeLineId(sceneId: string, lineIdx: number): string {
@@ -31,9 +38,10 @@ function makeErrorLine(errorType: string, message: string): Line {
  *   3: decision point (end of scene, implicit loop)
  */
 interface ScenePosition {
-  type: 'narrative' | 'image' | 'wait';
+  type: 'narrative' | 'image' | 'wait' | 'set' | 'unset';
   narrativeIdx?: number;
   text?: string;
+  variable?: string;
 }
 
 function buildScenePositions(schema: Schema, scanStart: number): ScenePosition[] {
@@ -56,6 +64,15 @@ function buildScenePositions(schema: Schema, scanStart: number): ScenePosition[]
         narrativeIdx: positions.filter((p) => p.type === 'narrative' || p.type === 'image').length,
         text: isImage ? (entry as ImageEntry).url : (entry as NarrativeEntry).text,
       });
+    } else if (entry.type === EntryType.METADATA) {
+      // Handle sets/unsets metadata
+      const meta = entry as MetadataEntry;
+      if (meta.key === 'sets') {
+        positions.push({ type: 'set', variable: meta.value });
+      } else if (meta.key === 'unsets') {
+        positions.push({ type: 'unset', variable: meta.value });
+      }
+      // Other metadata (image, allows, requires) doesn't create positions
     } else if (entry.type === EntryType.OPTION) {
       pendingOptions = true;
     } else if (entry.type === EntryType.JUMP) {
@@ -70,6 +87,14 @@ function buildScenePositions(schema: Schema, scanStart: number): ScenePosition[]
   }
 
   return positions;
+}
+
+/**
+ * Callback type for variable operations during stepping
+ */
+export interface StepCallbacks {
+  setVariable?: (variable: string) => void;
+  unsetVariable?: (variable: string) => void;
 }
 
 /**
@@ -88,11 +113,13 @@ export function step({
   sceneMap,
   sceneId,
   lineIdx,
+  callbacks,
 }: {
   schema: Schema;
   sceneMap: Record<string, number>;
   sceneId: string;
   lineIdx: number;
+  callbacks?: StepCallbacks;
 }): {
   type: 'continue' | 'wait' | 'end' | 'error';
   line?: Line;
@@ -140,6 +167,19 @@ export function step({
       const pos = positions[currentLineIdx];
       if (pos.type === 'wait') {
         return { type: 'wait' };
+      }
+      // Handle variable set/unset positions
+      if (pos.type === 'set' && pos.variable && callbacks?.setVariable) {
+        callbacks.setVariable(pos.variable);
+        // Continue to next position (don't show anything to player)
+        currentLineIdx++;
+        continue;
+      }
+      if (pos.type === 'unset' && pos.variable && callbacks?.unsetVariable) {
+        callbacks.unsetVariable(pos.variable);
+        // Continue to next position
+        currentLineIdx++;
+        continue;
       }
       return {
         type: 'continue',
