@@ -3,15 +3,7 @@ import { timeAgo } from '@/lib/player/utils/time';
 import { Branch } from '@/types/branch';
 import { twMerge } from 'tailwind-merge';
 
-export default function Item({
-  branch,
-  isSelected,
-  onClick,
-}: {
-  branch: Branch;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
+export default function Item({ branch, onClick }: { branch: Branch; onClick: () => void }) {
   const resolved = isResolved(branch);
   const status = getBranchStatus(branch);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, ReactNode, useCallback, useContext, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 interface TooltipState {
   content: ReactNode;
@@ -23,6 +23,8 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
     y: 0,
     visible: false,
   });
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ left: 0, top: 0, transform: 'translate(-50%, -100%) translateY(-8px)' });
 
   const show = useCallback((content: ReactNode, x: number, y: number) => {
     setTooltip({ content, x, y, visible: true });
@@ -32,17 +34,37 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
     setTooltip((prev) => ({ ...prev, visible: false }));
   }, []);
 
+  useEffect(() => {
+    if (tooltip.visible && tooltipRef.current) {
+      const tooltipRect = tooltipRef.current.getBoundingClientRect();
+      const padding = 8;
+      
+      let left = tooltip.x;
+      let transform = 'translate(-50%, -100%) translateY(-8px)';
+      
+      // Check if tooltip goes off right edge
+      if (left + tooltipRect.width / 2 > window.innerWidth - padding) {
+        left = window.innerWidth - padding;
+        transform = 'translate(-100%, -100%) translateY(-8px)';
+      }
+      // Check if tooltip goes off left edge
+      else if (left - tooltipRect.width / 2 < padding) {
+        left = padding;
+        transform = 'translate(0, -100%) translateY(-8px)';
+      }
+      
+      setPosition({ left, top: tooltip.y, transform });
+    }
+  }, [tooltip.visible, tooltip.x, tooltip.y]);
+
   return (
     <TooltipContext.Provider value={{ show, hide }}>
       {children}
       {tooltip.visible && (
         <div
-          className="fixed z-[100] px-2 py-1 text-sm bg-neutral-800 text-white rounded pointer-events-none"
-          style={{
-            left: tooltip.x,
-            top: tooltip.y,
-            transform: 'translate(-50%, -100%) translateY(-8px)',
-          }}
+          ref={tooltipRef}
+          className="fixed z-[100] px-2 py-1 text-sm bg-neutral-800 text-white rounded pointer-events-none max-w-xs"
+          style={position}
         >
           {tooltip.content}
         </div>

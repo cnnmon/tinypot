@@ -1,5 +1,6 @@
 'use client';
 
+import { useTooltipTrigger } from '@/components/TooltipProvider';
 import { getBranchStatus, isResolved } from '@/lib/branch';
 import { timeAgo } from '@/lib/player/utils/time';
 import { useProject } from '@/lib/project';
@@ -12,12 +13,13 @@ function Body({ branch }: { branch: Branch }) {
   const status = getBranchStatus(branch);
 
   if (resolved) {
+    const isRejected = branch.approved === false;
     return (
       <div className="text-neutral-500">
         <span className={twMerge(status === 'Approved' ? 'text-emerald-600' : 'text-neutral-400')}>
           {status}
         </span>
-        , viewing read-only changes in editor
+        , viewing {isRejected ? 'generated content' : 'your edits'} in editor
       </div>
     );
   }
@@ -43,6 +45,7 @@ function Body({ branch }: { branch: Branch }) {
 
 export default function Detail({ branch }: { branch: Branch }) {
   const { setSelectedBranchId } = useProject();
+  const tooltipProps = useTooltipTrigger('New paths generated from playthroughs');
 
   return (
     <div className="space-y-2 flex h-full flex-1 flex-col">
@@ -50,6 +53,7 @@ export default function Detail({ branch }: { branch: Branch }) {
         <button onClick={() => setSelectedBranchId(null)} className="bg-transparent! no-underline!">
           ←
         </button>
+        <h1 {...tooltipProps}>My branches ·</h1>
         <h3 className="font-medium leading-tight">{branch.title}</h3>
         <p className="text-neutral-400 text-sm">{timeAgo(branch.createdAt)} ago</p>
       </div>

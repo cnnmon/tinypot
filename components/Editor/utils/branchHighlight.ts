@@ -114,6 +114,9 @@ function buildBranchDecorations(view: EditorView): DecorationSet {
     return Decoration.none;
   }
 
+  // Check if this is a rejected branch
+  const isRejected = selectedBranch.approved === false;
+
   // Create a Set for fast lookup of affected scenes
   const affectedScenes = new Set(selectedBranch.sceneIds);
 
@@ -153,14 +156,23 @@ function buildBranchDecorations(view: EditorView): DecorationSet {
         const inBase = baseKeys.has(lineKey);
         const inGenerated = generatedKeys.has(lineKey);
 
-        if (inGenerated && !inBase) {
-          // Line exists in generated but NOT in base = AI-added
-          lineClass = 'cm-branch-generated'; // Yellow
-        } else if (!inGenerated && !inBase) {
-          // Line is not in generated and not in base = human-edited after generation
-          lineClass = 'cm-branch-edited'; // Green
+        if (isRejected) {
+          // For rejected branches, highlight generated content in red
+          if (inGenerated && !inBase) {
+            lineClass = 'cm-branch-rejected'; // Red with strikethrough
+          }
+          // Other lines in affected scenes stay gray
+        } else {
+          // Normal (unresolved or approved) branch highlighting
+          if (inGenerated && !inBase) {
+            // Line exists in generated but NOT in base = AI-added
+            lineClass = 'cm-branch-generated'; // Yellow
+          } else if (!inGenerated && !inBase) {
+            // Line is not in generated and not in base = human-edited after generation
+            lineClass = 'cm-branch-edited'; // Green
+          }
+          // If inBase = pre-existing, stays gray
         }
-        // If inBase = pre-existing, stays gray
       }
 
       decorations.push({
@@ -196,7 +208,7 @@ export const branchHighlightPlugin = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 
-// CSS for branch highlighting - three levels
+// CSS for branch highlighting - four levels
 export const branchHighlightTheme = EditorView.theme({
   // Gray - affected scene background
   '.cm-branch-scene': {
@@ -209,5 +221,11 @@ export const branchHighlightTheme = EditorView.theme({
   // Green - human edited
   '.cm-branch-edited': {
     backgroundColor: '#dcebcd', // green-500 at 20%
+  },
+  // Red - rejected content (shown when viewing rejected branch)
+  '.cm-branch-rejected': {
+    backgroundColor: '#FEE2E2', // red-100
+    textDecoration: 'line-through',
+    opacity: 0.8,
   },
 });

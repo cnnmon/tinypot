@@ -10,7 +10,7 @@ import { useTooltipTrigger } from '@/components/TooltipProvider';
 import { Id } from '@/convex/_generated/dataModel';
 import { PlayerProvider, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
-import { ArrowLeftIcon, ArrowPathIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useParams } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
@@ -21,9 +21,9 @@ function ProjectContent() {
   const [leftWidth, setLeftWidth] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
-  const guidebookTooltip = useTooltipTrigger(
-    'The guidebook helps the AI understand your world and style preferences',
-  );
+  const guidebookTooltip = useTooltipTrigger('The guidebook learns from your branch edits');
+  const jumpBackTooltip = useTooltipTrigger('Undo last choice');
+  const restartTooltip = useTooltipTrigger('Restart');
 
   const handleMouseDown = useCallback(() => {
     isDragging.current = true;
@@ -67,10 +67,9 @@ function ProjectContent() {
           )}
         >
           <div className="flex items-center justify-between gap-1">
-            <h1>Guidebook</h1>
-            <div className="p-1 rounded hover:bg-neutral-100 cursor-help" {...guidebookTooltip}>
-              <InformationCircleIcon width={16} height={16} />
-            </div>
+            <h1 className="cursor-default" {...guidebookTooltip}>
+              Guidebook
+            </h1>
           </div>
           {isMetalearning && (
             <span className="text-neutral-800/40 animate-pulse">(Updating guidebook...)</span>
@@ -109,10 +108,10 @@ function ProjectContent() {
                 <div className="flex items-center justify-between">
                   <h1>Player</h1>
                   <div className="w-full justify-end flex gap-1 text-neutral-400">
-                    <button onClick={handleJumpBack} className="p-1 rounded">
+                    <button onClick={handleJumpBack} className="p-1 rounded" {...jumpBackTooltip}>
                       <ArrowLeftIcon width={14} height={14} />
                     </button>
-                    <button onClick={handleRestart} className="p-1 rounded">
+                    <button onClick={handleRestart} className="p-1 rounded" {...restartTooltip}>
                       <ArrowPathIcon width={14} height={14} />
                     </button>
                   </div>
