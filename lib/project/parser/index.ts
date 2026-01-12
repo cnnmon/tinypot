@@ -1,4 +1,4 @@
-import { EntryType, Schema, SchemaEntry } from '@/types/schema';
+import { ConditionalEntry, EntryType, Schema, SchemaEntry } from '@/types/schema';
 
 /**
  * Parser for the new game script format (v2):
@@ -58,6 +58,31 @@ function parseMetadataLine(
   return null;
 }
 
+/**
+ * Check if line is a conditional start: [if: condition] or if [condition]
+ */
+function parseConditionalLine(line: string): string | null {
+  // Support both [if: key] and if [key] syntax
+  const bracketMatch = line.match(/^\[if:\s*(.+)\]$/);
+  if (bracketMatch) {
+    return bracketMatch[1].trim();
+  }
+  
+  const ifMatch = line.match(/^if\s+\[([^\]]+)\]\s*$/);
+  if (ifMatch) {
+    return ifMatch[1].trim();
+  }
+  
+  return null;
+}
+
+/**
+ * Check if line is an else marker: [else]
+ */
+function isElseLine(line: string): boolean {
+  return line.trim() === '[else]';
+}
+
 export function parseIntoSchema(entries: string[]): Schema {
   const schema: Schema = [];
   let i = 0;
@@ -92,6 +117,78 @@ export function parseIntoSchema(entries: string[]): Schema {
         target: cleanTarget,
       });
       i++;
+      continue;
+    }
+
+    // Conditional: [if: condition] or if [condition]
+    // Check this BEFORE options to avoid confusion with "if Choice" syntax
+    const condition = parseConditionalLine(trimmed);
+    if (condition) {
+      const conditionalIndent = getIndentLevel(entry);
+      const thenBlock: SchemaEntry[] = [];
+      let elseBlock: SchemaEntry[] | undefined;
+
+      // Collect indented entries for the then block
+      i++;
+      while (i < entries.length) {
+        const nextEntry = entries[i];
+        const nextTrimmed = nextEntry.trim();
+
+        if (!nextTrimmed) {
+          i++;
+          continue;
+        }
+
+        const nextIndent = getIndentLevel(nextEntry);
+
+        // Check for [else] at the same level as [if: ...]
+        if (nextIndent === conditionalIndent && isElseLine(nextTrimmed)) {
+          // Start collecting else block
+          elseBlock = [];
+          i++;
+          while (i < entries.length) {
+            const elseEntry = entries[i];
+            const elseTrimmed = elseEntry.trim();
+
+            if (!elseTrimmed) {
+              i++;
+              continue;
+            }
+
+            const elseIndent = getIndentLevel(elseEntry);
+            if (elseIndent > conditionalIndent) {
+              const [parsedEntry] = parseIntoSchema([elseTrimmed]);
+              if (parsedEntry) {
+                elseBlock.push(parsedEntry);
+              }
+              i++;
+            } else {
+              break;
+            }
+          }
+          break;
+        }
+
+        // If more indented, it's part of the then block
+        if (nextIndent > conditionalIndent) {
+          const [parsedEntry] = parseIntoSchema([nextTrimmed]);
+          if (parsedEntry) {
+            thenBlock.push(parsedEntry);
+          }
+          i++;
+        } else {
+          // Less or equal indentation (and not [else]) - done with conditional
+          break;
+        }
+      }
+
+      const conditionalEntry: ConditionalEntry = {
+        type: EntryType.CONDITIONAL,
+        condition,
+        then: thenBlock,
+        ...(elseBlock && { else: elseBlock }),
+      };
+      schema.push(conditionalEntry);
       continue;
     }
 

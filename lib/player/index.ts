@@ -120,6 +120,7 @@ export default function usePlayer() {
       callbacks: {
         setVariable: variables.set,
         unsetVariable: variables.unset,
+        hasVariable: variables.has,
       },
     });
 
@@ -157,6 +158,10 @@ export default function usePlayer() {
   /* Player actions */
   const handleSubmit = useCallback(
     async (input: string) => {
+      if (input === '') {
+        input = '(stay silent)';
+      }
+
       // Add the player's line
       addLine({
         id: 'player',
@@ -379,7 +384,6 @@ export default function usePlayer() {
   );
 
   function handleRestart() {
-    // TODO: Create a new playthrough, don't just replace the existing
     // Get the latest schema & copy that
     setPlaythrough({
       ...playthrough,
@@ -435,6 +439,7 @@ export default function usePlayer() {
     status,
     lines: playthrough.lines,
     variables: variables.getAll(),
+    currentSceneId,
     handleNext,
     handleSubmit,
     handleRestart,

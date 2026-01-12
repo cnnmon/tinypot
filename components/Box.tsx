@@ -14,7 +14,7 @@ export default function Box({
   return (
     <div
       style={style}
-      className={twMerge('flex flex-col bordered p-3 gap-2 min-w-1/4 w-full', className)}
+      className={twMerge('flex flex-col bordered min-w-1/4 w-full', className)}
       onClick={onClick}
     >
       {children}

@@ -220,7 +220,7 @@ export default function Editor() {
     <div className="h-full overflow-scroll relative">
       <div ref={editorRef} className="h-full" />
       {isViewingRejected && (
-        <div className="absolute top-0 right-0 px-2 py-1 text-sm bg-red-100 text-red-600 rounded">
+        <div className="absolute top-0 px-2 py-1 text-sm bg-white rounded bordered">
           Viewing rejected changes
         </div>
       )}

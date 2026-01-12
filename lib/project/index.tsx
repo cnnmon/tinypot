@@ -14,7 +14,7 @@ import {
   recordsEqual,
 } from '@/lib/branch';
 import { runJob } from '@/lib/jobs';
-import { runMetalearning, MetalearningResult } from '@/lib/jobs/metalearning';
+import { MetalearningResult, runMetalearning } from '@/lib/jobs/metalearning';
 import { Branch, SceneId } from '@/types/branch';
 import { Schema } from '@/types/schema';
 import { useMutation, useQuery } from 'convex/react';
@@ -153,7 +153,9 @@ export function ProjectProvider({
       }
 
       // Find added rules (not in old, not already marked as update target)
-      const updateTargets = new Set(changes.filter((c) => c.action === 'update').map((c) => c.rule));
+      const updateTargets = new Set(
+        changes.filter((c) => c.action === 'update').map((c) => c.rule),
+      );
       for (const newRule of newLines) {
         if (!oldLines.includes(newRule) && !updateTargets.has(newRule)) {
           changes.push({ action: 'add', rule: newRule });
@@ -314,7 +316,7 @@ export function ProjectProvider({
     [branches, schema, updateBranchMutation, startMetalearningJob],
   );
 
-  // Reject branch - optionally revert to base script
+  // Delete branch - optionally revert to base script
   // Rejects NEVER trigger metalearning (only accept with edits does)
   const rejectBranch = useCallback(
     (branchId: string, shouldRevert: boolean) => {

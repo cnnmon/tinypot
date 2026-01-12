@@ -1,4 +1,3 @@
-import { useTooltipTrigger } from '@/components/TooltipProvider';
 import { isResolved } from '@/lib/branch';
 import { useProject } from '@/lib/project';
 import Item from './Item';
@@ -9,12 +8,10 @@ export default function List() {
     .filter((b) => isResolved(b))
     .sort((a, b) => b.createdAt - a.createdAt); // Recent first
 
-  const tooltipProps = useTooltipTrigger('New paths generated from playthroughs');
-
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 pb-2">
       <div className="flex items-center gap-1 justify-between">
-        <h1 {...tooltipProps}>My branches</h1>
+        <h1>My branches</h1>
         {unresolvedBranches.length > 0 && (
           <div className="flex items-center gap-1 text-sm">
             {unresolvedBranches.length} pending branches

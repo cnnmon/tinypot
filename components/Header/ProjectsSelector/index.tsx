@@ -1,5 +1,6 @@
 'use client';
 
+import { useTooltipTrigger } from '@/components/TooltipProvider';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { useProjectOptional } from '@/lib/project';
@@ -34,6 +35,9 @@ export default function ProjectsSelector() {
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  const editProjectTooltip = useTooltipTrigger('Edit project name');
+  const deleteProjectTooltip = useTooltipTrigger('Delete project');
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -145,14 +149,14 @@ export default function ProjectsSelector() {
             </button>
             {project && (
               <>
-                <button onClick={handleStartEdit} className="p-1 rounded" title="Edit project name">
+                <button onClick={handleStartEdit} className="p-1 rounded" {...editProjectTooltip}>
                   <PencilSquareIcon width={14} height={14} />
                 </button>
                 <button
                   onClick={handleDelete}
                   disabled={isDeleting}
                   className="p-1 rounded"
-                  title="Delete project"
+                  {...deleteProjectTooltip}
                 >
                   <TrashIcon width={14} height={14} />
                 </button>

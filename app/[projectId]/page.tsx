@@ -4,12 +4,14 @@ import Box from '@/components/Box';
 import Editor from '@/components/Editor';
 import Branchbar from '@/components/Editor/Branchbar';
 import Header from '@/components/Header';
+import ProjectsSelector from '@/components/Header/ProjectsSelector';
 import Player from '@/components/Player';
-import ShareButton from '@/components/ShareButton';
 import { useTooltipTrigger } from '@/components/TooltipProvider';
 import { Id } from '@/convex/_generated/dataModel';
-import { PlayerProvider, usePlayerContext } from '@/lib/player/PlayerProvider';
+import usePlayer from '@/lib/player';
+import { PlayerProvider } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
+import { getShareUrl } from '@/lib/share';
 import { ArrowLeftIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useParams } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
@@ -17,12 +19,18 @@ import { twMerge } from 'tailwind-merge';
 
 function ProjectContent() {
   const { project, setProject, recordGuidebookChanges, isMetalearning } = useProject();
-  const { handleJumpBack, handleRestart } = usePlayerContext();
+  const { handleJumpBack, handleRestart } = usePlayer();
   const [leftWidth, setLeftWidth] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
-  const guidebookTooltip = useTooltipTrigger('The guidebook learns from your branch edits');
-  const jumpBackTooltip = useTooltipTrigger('Undo last choice');
+
+  const handleShare = useCallback(() => {
+    const shareUrl = getShareUrl(project.id);
+    window.open(shareUrl, '_blank');
+  }, [project.id]);
+
+  /* Tooltips */
+  const jumpBackTooltip = useTooltipTrigger('Undo');
   const restartTooltip = useTooltipTrigger('Restart');
 
   const handleMouseDown = useCallback(() => {
@@ -55,8 +63,18 @@ function ProjectContent() {
   return (
     <div className="h-screen p-4 gap-2 flex flex-col">
       <div className="flex items-center justify-between">
-        <Header showProjects={true} />
-        <ShareButton />
+        <div className="flex gap-2 items-center">
+          <Header />
+          <ProjectsSelector />
+        </div>
+        <div className="flex gap-1">
+          <button onClick={() => window.open('/help', '_blank')} className="px-1">
+            help
+          </button>
+          <button onClick={handleShare} className="px-1">
+            share
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -66,26 +84,28 @@ function ProjectContent() {
             isMetalearning && 'bg-gradient-to-b via-[var(--orange)] from-[var(--rose)] to-white',
           )}
         >
-          <div className="flex items-center justify-between gap-1">
-            <h1 className="cursor-default" {...guidebookTooltip}>
-              Guidebook
-            </h1>
+          <div className="p-3 h-full flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1">
+              <h1 className="cursor-default">Guidebook</h1>
+            </div>
+            {isMetalearning && (
+              <span className="text-neutral-800/40 animate-pulse">(Updating guidebook...)</span>
+            )}
+            <textarea
+              value={guidebook}
+              placeholder="Author is making a game about..."
+              className="w-full h-full"
+              onFocus={() => setGuidebookBaseline(guidebook)}
+              onChange={(e) => setProject({ guidebook: e.target.value })}
+              onBlur={() => recordGuidebookChanges(guidebookBaseline, guidebook)}
+            />
           </div>
-          {isMetalearning && (
-            <span className="text-neutral-800/40 animate-pulse">(Updating guidebook...)</span>
-          )}
-          <textarea
-            value={guidebook}
-            placeholder="Author is making a game about..."
-            className="w-full h-full"
-            onFocus={() => setGuidebookBaseline(guidebook)}
-            onChange={(e) => setProject({ guidebook: e.target.value })}
-            onBlur={() => recordGuidebookChanges(guidebookBaseline, guidebook)}
-          />
         </Box>
 
         <Box className="max-h-45 overflow-auto select-none bg-gradient-to-b from-[var(--sunflower)] to-white">
-          <Branchbar />
+          <div className="p-3 h-full">
+            <Branchbar />
+          </div>
         </Box>
       </div>
 
@@ -94,7 +114,9 @@ function ProjectContent() {
         className="flex flex-row min-h-[calc(100%-210px)] h-[calc(100%-210px)] pb-5"
       >
         <Box style={{ width: `${leftWidth}%` }}>
-          <b>Editor</b>
+          <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
+            <b>Editor</b>
+          </div>
           <Editor />
         </Box>
         <div
@@ -102,23 +124,22 @@ function ProjectContent() {
           className="w-2 cursor-col-resize hover:bg-gray-300 transition-colors shrink-0"
         />
         <Box style={{ width: `${100 - leftWidth}%` }}>
-          <Player
-            header={
-              <div>
-                <div className="flex items-center justify-between">
-                  <h1>Player</h1>
-                  <div className="w-full justify-end flex gap-1 text-neutral-400">
-                    <button onClick={handleJumpBack} className="p-1 rounded" {...jumpBackTooltip}>
-                      <ArrowLeftIcon width={14} height={14} />
-                    </button>
-                    <button onClick={handleRestart} className="p-1 rounded" {...restartTooltip}>
-                      <ArrowPathIcon width={14} height={14} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            }
-          />
+          <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <h1 className="shrink-0">Player</h1>
+            </div>
+            <div className="flex gap-1 text-neutral-400 shrink-0">
+              <button onClick={handleJumpBack} className="p-1 rounded" {...jumpBackTooltip}>
+                <ArrowLeftIcon width={14} height={14} />
+              </button>
+              <button onClick={handleRestart} className="p-1 rounded" {...restartTooltip}>
+                <ArrowPathIcon width={14} height={14} />
+              </button>
+            </div>
+          </div>
+          <div className="h-[calc(100%-60px)]">
+            <Player />
+          </div>
         </Box>
       </div>
     </div>
@@ -135,7 +156,10 @@ export default function ProjectPage() {
   if (!isValidId) {
     return (
       <div className="h-screen p-4 gap-2 flex flex-col">
-        <Header showProjects={true} />
+        <div className="flex gap-2 items-center">
+          <Header />
+          <ProjectsSelector />
+        </div>
         <div className="flex-1 flex items-center justify-center">
           <p className="text-neutral-400">
             Invalid project ID. Please select a project from the dropdown.

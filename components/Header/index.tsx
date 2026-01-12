@@ -4,9 +4,8 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import BranchDesign from '../Editor/Branchbar/BranchDesign';
-import ProjectsSelector from './ProjectsSelector';
 
-export default function Header({ showProjects = false }: { showProjects?: boolean }) {
+export default function Header() {
   const router = useRouter();
   const [randomNumber, setRandomNumber] = useState(0);
 
@@ -15,7 +14,7 @@ export default function Header({ showProjects = false }: { showProjects?: boolea
   }, []);
 
   return (
-    <div className="flex items-center justify-start gap-2">
+    <>
       <div
         className="flex items-center justify-center gap-1 cursor-pointer hover:opacity-50 transition-opacity"
         onClick={() => router.push('/')}
@@ -32,7 +31,6 @@ export default function Header({ showProjects = false }: { showProjects?: boolea
           />
         </div>
       </div>
-      {showProjects && <ProjectsSelector />}
-    </div>
+    </>
   );
 }

@@ -42,7 +42,7 @@ export async function matchInput({
     const matchInfo: MatchInfo | undefined = matchResult.matchedAlias
       ? { cachedMatch: { matchedAlias: matchResult.matchedAlias } }
       : undefined;
-    return buildResultFromOption(matchResult.option, sceneId, lineIdx, matchInfo);
+    return buildResultFromOption(matchResult.option, sceneId, lineIdx, matchInfo, hasVariable);
   }
 
   // Fallback to AI fuzzy matching
@@ -56,7 +56,7 @@ export async function matchInput({
           confidence: fuzzyResult.confidence,
           suggestedAlias: input, // Use original input as alias, not the AI's normalized version
         },
-      });
+      }, hasVariable);
     }
   }
 

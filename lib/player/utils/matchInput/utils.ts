@@ -1,11 +1,13 @@
 import {
   AllowsConfig,
+  ConditionalEntry,
   EntryType,
   MetadataEntry,
   NarrativeEntry,
   OptionEntry,
   parseAllows,
   Schema,
+  SchemaEntry,
 } from '@/types/schema';
 import { getScanStart } from '../getScanStart';
 import { HandleInputResult, MatchInfo, MatchOptionResult } from './types';
@@ -249,24 +251,84 @@ export async function matchOptionFuzzy(
 }
 
 /**
- * Process an option's `then` entries to extract narratives and find the target scene
+ * Evaluate a condition string against current variables.
+ * Supports negation with ! prefix.
  */
-function processOptionThen(option: OptionEntry): {
+function evaluateCondition(
+  condition: string,
+  hasVariable?: (variable: string) => boolean,
+): boolean {
+  if (!hasVariable) return true;
+  const trimmed = condition.trim();
+  if (trimmed.startsWith('!')) {
+    return !hasVariable(trimmed.slice(1).trim());
+  }
+  return hasVariable(trimmed);
+}
+
+/**
+ * Process schema entries to extract narratives, metadata, and find the target scene.
+ * Evaluates conditional entries based on current variables.
+ * Stops processing when a jump/goto is encountered.
+ */
+function processEntries(
+  entries: SchemaEntry[],
+  hasVariable?: (variable: string) => boolean,
+): {
   narratives: NarrativeEntry[];
+  metadata: MetadataEntry[];
   target: string | null;
 } {
   const narratives: NarrativeEntry[] = [];
+  const metadata: MetadataEntry[] = [];
   let target: string | null = null;
 
-  for (const entry of option.then) {
+  for (const entry of entries) {
     if (entry.type === EntryType.NARRATIVE) {
       narratives.push(entry);
+    } else if (entry.type === EntryType.METADATA) {
+      const meta = entry as MetadataEntry;
+      // Only collect sets/unsets metadata
+      if (meta.key === 'sets' || meta.key === 'unsets') {
+        metadata.push(meta);
+      }
     } else if (entry.type === EntryType.JUMP) {
       target = entry.target.trim();
+      // Stop processing after a jump - don't include narratives after goto
+      break;
+    } else if (entry.type === EntryType.CONDITIONAL) {
+      const conditional = entry as ConditionalEntry;
+      const conditionMet = evaluateCondition(conditional.condition, hasVariable);
+      const branchEntries = conditionMet ? conditional.then : conditional.else;
+
+      if (branchEntries) {
+        const branchResult = processEntries(branchEntries, hasVariable);
+        narratives.push(...branchResult.narratives);
+        metadata.push(...branchResult.metadata);
+        if (branchResult.target) {
+          target = branchResult.target;
+          // Stop processing after a conditional that contains a jump
+          break;
+        }
+      }
     }
   }
 
-  return { narratives, target };
+  return { narratives, metadata, target };
+}
+
+/**
+ * Process an option's `then` entries to extract narratives, metadata, and find the target scene
+ */
+function processOptionThen(
+  option: OptionEntry,
+  hasVariable?: (variable: string) => boolean,
+): {
+  narratives: NarrativeEntry[];
+  metadata: MetadataEntry[];
+  target: string | null;
+} {
+  return processEntries(option.then, hasVariable);
 }
 
 /**
@@ -277,13 +339,15 @@ export function buildResultFromOption(
   sceneId: string,
   lineIdx: number,
   matchInfo?: MatchInfo,
+  hasVariable?: (variable: string) => boolean,
 ): HandleInputResult {
-  const { narratives, target } = processOptionThen(option);
+  const { narratives, metadata, target } = processOptionThen(option, hasVariable);
 
   const base = {
     matched: true,
     optionText: option.text,
     narratives,
+    metadata,
     fuzzyMatch: matchInfo?.fuzzyMatch,
     cachedMatch: matchInfo?.cachedMatch,
   };

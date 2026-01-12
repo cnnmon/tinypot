@@ -1,11 +1,13 @@
 import { Line, Sender } from '@/types/playthrough';
 import {
+  ConditionalEntry,
   EntryType,
   ImageEntry,
   JumpEntry,
   MetadataEntry,
   NarrativeEntry,
   Schema,
+  SchemaEntry,
 } from '@/types/schema';
 import { getScanStart } from './getScanStart';
 
@@ -44,49 +46,88 @@ interface ScenePosition {
   variable?: string;
 }
 
-function buildScenePositions(schema: Schema, scanStart: number): ScenePosition[] {
+function buildScenePositions(
+  schema: Schema, 
+  scanStart: number,
+  hasVariable?: (variable: string) => boolean,
+): ScenePosition[] {
   const positions: ScenePosition[] = [];
   let pendingOptions = false;
 
-  for (let i = scanStart; i < schema.length; i++) {
-    const entry = schema[i];
-    if (entry.type === EntryType.SCENE) break;
+  // Helper to recursively process entries
+  const processEntries = (entries: SchemaEntry[]): boolean => {
+    for (const entry of entries) {
+      if (entry.type === EntryType.SCENE) break;
 
-    if (entry.type === EntryType.NARRATIVE || entry.type === EntryType.IMAGE) {
-      // If there were options before this narrative/image, add a decision point
-      if (pendingOptions) {
-        positions.push({ type: 'wait' });
-        pendingOptions = false;
+      if (entry.type === EntryType.NARRATIVE || entry.type === EntryType.IMAGE) {
+        // If there were options before this narrative/image, add a decision point
+        if (pendingOptions) {
+          positions.push({ type: 'wait' });
+          pendingOptions = false;
+        }
+        const isImage = entry.type === EntryType.IMAGE;
+        positions.push({
+          type: isImage ? 'image' : 'narrative',
+          narrativeIdx: positions.filter((p) => p.type === 'narrative' || p.type === 'image').length,
+          text: isImage ? (entry as ImageEntry).url : (entry as NarrativeEntry).text,
+        });
+      } else if (entry.type === EntryType.METADATA) {
+        // Handle sets/unsets metadata
+        const meta = entry as MetadataEntry;
+        if (meta.key === 'sets') {
+          positions.push({ type: 'set', variable: meta.value });
+        } else if (meta.key === 'unsets') {
+          positions.push({ type: 'unset', variable: meta.value });
+        }
+      } else if (entry.type === EntryType.CONDITIONAL) {
+        // Evaluate conditional and include appropriate branch
+        const conditional = entry as ConditionalEntry;
+        const conditionMet = evaluateCondition(conditional.condition, hasVariable);
+        const branchEntries = conditionMet ? conditional.then : conditional.else;
+        
+        if (branchEntries) {
+          // Recursively process the conditional's entries
+          const shouldBreak = processEntries(branchEntries);
+          if (shouldBreak) return true;
+        }
+      } else if (entry.type === EntryType.OPTION) {
+        pendingOptions = true;
+      } else if (entry.type === EntryType.JUMP) {
+        // Jump ends the scene traversal for positions
+        return true; // Signal to break
       }
-      const isImage = entry.type === EntryType.IMAGE;
-      positions.push({
-        type: isImage ? 'image' : 'narrative',
-        narrativeIdx: positions.filter((p) => p.type === 'narrative' || p.type === 'image').length,
-        text: isImage ? (entry as ImageEntry).url : (entry as NarrativeEntry).text,
-      });
-    } else if (entry.type === EntryType.METADATA) {
-      // Handle sets/unsets metadata
-      const meta = entry as MetadataEntry;
-      if (meta.key === 'sets') {
-        positions.push({ type: 'set', variable: meta.value });
-      } else if (meta.key === 'unsets') {
-        positions.push({ type: 'unset', variable: meta.value });
-      }
-      // Other metadata (image, allows, requires) doesn't create positions
-    } else if (entry.type === EntryType.OPTION) {
-      pendingOptions = true;
-    } else if (entry.type === EntryType.JUMP) {
-      // Jump ends the scene traversal for positions
-      break;
     }
-  }
+    return false;
+  };
 
-  // If there are pending options at the end, add a final decision point
-  if (pendingOptions) {
+  // Process main entries starting from scanStart
+  const entriesToProcess = schema.slice(scanStart);
+  const shouldBreak = processEntries(entriesToProcess);
+  
+  if (!shouldBreak && pendingOptions) {
     positions.push({ type: 'wait' });
   }
 
   return positions;
+}
+
+/**
+ * Evaluate a condition based on variable state.
+ * Supports negation with ! prefix.
+ */
+function evaluateCondition(
+  condition: string,
+  hasVariable?: (variable: string) => boolean,
+): boolean {
+  const trimmed = condition.trim();
+  
+  // Check for negation
+  if (trimmed.startsWith('!')) {
+    const varName = trimmed.slice(1).trim();
+    return !hasVariable?.(varName);
+  }
+  
+  return hasVariable?.(trimmed) ?? false;
 }
 
 /**
@@ -95,6 +136,7 @@ function buildScenePositions(schema: Schema, scanStart: number): ScenePosition[]
 export interface StepCallbacks {
   setVariable?: (variable: string) => void;
   unsetVariable?: (variable: string) => void;
+  hasVariable?: (variable: string) => boolean;
 }
 
 /**
@@ -160,7 +202,7 @@ export function step({
     }
 
     const scanStart = getScanStart(schema, sceneStart);
-    const positions = buildScenePositions(schema, scanStart);
+    const positions = buildScenePositions(schema, scanStart, callbacks?.hasVariable);
 
     // Check if the position exists
     if (currentLineIdx < positions.length) {

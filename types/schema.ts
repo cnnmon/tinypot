@@ -17,6 +17,7 @@ export enum EntryType {
   SCENE = 'scene',
   IMAGE = 'image',
   METADATA = 'metadata',
+  CONDITIONAL = 'conditional',
 }
 
 export interface NarrativeEntry {
@@ -56,6 +57,13 @@ export interface MetadataEntry {
   value: string; // Raw value string (parsed as needed)
 }
 
+export interface ConditionalEntry {
+  type: EntryType.CONDITIONAL;
+  condition: string; // Variable name, supports ! prefix for negation
+  then: SchemaEntry[];
+  else?: SchemaEntry[];
+}
+
 // Parsed allows value for convenience
 export interface AllowsConfig {
   scenes: string[]; // Specific scene names allowed (without @)
@@ -69,7 +77,8 @@ export type SchemaEntry =
   | JumpEntry
   | SceneEntry
   | ImageEntry
-  | MetadataEntry;
+  | MetadataEntry
+  | ConditionalEntry;
 
 export type Schema = SchemaEntry[];
 
