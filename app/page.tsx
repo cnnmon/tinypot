@@ -26,7 +26,7 @@ function ExampleProject() {
             <div className="flex min-h-8 items-center border-b-2 px-2">
               <span className="text-sm text-neutral-500">Player</span>
             </div>
-            <div className="h-[calc(100%-32px)] relative m-2">
+            <div className="h-[calc(100%-48px)] relative m-2">
               <Player />
             </div>
           </Box>
