@@ -63,9 +63,11 @@ const ProjectContext = createContext<ProjectContextValue | null>(null);
 export function ProjectProvider({
   children,
   projectId,
+  readOnly = false,
 }: {
   children: ReactNode;
   projectId: Id<'projects'>;
+  readOnly?: boolean;
 }) {
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [isMetalearning, setIsMetalearning] = useState(false);
@@ -103,6 +105,9 @@ export function ProjectProvider({
   // Update project (name, script, or guidebook)
   const setProject = useCallback(
     (updates: { name?: string; script?: string[]; guidebook?: string }) => {
+      // Skip mutations in read-only mode
+      if (readOnly) return;
+
       // Optimistic update for script and guidebook
       if (updates.script !== undefined) setLocalScript(updates.script);
       if (updates.guidebook !== undefined) setLocalGuidebook(updates.guidebook);
@@ -113,12 +118,13 @@ export function ProjectProvider({
         ...updates,
       });
     },
-    [projectId, updateProjectMutation],
+    [projectId, updateProjectMutation, readOnly],
   );
 
   // Record guidebook changes for analytics (call on blur with baseline value)
   const recordGuidebookChanges = useCallback(
     (oldGuidebook: string, newGuidebook: string) => {
+      if (readOnly) return;
       if (oldGuidebook === newGuidebook) return;
 
       const oldLines = oldGuidebook
@@ -171,7 +177,7 @@ export function ProjectProvider({
         });
       }
     },
-    [createManyGuidebookChangesMutation, projectId],
+    [createManyGuidebookChangesMutation, projectId, readOnly],
   );
 
   // Schema from project script
@@ -254,6 +260,8 @@ export function ProjectProvider({
   // Add or merge branch - one branch per playthrough
   const addOrMergeBranch = useCallback(
     (branch: Branch, baseSchema: Schema, generatedSchema: Schema) => {
+      if (readOnly) return;
+
       // Check if there's already an unresolved branch for this playthrough
       const existingBranch = branches.find(
         (b) => b.playthroughId === branch.playthroughId && !isResolved(b),
@@ -288,7 +296,7 @@ export function ProjectProvider({
         });
       }
     },
-    [projectId, branches, updateBranchMutation, createBranchMutation],
+    [projectId, branches, updateBranchMutation, createBranchMutation, readOnly],
   );
 
   // Approve branch - capture authored scenes and mark as approved

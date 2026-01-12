@@ -111,7 +111,7 @@ function sceneEntryToLine(entry: Scene[number]): string {
   }
 }
 
-export default function Editor() {
+export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
   const { script, setScript } = useEditor();
   const { branches, sceneToBranchMap, selectedBranchId } = useProject();
 
@@ -163,7 +163,7 @@ export default function Editor() {
         syntaxHighlighting(bonsaiHighlighting),
         updateListener,
         EditorView.lineWrapping,
-        readOnlyCompartment.of(EditorState.readOnly.of(false)),
+        readOnlyCompartment.of(EditorState.readOnly.of(readOnly)),
       ],
     });
 
@@ -196,15 +196,15 @@ export default function Editor() {
     }
   }, [displayScript, isViewingRejected]);
 
-  // Toggle read-only mode when viewing rejected branches
+  // Toggle read-only mode when viewing rejected branches or when readOnly prop is set
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
 
     view.dispatch({
-      effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(isViewingRejected)),
+      effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly || isViewingRejected)),
     });
-  }, [isViewingRejected]);
+  }, [readOnly, isViewingRejected]);
 
   // Update branch highlighting when selection changes
   useEffect(() => {

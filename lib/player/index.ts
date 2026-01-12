@@ -231,6 +231,8 @@ export default function usePlayer() {
 
         if (result.sceneId) {
           // Update position to the matched option's target
+          // Reset position tracking before navigating
+          lastProcessedRef.current = null;
           setState({
             currentSceneId: result.sceneId,
             currentLineIdx: result.lineIdx ?? 0,
@@ -341,6 +343,8 @@ export default function usePlayer() {
                   setState((prev) => ({ ...prev, status: Status.ENDED }));
                   return;
                 }
+                // Reset position tracking before jumping to new scene
+                lastProcessedRef.current = null;
                 setState({
                   currentSceneId: cleanTarget,
                   currentLineIdx: 0,
@@ -358,6 +362,8 @@ export default function usePlayer() {
             }
 
             // No jump in generated content - loop back to current scene
+            // Reset position tracking so we can re-process this position with new options
+            lastProcessedRef.current = null;
             setState((prev) => ({ ...prev, status: Status.RUNNING }));
           } else {
             throw new Error(data.error || 'Generation failed');
