@@ -450,21 +450,33 @@ export function addGeneratedOptionToScript(
   aliases: string[],
   thenLines: string[],
 ): string[] {
-  // Resolve "START" to the actual first scene (or treat as implicit first scene)
-  let targetSceneId = sceneId;
-  if (sceneId === 'START') {
-    // Find the first scene marker to use as target
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
-        targetSceneId = trimmed.slice(1).trim();
-        break;
-      }
+  // Check if this is the implicit START scene (content before any @SCENE marker)
+  const isImplicitStart = sceneId === 'START';
+  
+  // Find if there's any scene marker in the script
+  let firstSceneMarkerIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
+      firstSceneMarkerIdx = i;
+      break;
     }
+  }
+  
+  // For implicit START, we work with content before the first scene marker
+  // For explicit scenes, find and work within that scene
+  let targetSceneId = sceneId;
+  let inImplicitStart = false;
+  
+  if (isImplicitStart) {
+    // If there are scene markers, START is the implicit content before them
+    // If no scene markers, entire script is the implicit START
+    inImplicitStart = true;
+    targetSceneId = ''; // We'll use inImplicitStart flag instead
   }
 
   const result: string[] = [];
-  let inTargetScene = false;
+  let inTargetScene = inImplicitStart;
   let lastOptionEndIdx = -1;
 
   for (let i = 0; i < lines.length; i++) {
@@ -474,7 +486,23 @@ export function addGeneratedOptionToScript(
     // Track scene changes
     if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
       const sceneName = trimmed.slice(1).trim();
-      inTargetScene = sceneName === targetSceneId;
+      
+      // If we were in implicit START, we're now leaving it
+      if (inImplicitStart && inTargetScene) {
+        // We're transitioning out of implicit START into a named scene
+        // If we found options in START, lastOptionEndIdx is set
+        // If not, we need to insert before this scene marker
+        if (lastOptionEndIdx === -1) {
+          lastOptionEndIdx = result.length;
+        }
+        inTargetScene = false;
+      }
+      
+      // Check if entering the explicit target scene
+      if (!inImplicitStart) {
+        inTargetScene = sceneName === targetSceneId;
+      }
+      
       result.push(line);
       continue;
     }
@@ -523,19 +551,34 @@ export function addGeneratedOptionToScript(
     result.splice(lastOptionEndIdx, 0, ...newOptionLines);
   } else {
     // No choices found - find where to insert in the target scene
-    // Insert before the next scene marker or at end of file
+    // For implicit START with no scene markers, insert at end
+    // For implicit START with scene markers, insert before first scene marker
+    // For explicit scenes, insert before the next scene marker or at end
     let insertIdx = result.length;
-    inTargetScene = false;
-    for (let i = 0; i < result.length; i++) {
-      const trimmed = result[i].trim();
-      if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
-        const sceneName = trimmed.slice(1).trim();
-        if (sceneName === targetSceneId) {
-          inTargetScene = true;
-        } else if (inTargetScene) {
-          // Found next scene after target - insert before it
+    
+    if (inImplicitStart) {
+      // Find first scene marker in result to insert before
+      for (let i = 0; i < result.length; i++) {
+        const trimmed = result[i].trim();
+        if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
           insertIdx = i;
           break;
+        }
+      }
+    } else {
+      // Explicit scene: find where to insert
+      let foundTarget = false;
+      for (let i = 0; i < result.length; i++) {
+        const trimmed = result[i].trim();
+        if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
+          const sceneName = trimmed.slice(1).trim();
+          if (sceneName === targetSceneId) {
+            foundTarget = true;
+          } else if (foundTarget) {
+            // Found next scene after target - insert before it
+            insertIdx = i;
+            break;
+          }
         }
       }
     }

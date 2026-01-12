@@ -12,7 +12,6 @@ import usePlayer from '@/lib/player';
 import { PlayerProvider } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
 import { getShareUrl } from '@/lib/share';
-import { ArrowLeftIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useParams } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
@@ -86,14 +85,14 @@ function ProjectContent() {
         >
           <div className="p-3 h-full flex flex-col justify-between">
             <div className="flex items-center justify-between gap-1">
-              <h1 className="cursor-default">Guidebook</h1>
+              <h1 className="cursor-default">Global prompt</h1>
             </div>
             {isMetalearning && (
               <span className="text-neutral-800/40 animate-pulse">(Updating guidebook...)</span>
             )}
             <textarea
               value={guidebook}
-              placeholder="Author is making a game about..."
+              placeholder="Always generate content based on this prompt..."
               className="w-full h-full"
               onFocus={() => setGuidebookBaseline(guidebook)}
               onChange={(e) => setProject({ guidebook: e.target.value })}
@@ -125,19 +124,9 @@ function ProjectContent() {
         />
         <Box style={{ width: `${100 - leftWidth}%` }}>
           <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
-            <div className="flex items-center gap-2 overflow-hidden">
-              <h1 className="shrink-0">Player</h1>
-            </div>
-            <div className="flex gap-1 text-neutral-400 shrink-0">
-              <button onClick={handleJumpBack} className="p-1 rounded" {...jumpBackTooltip}>
-                <ArrowLeftIcon width={14} height={14} />
-              </button>
-              <button onClick={handleRestart} className="p-1 rounded" {...restartTooltip}>
-                <ArrowPathIcon width={14} height={14} />
-              </button>
-            </div>
+            <h1 className="shrink-0">Player</h1>
           </div>
-          <div className="h-[calc(100%-60px)]">
+          <div className="h-[calc(100%-60px)] m-2 relative">
             <Player />
           </div>
         </Box>

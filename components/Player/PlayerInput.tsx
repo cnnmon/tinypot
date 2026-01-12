@@ -1,6 +1,6 @@
 import { Status, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTooltipTrigger } from '../TooltipProvider';
 
 export default function PlayerInput({
@@ -11,6 +11,14 @@ export default function PlayerInput({
   const { status, handleJumpBack, handleRestart } = usePlayerContext();
   const [input, setInput] = useState<string>('');
   const isSubmitting = status === Status.MATCHING;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isDisabled = isSubmitting || status !== Status.WAITING;
+
+  useEffect(() => {
+    if (!isDisabled) {
+      inputRef.current?.focus();
+    }
+  }, [isDisabled]);
 
   const jumpBackTooltip = useTooltipTrigger('Undo last action');
   const restartTooltip = useTooltipTrigger('Start over');
@@ -31,12 +39,13 @@ export default function PlayerInput({
         transition={{ duration: 0.2, ease: 'easeOut' }}
       >
         <input
+          ref={inputRef}
           autoFocus
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={`What do you want to do?`}
           onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
-          disabled={isSubmitting || status !== Status.WAITING}
+          disabled={isDisabled}
           className="pb-10! bordered w-full bg-white z-[1] disabled:opacity-50 disabled:cursor-not-allowed"
         />
         <button

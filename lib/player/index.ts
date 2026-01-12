@@ -55,6 +55,8 @@ export default function usePlayer() {
 
   // Ref to prevent double execution during React strict mode or rapid state changes
   const isSteppingRef = useRef(false);
+  // Track last processed position to prevent duplicates from Strict Mode
+  const lastProcessedRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Accept any valid changes
@@ -83,6 +85,7 @@ export default function usePlayer() {
         currentLineIdx: 0,
       });
       variables.reset();
+      lastProcessedRef.current = null;
     }
   }, [playerResetKey, schema, variables]);
 
@@ -110,7 +113,13 @@ export default function usePlayer() {
   const handleNext = useCallback(() => {
     // Prevent double execution
     if (isSteppingRef.current) return;
+    
+    // Prevent Strict Mode duplicates by tracking processed positions
+    const positionKey = `${currentSceneId}-${currentLineIdx}`;
+    if (lastProcessedRef.current === positionKey) return;
+    
     isSteppingRef.current = true;
+    lastProcessedRef.current = positionKey;
 
     const nextMove = step({
       schema: playthrough.snapshot,
@@ -129,24 +138,17 @@ export default function usePlayer() {
         ...state,
         status: Status.WAITING,
       });
-      isSteppingRef.current = false;
     } else if (nextMove.type === 'end') {
       setState({
         ...state,
         status: Status.ENDED,
       });
-      isSteppingRef.current = false;
-    }
-
-    if (nextMove.line) {
+    } else if (nextMove.line) {
+      // 'continue' type - add line and let the state update trigger next step
       addLine(nextMove.line);
-      // Allow next step after a microtask to let React finish updating
-      queueMicrotask(() => {
-        isSteppingRef.current = false;
-      });
-    } else {
-      isSteppingRef.current = false;
     }
+    
+    isSteppingRef.current = false;
   }, [state, currentSceneId, currentLineIdx, sceneMap, addLine, playthrough.snapshot, variables]);
 
   useEffect(() => {
@@ -397,6 +399,7 @@ export default function usePlayer() {
       currentLineIdx: 0,
     });
     variables.reset();
+    lastProcessedRef.current = null;
   }
 
   // Jump to a specific point in history, slicing lines from there
@@ -413,6 +416,7 @@ export default function usePlayer() {
       ...newPosition,
       status: Status.RUNNING,
     });
+    lastProcessedRef.current = null;
   }
 
   // Jump back to just before the last player decision

@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import PlayerInput from './PlayerInput';
 
-export default function Player({ className }: { className?: string }) {
+export default function Player() {
   const { lines, status, handleSubmit, currentSceneId, variables } = usePlayerContext();
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -26,7 +26,7 @@ export default function Player({ className }: { className?: string }) {
   };
 
   return (
-    <div className="flex flex-col relative m-2 h-full">
+    <>
       {/* State */}
       <div
         className={twMerge(
@@ -35,13 +35,14 @@ export default function Player({ className }: { className?: string }) {
         )}
       >
         <p>
-          Currently in scene <span className="font-bold">{currentSceneId}</span>
+          Currently in scene <span className="font-bold">{currentSceneId}</span>.
+          {variables.length > 0 && (
+            <>
+              {' '}
+              You have: <span className="font-bold">{variables.join(', ')}</span>
+            </>
+          )}
         </p>
-        {variables.length > 0 && (
-          <p>
-            You have: <span className="font-bold">{variables.join(', ')}</span>
-          </p>
-        )}
       </div>
 
       {/* Lines */}
@@ -104,10 +105,10 @@ export default function Player({ className }: { className?: string }) {
         id={lines.length.toString()}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={twMerge('w-full absolute bottom-0', className)}
+        className={twMerge('w-full absolute bottom-0')}
       >
         <PlayerInput handleSubmit={handleSubmit} />
       </motion.div>
-    </div>
+    </>
   );
 }

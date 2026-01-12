@@ -212,7 +212,7 @@ export const branchHighlightPlugin = ViewPlugin.fromClass(
 export const branchHighlightTheme = EditorView.theme({
   // Gray - affected scene background
   '.cm-branch-scene': {
-    backgroundColor: '#D7DFE34E', // gray-400 at 10%
+    backgroundColor: 'none', // gray-400 at 10%
   },
   // Yellow - AI generated, unchanged
   '.cm-branch-generated': {
