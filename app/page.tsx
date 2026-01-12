@@ -13,7 +13,7 @@ const EXAMPLE_PROJECT_ID = 'jd78c0k7gvsf3hpqybwcb3f1997ymxgh' as Id<'projects'>;
 
 function ExampleProject() {
   return (
-    <ProjectProvider projectId={EXAMPLE_PROJECT_ID}>
+    <ProjectProvider projectId={EXAMPLE_PROJECT_ID} readOnly>
       <PlayerProvider>
         <div className="flex gap-2 h-[500px] w-full max-w-5xl">
           <Box className="w-1/2 overflow-hidden">
