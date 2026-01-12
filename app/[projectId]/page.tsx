@@ -16,7 +16,7 @@ import { useCallback, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 function ProjectContent() {
-  const { project, setProject, isMetalearning } = useProject();
+  const { project, setProject, recordGuidebookChanges, isMetalearning } = useProject();
   const { handleJumpBack, handleRestart } = usePlayerContext();
   const [leftWidth, setLeftWidth] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,10 +50,7 @@ function ProjectContent() {
   }, []);
 
   const guidebook = project.guidebook;
-
-  const setGuidebook = (guidebook: string) => {
-    setProject({ guidebook });
-  };
+  const [guidebookBaseline, setGuidebookBaseline] = useState(guidebook);
 
   return (
     <div className="h-screen p-4 gap-2 flex flex-col">
@@ -82,7 +79,9 @@ function ProjectContent() {
             value={guidebook}
             placeholder="Author is making a game about..."
             className="w-full h-full"
-            onChange={(e) => setGuidebook(e.target.value)}
+            onFocus={() => setGuidebookBaseline(guidebook)}
+            onChange={(e) => setProject({ guidebook: e.target.value })}
+            onBlur={() => recordGuidebookChanges(guidebookBaseline, guidebook)}
           />
         </Box>
 

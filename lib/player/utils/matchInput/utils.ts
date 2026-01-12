@@ -116,8 +116,18 @@ export function getOptionsAtPosition({
       }
     } else if (entry.type === EntryType.OPTION) {
       // Check if option's requires condition is met
+      // Supports negation: [!variable] means variable must NOT be set
       const opt = entry as OptionEntry;
-      const meetsCondition = !opt.requires || (hasVariable && hasVariable(opt.requires));
+      let meetsCondition = true;
+      if (opt.requires && hasVariable) {
+        if (opt.requires.startsWith('!')) {
+          // Negated condition - variable must NOT be set
+          meetsCondition = !hasVariable(opt.requires.slice(1));
+        } else {
+          // Normal condition - variable must be set
+          meetsCondition = hasVariable(opt.requires);
+        }
+      }
 
       if (meetsCondition) {
         // Collect all options in the scene for potential implicit loop

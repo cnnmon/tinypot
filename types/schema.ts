@@ -83,7 +83,6 @@ export function parseAllows(value: string | undefined): AllowsConfig {
   const parts = value.split(',').map((p) => p.trim());
   const scenes: string[] = [];
   let allowNew = false;
-  let allowAny = false;
 
   for (const part of parts) {
     if (part === 'new') {
@@ -91,8 +90,6 @@ export function parseAllows(value: string | undefined): AllowsConfig {
     } else if (part === 'none') {
       // Explicit none - no linking allowed
       return { scenes: [], allowNew: false, allowAny: false };
-    } else if (part === 'any') {
-      allowAny = true;
     } else if (part.startsWith('@')) {
       scenes.push(part.slice(1)); // Remove @ prefix
     }

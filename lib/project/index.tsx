@@ -14,7 +14,7 @@ import {
   recordsEqual,
 } from '@/lib/branch';
 import { runJob } from '@/lib/jobs';
-import { runMetalearning } from '@/lib/jobs/metalearning';
+import { runMetalearning, MetalearningResult } from '@/lib/jobs/metalearning';
 import { Branch, SceneId } from '@/types/branch';
 import { Schema } from '@/types/schema';
 import { useMutation, useQuery } from 'convex/react';
@@ -38,6 +38,7 @@ interface ProjectContextValue {
     guidebook: string;
   };
   setProject: (updates: { name?: string; script?: string[]; guidebook?: string }) => void;
+  recordGuidebookChanges: (oldGuidebook: string, newGuidebook: string) => void;
   schema: Schema;
 
   // Branch state
@@ -74,6 +75,8 @@ export function ProjectProvider({
   const updateProjectMutation = useMutation(api.projects.update);
   const createBranchMutation = useMutation(api.branches.create);
   const updateBranchMutation = useMutation(api.branches.update);
+  const createGuidebookChangeMutation = useMutation(api.guidebookChanges.create);
+  const createManyGuidebookChangesMutation = useMutation(api.guidebookChanges.createMany);
 
   // Convex queries
   const convexProject = useQuery(api.projects.get, { projectId });
@@ -111,6 +114,62 @@ export function ProjectProvider({
       });
     },
     [projectId, updateProjectMutation],
+  );
+
+  // Record guidebook changes for analytics (call on blur with baseline value)
+  const recordGuidebookChanges = useCallback(
+    (oldGuidebook: string, newGuidebook: string) => {
+      if (oldGuidebook === newGuidebook) return;
+
+      const oldLines = oldGuidebook
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+      const newLines = newGuidebook
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+
+      // Compute changes
+      type Change = {
+        action: 'add' | 'update' | 'delete';
+        rule: string;
+        previousRule?: string;
+      };
+      const changes: Change[] = [];
+
+      // Find deleted and updated rules
+      for (const oldRule of oldLines) {
+        if (!newLines.includes(oldRule)) {
+          // Check if it was updated (fuzzy match by position or similarity)
+          const oldIdx = oldLines.indexOf(oldRule);
+          if (oldIdx < newLines.length && !oldLines.includes(newLines[oldIdx])) {
+            // Rule at same position changed - likely an update
+            changes.push({ action: 'update', rule: newLines[oldIdx], previousRule: oldRule });
+          } else {
+            changes.push({ action: 'delete', rule: oldRule });
+          }
+        }
+      }
+
+      // Find added rules (not in old, not already marked as update target)
+      const updateTargets = new Set(changes.filter((c) => c.action === 'update').map((c) => c.rule));
+      for (const newRule of newLines) {
+        if (!oldLines.includes(newRule) && !updateTargets.has(newRule)) {
+          changes.push({ action: 'add', rule: newRule });
+        }
+      }
+
+      // Record changes if any
+      if (changes.length > 0) {
+        createManyGuidebookChangesMutation({
+          projectId,
+          changes,
+          source: 'manual',
+        });
+      }
+    },
+    [createManyGuidebookChangesMutation, projectId],
   );
 
   // Schema from project script
@@ -156,7 +215,7 @@ export function ProjectProvider({
         `metalearning-${resolvedBranch.id}`,
         () => runMetalearning(resolvedBranch._id, resolvedBranch, guidebook),
         {
-          onComplete: (result) => {
+          onComplete: (result: MetalearningResult) => {
             // Use the intelligently updated guidebook
             setProject({ guidebook: result.updatedGuidebook });
 
@@ -165,6 +224,18 @@ export function ProjectProvider({
               branchId: resolvedBranch._id,
               metalearning: result.newRule || '',
             });
+
+            // Record guidebook change for analytics
+            if (result.action !== 'none' && result.newRule) {
+              createGuidebookChangeMutation({
+                projectId,
+                branchId: resolvedBranch._id,
+                action: result.action,
+                rule: result.newRule,
+                previousRule: result.previousRule,
+                source: 'metalearning',
+              });
+            }
 
             setIsMetalearning(false);
           },
@@ -175,7 +246,7 @@ export function ProjectProvider({
         },
       );
     },
-    [guidebook, setProject, updateBranchMutation],
+    [guidebook, setProject, updateBranchMutation, createGuidebookChangeMutation, projectId],
   );
 
   // Add or merge branch - one branch per playthrough
@@ -286,6 +357,7 @@ export function ProjectProvider({
         projectId,
         project,
         setProject,
+        recordGuidebookChanges,
         schema,
         branches,
         unresolvedBranches,

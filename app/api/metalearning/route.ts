@@ -13,6 +13,8 @@ export interface MetalearningResponse {
   success: boolean;
   updatedGuidebook: string | null; // Full updated guidebook
   newRule: string | null; // The rule that was added/updated (for display)
+  action: 'add' | 'update' | 'none'; // What action was taken
+  previousRule?: string; // The rule that was replaced (for updates)
   error?: string;
 }
 
@@ -31,6 +33,7 @@ export async function POST(req: Request) {
       success: false,
       updatedGuidebook: null,
       newRule: null,
+      action: 'none',
       error: 'Missing required fields',
     } satisfies MetalearningResponse);
   }
@@ -107,6 +110,7 @@ JSON response:`,
         success: true,
         updatedGuidebook: existingGuidebook,
         newRule: null,
+        action: 'none',
       } satisfies MetalearningResponse);
     }
 
@@ -117,6 +121,7 @@ JSON response:`,
         success: true,
         updatedGuidebook: existingGuidebook,
         newRule: null,
+        action: 'none',
       } satisfies MetalearningResponse);
     }
 
@@ -142,15 +147,18 @@ JSON response:`,
         success: true,
         updatedGuidebook: existingGuidebook,
         newRule: null,
+        action: 'none',
       } satisfies MetalearningResponse);
     }
 
     let updatedLines = [...existingLines];
+    let previousRule: string | undefined;
 
     if (parsed.action === 'update' && parsed.ruleIndex) {
       // Update existing rule (1-indexed)
       const idx = parsed.ruleIndex - 1;
       if (idx >= 0 && idx < updatedLines.length) {
+        previousRule = updatedLines[idx];
         updatedLines[idx] = parsed.rule;
       }
       // If invalid index, don't add - just skip
@@ -164,12 +172,15 @@ JSON response:`,
       success: true,
       updatedGuidebook,
       newRule: parsed.rule,
+      action: parsed.action as 'add' | 'update',
+      previousRule,
     } satisfies MetalearningResponse);
   } catch {
     return Response.json({
       success: true,
       updatedGuidebook: existingGuidebook,
       newRule: null,
+      action: 'none',
     } satisfies MetalearningResponse);
   }
 }

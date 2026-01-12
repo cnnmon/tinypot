@@ -9,6 +9,8 @@ export interface MetalearningResult {
   branchId: string;
   updatedGuidebook: string;
   newRule: string | null;
+  action: 'add' | 'update' | 'none';
+  previousRule?: string;
 }
 
 /**
@@ -50,7 +52,12 @@ function formatScenes(scenes: Record<SceneId, Scene>): string {
 async function analyzeChanges(
   branch: Branch,
   existingGuidebook: string,
-): Promise<{ updatedGuidebook: string; newRule: string | null }> {
+): Promise<{
+  updatedGuidebook: string;
+  newRule: string | null;
+  action: 'add' | 'update' | 'none';
+  previousRule?: string;
+}> {
   const generated = formatScenes(branch.generated);
   const authored = branch.authored ? formatScenes(branch.authored) : generated;
 
@@ -77,6 +84,8 @@ async function analyzeChanges(
   return {
     updatedGuidebook: data.updatedGuidebook || existingGuidebook,
     newRule: data.newRule,
+    action: data.action,
+    previousRule: data.previousRule,
   };
 }
 
@@ -89,11 +98,16 @@ export async function runMetalearning(
   branch: Branch,
   existingGuidebook: string,
 ): Promise<MetalearningResult> {
-  const { updatedGuidebook, newRule } = await analyzeChanges(branch, existingGuidebook);
+  const { updatedGuidebook, newRule, action, previousRule } = await analyzeChanges(
+    branch,
+    existingGuidebook,
+  );
 
   return {
     branchId,
     updatedGuidebook,
     newRule,
+    action,
+    previousRule,
   };
 }

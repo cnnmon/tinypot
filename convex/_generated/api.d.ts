@@ -9,6 +9,7 @@
  */
 
 import type * as branches from "../branches.js";
+import type * as guidebookChanges from "../guidebookChanges.js";
 import type * as playthroughs from "../playthroughs.js";
 import type * as projects from "../projects.js";
 
@@ -20,6 +21,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   branches: typeof branches;
+  guidebookChanges: typeof guidebookChanges;
   playthroughs: typeof playthroughs;
   projects: typeof projects;
 }>;

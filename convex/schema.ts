@@ -52,4 +52,15 @@ export default defineSchema({
   })
     .index('by_project', ['projectId'])
     .index('by_playthrough', ['playthroughId']),
+
+  // Tracks all guidebook changes for analytics
+  guidebookChanges: defineTable({
+    projectId: v.id('projects'),
+    branchId: v.optional(v.id('branches')), // null if manual edit
+    action: v.union(v.literal('add'), v.literal('update'), v.literal('delete')),
+    rule: v.string(),
+    previousRule: v.optional(v.string()), // for updates
+    source: v.union(v.literal('metalearning'), v.literal('manual')),
+    createdAt: v.number(),
+  }).index('by_project', ['projectId']),
 });
