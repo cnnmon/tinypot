@@ -1,7 +1,6 @@
 import { Status, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
-import { useTooltipTrigger } from '../TooltipProvider';
 
 export default function PlayerInput({
   handleSubmit,
@@ -19,10 +18,6 @@ export default function PlayerInput({
       inputRef.current?.focus();
     }
   }, [isDisabled]);
-
-  const jumpBackTooltip = useTooltipTrigger('Undo last action');
-  const restartTooltip = useTooltipTrigger('Start over');
-  const nextTooltip = useTooltipTrigger('Skip');
 
   const onSubmit = async () => {
     if (input.length === 0 || isSubmitting) return;
@@ -57,15 +52,9 @@ export default function PlayerInput({
         </button>
       </motion.div>
       <div className="flex gap-1 flex-col text-sm items-start">
-        <button onClick={handleRestart} {...restartTooltip}>
-          Restart
-        </button>
-        <button onClick={handleJumpBack} {...jumpBackTooltip}>
-          Undo
-        </button>
-        <button onClick={() => handleSubmit('')} {...nextTooltip}>
-          Skip
-        </button>
+        <button onClick={handleRestart}>Restart</button>
+        <button onClick={handleJumpBack}>Undo</button>
+        <button onClick={() => handleSubmit('')}>Skip</button>
       </div>
     </div>
   );
