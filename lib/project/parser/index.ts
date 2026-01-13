@@ -9,7 +9,24 @@ import { ConditionalEntry, EntryType, Schema, SchemaEntry } from '@/types/schema
  * - Indented lines after `if` are the choice's response/navigation
  * - `[key: value]` - Metadata (image, allows, sets, unsets, requires)
  * - Regular text is narrative
+ * - `*`, `**`, `***` prefixes indicate indentation levels (like Ink)
  */
+
+/**
+ * Convert star prefixes to space indentation.
+ * `* content` becomes `  content` (2 spaces per star)
+ * `** content` becomes `    content`
+ * `*** content` becomes `      content`
+ */
+function convertStarsToIndent(line: string): string {
+  const starMatch = line.match(/^(\*+)\s*/);
+  if (!starMatch) return line;
+  
+  const starCount = starMatch[1].length;
+  const indent = '  '.repeat(starCount); // 2 spaces per star
+  const content = line.slice(starMatch[0].length);
+  return indent + content;
+}
 
 function getIndentLevel(entry: string): number {
   const match = entry.match(/^(\s*)/);
@@ -83,7 +100,10 @@ function isElseLine(line: string): boolean {
   return line.trim() === '[else]';
 }
 
-export function parseIntoSchema(entries: string[]): Schema {
+export function parseIntoSchema(rawEntries: string[]): Schema {
+  // Preprocess: convert star prefixes to space indentation
+  const entries = rawEntries.map(convertStarsToIndent);
+  
   const schema: Schema = [];
   let i = 0;
 
@@ -462,29 +482,37 @@ export function addGeneratedOptionToScript(
   aliases: string[],
   thenLines: string[],
 ): string[] {
-  // Check if this is the implicit START scene (content before any @SCENE marker)
-  const isImplicitStart = sceneId === 'START';
-  
-  // Find if there's any scene marker in the script
+  // Find the first scene marker in the script
   let firstSceneMarkerIdx = -1;
+  let firstSceneName = '';
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
     if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
       firstSceneMarkerIdx = i;
+      firstSceneName = trimmed.slice(1).trim();
       break;
     }
   }
   
-  // For implicit START, we work with content before the first scene marker
-  // For explicit scenes, find and work within that scene
+  // Handle START scene: if the first line is a scene marker (like @HOME),
+  // and sceneId is 'START', we should target that first scene instead
   let targetSceneId = sceneId;
   let inImplicitStart = false;
   
-  if (isImplicitStart) {
-    // If there are scene markers, START is the implicit content before them
-    // If no scene markers, entire script is the implicit START
-    inImplicitStart = true;
-    targetSceneId = ''; // We'll use inImplicitStart flag instead
+  if (sceneId === 'START') {
+    if (firstSceneMarkerIdx === 0 && firstSceneName) {
+      // Script starts with @SCENE - START and that scene are the same
+      // Target the explicit scene instead
+      targetSceneId = firstSceneName;
+    } else if (firstSceneMarkerIdx > 0) {
+      // There's content before the first scene marker - this is implicit START
+      inImplicitStart = true;
+      targetSceneId = '';
+    } else {
+      // No scene markers at all - entire script is implicit START
+      inImplicitStart = true;
+      targetSceneId = '';
+    }
   }
 
   const result: string[] = [];

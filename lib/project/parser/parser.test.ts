@@ -1,6 +1,6 @@
 import { EntryType } from '@/types/schema';
 import { describe, expect, it } from 'vitest';
-import { addGeneratedOptionToScript, parseIntoSchema } from './index';
+import { addAliasToOption, addGeneratedOptionToScript, parseIntoSchema } from './index';
 
 describe('addGeneratedOptionToScript', () => {
   describe('script with explicit scenes', () => {
@@ -178,6 +178,235 @@ describe('addGeneratedOptionToScript', () => {
 
       expect(result).toEqual(['You are here.', 'if leave', '   You leave.']);
     });
+  });
+
+  describe('explicit scene at start of file', () => {
+    it('should add option to HOME scene when it is the first scene', () => {
+      const lines = [
+        '@HOME',
+        '[image: https://i.imgur.com/PR6oN9P.png]',
+        "You're in a room. You see a chair, a desk, and a plant.",
+        'if leave & [key]',
+        '  You did it!',
+        '  goto @END',
+        'if examine the desk',
+        '  You lean closer to the desk.',
+        '  goto @DESK',
+      ];
+
+      const result = addGeneratedOptionToScript(
+        lines,
+        'HOME',
+        'look around',
+        [],
+        ['You scan the room more carefully.', 'So... what now?'],
+      );
+
+      // New option should be added AFTER existing options in HOME, not before @HOME
+      expect(result).toEqual([
+        '@HOME',
+        '[image: https://i.imgur.com/PR6oN9P.png]',
+        "You're in a room. You see a chair, a desk, and a plant.",
+        'if leave & [key]',
+        '  You did it!',
+        '  goto @END',
+        'if examine the desk',
+        '  You lean closer to the desk.',
+        '  goto @DESK',
+        'if look around',
+        '   You scan the room more carefully.',
+        '   So... what now?',
+      ]);
+    });
+
+    it('should add option when START is passed but script starts with @HOME', () => {
+      // This is the bug case: player is in "START" but script starts with @HOME
+      // The option should go inside HOME, not before it
+      const lines = [
+        '@HOME',
+        '[image: https://i.imgur.com/PR6oN9P.png]',
+        "You're in a room. You see a chair, a desk, and a plant.",
+        'if leave & [key]',
+        '  You did it!',
+        '  goto @END',
+        'if examine the desk',
+        '  You lean closer to the desk.',
+        '  goto @DESK',
+      ];
+
+      const result = addGeneratedOptionToScript(
+        lines,
+        'START', // Player's currentSceneId is still 'START'
+        'look around',
+        [],
+        ['You scan the room more carefully.', 'So... what now?'],
+      );
+
+      // New option should be added INSIDE HOME (after existing options), not before @HOME
+      expect(result).toEqual([
+        '@HOME',
+        '[image: https://i.imgur.com/PR6oN9P.png]',
+        "You're in a room. You see a chair, a desk, and a plant.",
+        'if leave & [key]',
+        '  You did it!',
+        '  goto @END',
+        'if examine the desk',
+        '  You lean closer to the desk.',
+        '  goto @DESK',
+        'if look around',
+        '   You scan the room more carefully.',
+        '   So... what now?',
+      ]);
+    });
+
+    it('should add option to HOME scene even with empty lines or whitespace before it', () => {
+      // Sometimes scripts might have leading whitespace or empty lines
+      const lines = [
+        '',
+        '@HOME',
+        '[image: https://i.imgur.com/PR6oN9P.png]',
+        "You're in a room.",
+        'if examine the desk',
+        '  You lean closer.',
+      ];
+
+      const result = addGeneratedOptionToScript(
+        lines,
+        'HOME',
+        'look around',
+        [],
+        ['You scan the room.'],
+      );
+
+      expect(result).toEqual([
+        '',
+        '@HOME',
+        '[image: https://i.imgur.com/PR6oN9P.png]',
+        "You're in a room.",
+        'if examine the desk',
+        '  You lean closer.',
+        'if look around',
+        '   You scan the room.',
+      ]);
+    });
+  });
+});
+
+describe('addAliasToOption - nested options', () => {
+  it('should add alias to nested option inside conditional', () => {
+    const lines = [
+      '@DESK',
+      '[if: !key]',
+      '  [image: https://example.com/key.png]',
+      '  Take the key?',
+      '  if take the key',
+      '    Yoink!',
+      '    goto @KEY',
+      '  if leave it',
+      '    You step back.',
+      'if leave',
+      '  goto @HOME',
+    ];
+
+    const result = addAliasToOption(lines, 'take the key', 'yes');
+
+    expect(result).toEqual([
+      '@DESK',
+      '[if: !key]',
+      '  [image: https://example.com/key.png]',
+      '  Take the key?',
+      '  if take the key | yes',
+      '    Yoink!',
+      '    goto @KEY',
+      '  if leave it',
+      '    You step back.',
+      'if leave',
+      '  goto @HOME',
+    ]);
+  });
+
+  it('should add alias to deeply nested option', () => {
+    const lines = [
+      '@ROOM',
+      '[if: door_open]',
+      '  You see the open door.',
+      '  [if: has_key]',
+      '    if unlock chest',
+      '      You unlock the chest.',
+      'if look around',
+      '  Nothing special.',
+    ];
+
+    const result = addAliasToOption(lines, 'unlock chest', 'open chest');
+
+    expect(result[4]).toBe('    if unlock chest | open chest');
+  });
+});
+
+describe('parseIntoSchema - star syntax for indentation', () => {
+  it('should convert * to one level of indentation', () => {
+    const lines = [
+      '@DESK',
+      'Take the key?',
+      'if take the key',
+      '* Yoink!',
+      '* goto @HOME',
+    ];
+
+    const schema = parseIntoSchema(lines);
+    
+    expect(schema.length).toBe(3); // SCENE, NARRATIVE, OPTION
+    const option = schema[2];
+    if (option.type === EntryType.OPTION) {
+      expect(option.then.length).toBe(2); // Yoink! and goto
+    }
+  });
+
+  it('should convert ** to two levels of indentation', () => {
+    const lines = [
+      '@DESK',
+      '[if: !key]',
+      '* Take the key?',
+      '* if take the key',
+      '** Yoink!',
+      '** goto @HOME',
+    ];
+
+    const schema = parseIntoSchema(lines);
+    
+    // SCENE, CONDITIONAL
+    expect(schema.length).toBe(2);
+    const conditional = schema[1];
+    if (conditional.type === EntryType.CONDITIONAL) {
+      // then block: NARRATIVE, OPTION
+      expect(conditional.then.length).toBe(2);
+      const nestedOption = conditional.then[1];
+      if (nestedOption.type === EntryType.OPTION) {
+        expect(nestedOption.text).toBe('take the key');
+        expect(nestedOption.then.length).toBe(2);
+      }
+    }
+  });
+
+  it('should handle mixed stars and spaces at same level', () => {
+    // Both '  ' (2 spaces) and '*' (1 star = 2 spaces) are equivalent
+    const lines = [
+      '@ROOM',
+      'if look around',
+      '  You see a key.', // 2 space indent
+      '* if [key]',       // 1 star = 2 spaces (same level as above)
+      '** You already have the key.', // 2 stars = 4 spaces (nested in conditional)
+    ];
+
+    const schema = parseIntoSchema(lines);
+    
+    expect(schema.length).toBe(2); // SCENE, OPTION
+    const option = schema[1];
+    if (option.type === EntryType.OPTION) {
+      // option.then has: narrative, conditional
+      // The "if [key]" at same level becomes a conditional in the then block
+      expect(option.then.length).toBeGreaterThanOrEqual(2);
+    }
   });
 });
 

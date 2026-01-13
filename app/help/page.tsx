@@ -33,6 +33,33 @@ export default function HelpPage() {
         </section>
 
         <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Indentation with Stars</h2>
+          <p className="text-neutral-600">
+            Use <code className="bg-neutral-100 px-1">*</code> to indicate nesting levels instead of
+            spaces. Each star equals one level of indentation (like Ink).
+          </p>
+
+          <div className="bg-neutral-50 p-4 font-mono text-sm space-y-1 border">
+            <p>if take the key</p>
+            <p>* Yoink!</p>
+            <p>* goto @HOME</p>
+            <br />
+            <p className="text-neutral-400"># Multiple stars for deeper nesting:</p>
+            <p>if [!key]</p>
+            <p>* Take the key?</p>
+            <p>* if take it | yes</p>
+            <p>** You grab the key.</p>
+            <p>** [sets: key]</p>
+          </div>
+
+          <p className="text-neutral-600 text-sm">
+            <code className="bg-neutral-100 px-1">*</code> = 1 level,{' '}
+            <code className="bg-neutral-100 px-1">**</code> = 2 levels,{' '}
+            <code className="bg-neutral-100 px-1">***</code> = 3 levels, etc.
+          </p>
+        </section>
+
+        <section className="space-y-3">
           <h2 className="text-lg font-semibold">Automatic Conditionals</h2>
           <p className="text-neutral-600">
             Show different content automatically based on player state. These run without waiting
@@ -41,10 +68,10 @@ export default function HelpPage() {
 
           <div className="bg-neutral-50 p-4 font-mono text-sm space-y-1 border">
             <p>if [key]</p>
-            <p className="pl-4">You use the key to unlock the door.</p>
-            <p className="pl-4">[unsets: key]</p>
+            <p>* You use the key to unlock the door.</p>
+            <p>* [unsets: key]</p>
             <p>[else]</p>
-            <p className="pl-4">The door is locked. You need a key.</p>
+            <p>* The door is locked. You need a key.</p>
           </div>
 
           <p className="text-neutral-600 text-sm">
@@ -52,21 +79,33 @@ export default function HelpPage() {
             <code className="bg-neutral-100 px-1">if [!variable]</code> to check if not set. Add{' '}
             <code className="bg-neutral-100 px-1">[else]</code> for alternative content.
           </p>
+        </section>
 
-          <div className="bg-neutral-50 p-4 font-mono text-sm space-y-1 border mt-2">
-            <p className="text-neutral-600"># Nested in option responses:</p>
-            <p>if examine desk | look at desk</p>
-            <p className="pl-4">if [key]</p>
-            <p className="pl-8">The desk is empty now.</p>
-            <p className="pl-4">[else]</p>
-            <p className="pl-8">You find a key on it!</p>
-            <p className="pl-8">[sets: key]</p>
-            <p className="pl-8">goto @START</p>
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Nested Options in Conditionals</h2>
+          <p className="text-neutral-600">
+            Put choices inside conditionals to show different options based on player state. All
+            available options are shown together.
+          </p>
+
+          <div className="bg-neutral-50 p-4 font-mono text-sm space-y-1 border">
+            <p>@DESK</p>
+            <p>if [!key]</p>
+            <p>* There&apos;s a key on the desk. Take it?</p>
+            <p>* if take the key | yes</p>
+            <p>** Yoink!</p>
+            <p>** [sets: key]</p>
+            <p>* if leave it | no</p>
+            <p>** You leave the key.</p>
+            <p>if [key]</p>
+            <p>* The desk is empty now.</p>
+            <p>if leave | go back</p>
+            <p>* goto @HOME</p>
           </div>
 
-          <p className="text-neutral-600 text-sm mt-2">
-            Note: When a <code className="bg-neutral-100 px-1">goto</code> is encountered, no
-            further content in that block will be shown.
+          <p className="text-neutral-600 text-sm">
+            In this example, &quot;leave&quot; is always available. The key-related options only
+            appear when the key hasn&apos;t been taken yet.
           </p>
         </section>
 
@@ -176,8 +215,12 @@ export default function HelpPage() {
                 <td className="p-2 border-b font-sans">Auto-conditional block</td>
               </tr>
               <tr>
-                <td className="p-2">[image: url]</td>
-                <td className="p-2 font-sans">Display image</td>
+                <td className="p-2 border-b">[image: url]</td>
+                <td className="p-2 border-b font-sans">Display image</td>
+              </tr>
+              <tr>
+                <td className="p-2 border-b">* / ** / ***</td>
+                <td className="p-2 border-b font-sans">Indentation (1/2/3 levels)</td>
               </tr>
             </tbody>
           </table>
