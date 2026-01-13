@@ -46,16 +46,23 @@ interface ScenePosition {
   variable?: string;
 }
 
+interface BuildPositionsResult {
+  positions: ScenePosition[];
+  jumpTarget: string | null; // Target scene if a jump was encountered (null = no jump, 'END' = end game)
+}
+
 function buildScenePositions(
   schema: Schema, 
   scanStart: number,
   hasVariable?: (variable: string) => boolean,
-): ScenePosition[] {
+): BuildPositionsResult {
   const positions: ScenePosition[] = [];
   let pendingOptions = false;
+  let jumpTarget: string | null = null;
 
   // Helper to recursively process entries
-  const processEntries = (entries: SchemaEntry[]): boolean => {
+  // Returns the jump target if one was encountered, null otherwise
+  const processEntries = (entries: SchemaEntry[]): string | null => {
     for (const entry of entries) {
       if (entry.type === EntryType.SCENE) break;
 
@@ -87,28 +94,28 @@ function buildScenePositions(
         
         if (branchEntries) {
           // Recursively process the conditional's entries
-          const shouldBreak = processEntries(branchEntries);
-          if (shouldBreak) return true;
+          const target = processEntries(branchEntries);
+          if (target !== null) return target;
         }
       } else if (entry.type === EntryType.OPTION) {
         pendingOptions = true;
       } else if (entry.type === EntryType.JUMP) {
         // Jump ends the scene traversal for positions
-        return true; // Signal to break
+        return (entry as JumpEntry).target.trim();
       }
     }
-    return false;
+    return null;
   };
 
   // Process main entries starting from scanStart
   const entriesToProcess = schema.slice(scanStart);
-  const shouldBreak = processEntries(entriesToProcess);
+  jumpTarget = processEntries(entriesToProcess);
   
-  if (!shouldBreak && pendingOptions) {
+  if (jumpTarget === null && pendingOptions) {
     positions.push({ type: 'wait' });
   }
 
-  return positions;
+  return { positions, jumpTarget };
 }
 
 /**
@@ -202,7 +209,7 @@ export function step({
     }
 
     const scanStart = getScanStart(schema, sceneStart);
-    const positions = buildScenePositions(schema, scanStart, callbacks?.hasVariable);
+    const { positions, jumpTarget } = buildScenePositions(schema, scanStart, callbacks?.hasVariable);
 
     // Check if the position exists
     if (currentLineIdx < positions.length) {
@@ -234,27 +241,17 @@ export function step({
       };
     }
 
-    // Past the end of positions - check for jumps or wait at end
-    let didJump = false;
-    for (let i = scanStart; i < schema.length; i++) {
-      const entry = schema[i];
-      if (entry.type === EntryType.SCENE) break;
-
-      if (entry.type === EntryType.JUMP) {
-        const jumpEntry = entry as JumpEntry;
-        if (jumpEntry.target === 'END') {
-          return { type: 'end' };
-        }
-        currentScene = jumpEntry.target.trim();
-        currentLineIdx = 0;
-        didJump = true;
-        break;
+    // Past the end of positions - use jump target from position building (includes conditionals)
+    if (jumpTarget !== null) {
+      if (jumpTarget === 'END') {
+        return { type: 'end' };
       }
+      currentScene = jumpTarget;
+      currentLineIdx = 0;
+      continue;
     }
 
-    if (!didJump) {
-      // No more positions and no jump - wait at end of scene (implicit loop)
-      return { type: 'wait' };
-    }
+    // No jump found - wait at end of scene (implicit loop)
+    return { type: 'wait' };
   }
 }

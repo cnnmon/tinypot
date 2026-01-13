@@ -243,4 +243,59 @@ describe('Player flow - desk key scenario', () => {
       expect(state.type).toBe('wait'); // Should be waiting for input
     });
   });
+
+  describe('conditional jump to END', () => {
+    const CONDITIONAL_END_SCRIPT = `
+@HOME
+[sets: key]
+[image: https://i.imgur.com/PR6oN9P.png]
+You're in a room.
+[if: key]
+  you did it!
+  goto @END
+`.trim().split('\n');
+
+    it('should reach END when conditional with goto @END is true', () => {
+      const schema = parseIntoSchema(CONDITIONAL_END_SCRIPT);
+      const sceneMap = constructSceneMap({ schema });
+      const variables = new Set<string>();
+      const callbacks = {
+        setVariable: (v: string) => variables.add(v),
+        unsetVariable: (v: string) => variables.delete(v),
+        hasVariable: (v: string) => variables.has(v),
+      };
+
+      const lines: string[] = [];
+      let sceneId = 'HOME';
+      let lineIdx = 0;
+      let stepCount = 0;
+      const maxSteps = 20;
+      let endReached = false;
+
+      while (stepCount < maxSteps) {
+        stepCount++;
+        const result = step({ schema, sceneMap, sceneId, lineIdx, callbacks });
+        
+        if (result.type === 'end') {
+          endReached = true;
+          break;
+        }
+        if (result.type === 'wait' || result.type === 'error') {
+          break;
+        }
+        if (result.line) {
+          lines.push(result.line.text);
+          const match = result.line.id.match(/^(.+)-(\d+)$/);
+          if (match) {
+            sceneId = match[1];
+            lineIdx = parseInt(match[2], 10) + 1;
+          }
+        }
+      }
+
+      expect(variables.has('key')).toBe(true);
+      expect(lines).toContain('you did it!');
+      expect(endReached).toBe(true);
+    });
+  });
 });
