@@ -5,8 +5,8 @@ import Item from './Item';
 export default function List() {
   const { branches, unresolvedBranches, setSelectedBranchId } = useProject();
   
-  // Sort unresolved branches oldest first (timeline order), but only newest can be reverted
-  const sortedUnresolvedBranches = [...unresolvedBranches].sort((a, b) => a.createdAt - b.createdAt);
+  // Sort unresolved branches newest first - must revert in this order
+  const sortedUnresolvedBranches = [...unresolvedBranches].sort((a, b) => b.createdAt - a.createdAt);
   
   const resolvedBranches = branches
     .filter((b) => isResolved(b))
