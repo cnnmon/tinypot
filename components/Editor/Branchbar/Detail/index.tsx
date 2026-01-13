@@ -7,7 +7,7 @@ import { Branch } from '@/types/branch';
 import { twMerge } from 'tailwind-merge';
 
 function Body({ branch }: { branch: Branch }) {
-  const { approveBranch, rejectBranch } = useProject();
+  const { approveBranch, rejectBranch, unresolvedBranches } = useProject();
   const resolved = isResolved(branch);
   const status = getBranchStatus(branch);
 
@@ -23,20 +23,32 @@ function Body({ branch }: { branch: Branch }) {
     );
   }
 
+  // Only allow reverting the newest unresolved branch to prevent data loss
+  const newestUnresolved = unresolvedBranches.length > 0
+    ? unresolvedBranches.reduce((a, b) => (a.createdAt > b.createdAt ? a : b))
+    : null;
+  const canRevert = newestUnresolved?.id === branch.id;
+
   return (
     <div className="space-y-2 relative h-full flex-1 flex">
       <p className="text-neutral-500">
-        Edit the changes until you're happy with them, then resolve to archive this branch. Or
-        revert changes to completely remove these changes.
+        Edit the changes until you're happy with them, then resolve to archive this branch.
+        {canRevert
+          ? ' Or revert changes to completely remove these changes.'
+          : ' Review newer branches first before reverting this one.'}
       </p>
       <div className="absolute bottom-0 left-0 flex gap-2">
         <button className="bg-[#b7dcbd]!" onClick={() => approveBranch(branch.id)}>
           Resolve
         </button>
-        <p>or</p>
-        <button className="bg-[#F7C7DD]!" onClick={() => rejectBranch(branch.id, true)}>
-          Revert changes
-        </button>
+        {canRevert && (
+          <>
+            <p>or</p>
+            <button className="bg-[#F7C7DD]!" onClick={() => rejectBranch(branch.id, true)}>
+              Revert changes
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

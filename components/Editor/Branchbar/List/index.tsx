@@ -4,6 +4,10 @@ import Item from './Item';
 
 export default function List() {
   const { branches, unresolvedBranches, setSelectedBranchId } = useProject();
+  
+  // Sort unresolved branches oldest first (timeline order), but only newest can be reverted
+  const sortedUnresolvedBranches = [...unresolvedBranches].sort((a, b) => a.createdAt - b.createdAt);
+  
   const resolvedBranches = branches
     .filter((b) => isResolved(b))
     .sort((a, b) => b.createdAt - a.createdAt); // Recent first
@@ -21,7 +25,7 @@ export default function List() {
         )}
       </div>
 
-      {unresolvedBranches.map((branch) => (
+      {sortedUnresolvedBranches.map((branch) => (
         <Item key={branch.id} branch={branch} onClick={() => setSelectedBranchId(branch.id)} />
       ))}
 

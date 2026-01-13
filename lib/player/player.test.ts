@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseIntoSchema } from '../project/parser';
 import { constructSceneMap } from './utils/constructSceneMap';
-import { step } from './utils/step';
 import { matchInput } from './utils/matchInput';
+import { step } from './utils/step';
 
 const TEST_SCRIPT = `
 @HOME
@@ -30,7 +30,9 @@ if You step back from the desk, leaving the key where it is. | don't take it | l
 @KEY
 [sets: key]
 goto @HOME
-`.trim().split('\n');
+`
+  .trim()
+  .split('\n');
 
 describe('Player flow - desk key scenario', () => {
   const schema = parseIntoSchema(TEST_SCRIPT);
@@ -55,7 +57,7 @@ describe('Player flow - desk key scenario', () => {
       // Step 0: should set bike variable
       let result = step({ schema, sceneMap, sceneId: 'HOME', lineIdx: 0, callbacks });
       expect(variables.has('bike')).toBe(true);
-      
+
       // Should return image (lineIdx 1 after skipping set)
       expect(result.type).toBe('continue');
       expect(result.line?.type).toBe('image');
@@ -73,7 +75,7 @@ describe('Player flow - desk key scenario', () => {
       // KEY has: [sets: key], goto @HOME
       // Should set key variable, then jump to HOME
       let result = step({ schema, sceneMap, sceneId: 'KEY', lineIdx: 0, callbacks });
-      
+
       expect(variables.has('key')).toBe(true);
       // After setting key and jumping to HOME, should return the image from HOME
       expect(result.type).toBe('continue');
@@ -174,7 +176,7 @@ describe('Player flow - desk key scenario', () => {
         while (stepCount < maxSteps) {
           stepCount++;
           const result = step({ schema, sceneMap, sceneId, lineIdx, callbacks });
-          
+
           if (result.type === 'wait') {
             return { sceneId, lineIdx, lines, type: 'wait' as const };
           }
@@ -253,7 +255,9 @@ You're in a room.
 [if: key]
   you did it!
   goto @END
-`.trim().split('\n');
+`
+      .trim()
+      .split('\n');
 
     it('should reach END when conditional with goto @END is true', () => {
       const schema = parseIntoSchema(CONDITIONAL_END_SCRIPT);
@@ -275,7 +279,7 @@ You're in a room.
       while (stepCount < maxSteps) {
         stepCount++;
         const result = step({ schema, sceneMap, sceneId, lineIdx, callbacks });
-        
+
         if (result.type === 'end') {
           endReached = true;
           break;
