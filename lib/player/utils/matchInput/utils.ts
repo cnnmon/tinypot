@@ -53,6 +53,11 @@ function countMatchingKeywordsWithAliases(
   score: number;
   matchedAlias?: string; // The alias that matched, if any
 } {
+  // Check for exact option text match first
+  if (option.text.toLowerCase() === input.toLowerCase()) {
+    return { score: 10 }; // High score for exact text match
+  }
+
   let bestScore = countMatchingKeywords(input, option.text);
   let matchedAlias: string | undefined;
 
@@ -152,11 +157,6 @@ export function getOptionsAtPosition({
 
   const entriesToProcess = schema.slice(scanStart);
   processEntries(entriesToProcess);
-
-  // Debug logging
-  console.log(`getOptionsAtPosition: sceneId=${sceneId}, lineIdx=${lineIdx}, scanStart=${scanStart}`);
-  console.log(`  positionCount=${positionCount}, options.length=${options.length}, allSceneOptions.length=${allSceneOptions.length}`);
-  console.log(`  options:`, options.map(o => o.text));
 
   // If lineIdx is past all content (end of scene), return all scene options (implicit loop)
   if (options.length === 0 && lineIdx > positionCount && allSceneOptions.length > 0) {

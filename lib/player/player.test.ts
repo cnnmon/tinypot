@@ -281,26 +281,17 @@ You're home.
         hasVariable: () => false, // No key
       };
 
-      // Debug: Log the parsed schema structure
-      console.log('Schema:', JSON.stringify(schema, null, 2));
-      console.log('SceneMap:', sceneMap);
-
       // Step through to find the decision point
       let lineIdx = 0;
-      const lines: string[] = [];
       while (true) {
         const result = step({ schema, sceneMap, sceneId: 'DESK', lineIdx, callbacks });
-        console.log(`Step lineIdx=${lineIdx}: type=${result.type}, line=${result.line?.text || 'none'}`);
         if (result.type === 'wait') break;
         if (result.type === 'error' || result.type === 'end') break;
         if (result.line) {
-          lines.push(result.line.text);
           const match = result.line.id.match(/^(.+)-(\d+)$/);
           if (match) lineIdx = parseInt(match[2], 10) + 1;
         }
       }
-      console.log('Lines shown:', lines);
-      console.log('Final lineIdx:', lineIdx);
 
       // Without key: should see "take the key", "don't take it", and "leave"
       const optionsWithoutKey = await matchInput({
@@ -312,7 +303,6 @@ You're home.
         hasVariable: () => false, // No key
         useFuzzyFallback: false,
       });
-      console.log('optionsWithoutKey:', optionsWithoutKey);
       expect(optionsWithoutKey.matched).toBe(true);
       expect(optionsWithoutKey.optionText).toBe('take the key');
 

@@ -85,7 +85,7 @@ function ProjectContent() {
         >
           <div className="p-3 h-full flex flex-col justify-between">
             <div className="flex items-center justify-between gap-1">
-              <h1 className="cursor-default">Global prompt</h1>
+              <h1 className="cursor-default">Guidebook</h1>
             </div>
             {isMetalearning && (
               <span className="text-neutral-800/40 animate-pulse">(Updating guidebook...)</span>
