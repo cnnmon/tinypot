@@ -246,6 +246,150 @@ describe('Player flow - desk key scenario', () => {
     });
   });
 
+  describe('nested options inside conditionals', () => {
+    const NESTED_OPTIONS_SCRIPT = `
+@DESK
+[if: !key]
+  [image: https://i.imgur.com/2Thd6hv.png]
+  Oh lookee, there's a key on it. Take it?
+  if take the key | yes
+    Yoink!
+    goto @KEY
+  if don't take it | nope
+    You step back.
+[if: key]
+  [image: https://i.imgur.com/1uOFWQr.png]
+  if what about the key
+     You're still holding the key.
+if leave | go | exit
+   goto @HOME
+@KEY
+[sets: key]
+goto @DESK
+@HOME
+You're home.
+`
+      .trim()
+      .split('\n');
+
+    it('should find options nested inside conditionals plus top-level options', async () => {
+      const schema = parseIntoSchema(NESTED_OPTIONS_SCRIPT);
+      const sceneMap = constructSceneMap({ schema });
+      const callbacks = {
+        setVariable: () => {},
+        unsetVariable: () => {},
+        hasVariable: () => false, // No key
+      };
+
+      // Debug: Log the parsed schema structure
+      console.log('Schema:', JSON.stringify(schema, null, 2));
+      console.log('SceneMap:', sceneMap);
+
+      // Step through to find the decision point
+      let lineIdx = 0;
+      const lines: string[] = [];
+      while (true) {
+        const result = step({ schema, sceneMap, sceneId: 'DESK', lineIdx, callbacks });
+        console.log(`Step lineIdx=${lineIdx}: type=${result.type}, line=${result.line?.text || 'none'}`);
+        if (result.type === 'wait') break;
+        if (result.type === 'error' || result.type === 'end') break;
+        if (result.line) {
+          lines.push(result.line.text);
+          const match = result.line.id.match(/^(.+)-(\d+)$/);
+          if (match) lineIdx = parseInt(match[2], 10) + 1;
+        }
+      }
+      console.log('Lines shown:', lines);
+      console.log('Final lineIdx:', lineIdx);
+
+      // Without key: should see "take the key", "don't take it", and "leave"
+      const optionsWithoutKey = await matchInput({
+        input: 'take the key',
+        schema,
+        sceneMap,
+        sceneId: 'DESK',
+        lineIdx,
+        hasVariable: () => false, // No key
+        useFuzzyFallback: false,
+      });
+      console.log('optionsWithoutKey:', optionsWithoutKey);
+      expect(optionsWithoutKey.matched).toBe(true);
+      expect(optionsWithoutKey.optionText).toBe('take the key');
+
+      // "leave" should also be available (top-level option)
+      const leaveWithoutKey = await matchInput({
+        input: 'leave',
+        schema,
+        sceneMap,
+        sceneId: 'DESK',
+        lineIdx,
+        hasVariable: () => false,
+        useFuzzyFallback: false,
+      });
+      expect(leaveWithoutKey.matched).toBe(true);
+      expect(leaveWithoutKey.sceneId).toBe('HOME');
+    });
+
+    it('should show different options when key is set', async () => {
+      const schema = parseIntoSchema(NESTED_OPTIONS_SCRIPT);
+      const sceneMap = constructSceneMap({ schema });
+      const hasKey = (v: string) => v === 'key';
+      const callbacks = {
+        setVariable: () => {},
+        unsetVariable: () => {},
+        hasVariable: hasKey,
+      };
+
+      // Step through to find the decision point (with key set)
+      let lineIdx = 0;
+      while (true) {
+        const result = step({ schema, sceneMap, sceneId: 'DESK', lineIdx, callbacks });
+        if (result.type === 'wait') break;
+        if (result.line) {
+          const match = result.line.id.match(/^(.+)-(\d+)$/);
+          if (match) lineIdx = parseInt(match[2], 10) + 1;
+        }
+      }
+
+      // With key: should see "what about the key" and "leave"
+      const optionsWithKey = await matchInput({
+        input: 'what about the key',
+        schema,
+        sceneMap,
+        sceneId: 'DESK',
+        lineIdx,
+        hasVariable: hasKey,
+        useFuzzyFallback: false,
+      });
+      expect(optionsWithKey.matched).toBe(true);
+      expect(optionsWithKey.optionText).toBe('what about the key');
+
+      // "take the key" should NOT be available when key is set
+      const takeKeyWithKey = await matchInput({
+        input: 'take the key',
+        schema,
+        sceneMap,
+        sceneId: 'DESK',
+        lineIdx,
+        hasVariable: hasKey,
+        useFuzzyFallback: false,
+      });
+      expect(takeKeyWithKey.matched).toBe(false);
+
+      // "leave" should still be available
+      const leaveWithKey = await matchInput({
+        input: 'leave',
+        schema,
+        sceneMap,
+        sceneId: 'DESK',
+        lineIdx,
+        hasVariable: hasKey,
+        useFuzzyFallback: false,
+      });
+      expect(leaveWithKey.matched).toBe(true);
+    });
+  });
+
   describe('conditional jump to END', () => {
     const CONDITIONAL_END_SCRIPT = `
 @HOME

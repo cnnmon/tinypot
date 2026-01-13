@@ -130,6 +130,38 @@ export function parseIntoSchema(entries: string[]): Schema {
 
       // Collect indented entries for the then block
       i++;
+      
+      // Helper to collect a block of indented lines and parse them together
+      const collectBlock = (startIdx: number, baseIndent: number): { entries: SchemaEntry[]; endIdx: number } => {
+        const blockLines: string[] = [];
+        let idx = startIdx;
+        
+        while (idx < entries.length) {
+          const line = entries[idx];
+          const lineTrimmed = line.trim();
+          
+          if (!lineTrimmed) {
+            blockLines.push(line);
+            idx++;
+            continue;
+          }
+          
+          const lineIndent = getIndentLevel(line);
+          if (lineIndent > baseIndent) {
+            // Dedent the line to make it relative to this block
+            const dedented = line.slice(baseIndent + 1) || lineTrimmed;
+            blockLines.push(dedented);
+            idx++;
+          } else {
+            break;
+          }
+        }
+        
+        // Parse the collected block as a unit
+        const parsedEntries = parseIntoSchema(blockLines);
+        return { entries: parsedEntries, endIdx: idx };
+      };
+      
       while (i < entries.length) {
         const nextEntry = entries[i];
         const nextTrimmed = nextEntry.trim();
@@ -144,38 +176,18 @@ export function parseIntoSchema(entries: string[]): Schema {
         // Check for [else] at the same level as [if: ...]
         if (nextIndent === conditionalIndent && isElseLine(nextTrimmed)) {
           // Start collecting else block
-          elseBlock = [];
           i++;
-          while (i < entries.length) {
-            const elseEntry = entries[i];
-            const elseTrimmed = elseEntry.trim();
-
-            if (!elseTrimmed) {
-              i++;
-              continue;
-            }
-
-            const elseIndent = getIndentLevel(elseEntry);
-            if (elseIndent > conditionalIndent) {
-              const [parsedEntry] = parseIntoSchema([elseTrimmed]);
-              if (parsedEntry) {
-                elseBlock.push(parsedEntry);
-              }
-              i++;
-            } else {
-              break;
-            }
-          }
+          const elseResult = collectBlock(i, conditionalIndent);
+          elseBlock = elseResult.entries;
+          i = elseResult.endIdx;
           break;
         }
 
-        // If more indented, it's part of the then block
+        // If more indented, collect and parse the entire then block
         if (nextIndent > conditionalIndent) {
-          const [parsedEntry] = parseIntoSchema([nextTrimmed]);
-          if (parsedEntry) {
-            thenBlock.push(parsedEntry);
-          }
-          i++;
+          const thenResult = collectBlock(i, conditionalIndent);
+          thenBlock.push(...thenResult.entries);
+          i = thenResult.endIdx;
         } else {
           // Less or equal indentation (and not [else]) - done with conditional
           break;

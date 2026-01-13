@@ -103,49 +103,60 @@ export function getOptionsAtPosition({
   const options: OptionEntry[] = [];
   const allSceneOptions: OptionEntry[] = [];
 
-  for (let i = scanStart; i < schema.length; i++) {
-    const entry = schema[i];
+  // Helper to check if an option's requires condition is met
+  const meetsRequiresCondition = (opt: OptionEntry): boolean => {
+    if (!opt.requires || !hasVariable) return true;
+    if (opt.requires.startsWith('!')) {
+      return !hasVariable(opt.requires.slice(1));
+    }
+    return hasVariable(opt.requires);
+  };
 
-    if (entry.type === EntryType.SCENE) break;
+  // Recursively process entries to find options (handles conditionals)
+  const processEntries = (entries: SchemaEntry[]): boolean => {
+    for (const entry of entries) {
+      if (entry.type === EntryType.SCENE) return true; // Stop at scene boundary
 
-    if (entry.type === EntryType.NARRATIVE || entry.type === EntryType.IMAGE) {
-      positionCount++;
-    } else if (entry.type === EntryType.METADATA) {
-      // sets/unsets create positions too
-      const meta = entry as MetadataEntry;
-      if (meta.key === 'sets' || meta.key === 'unsets') {
+      if (entry.type === EntryType.NARRATIVE || entry.type === EntryType.IMAGE) {
         positionCount++;
-      }
-    } else if (entry.type === EntryType.OPTION) {
-      // Check if option's requires condition is met
-      // Supports negation: [!variable] means variable must NOT be set
-      const opt = entry as OptionEntry;
-      let meetsCondition = true;
-      if (opt.requires && hasVariable) {
-        if (opt.requires.startsWith('!')) {
-          // Negated condition - variable must NOT be set
-          meetsCondition = !hasVariable(opt.requires.slice(1));
-        } else {
-          // Normal condition - variable must be set
-          meetsCondition = hasVariable(opt.requires);
+      } else if (entry.type === EntryType.METADATA) {
+        const meta = entry as MetadataEntry;
+        if (meta.key === 'sets' || meta.key === 'unsets') {
+          positionCount++;
         }
-      }
-
-      if (meetsCondition) {
-        // Collect all options in the scene for potential implicit loop
-        allSceneOptions.push(opt);
-        // Options after the current lineIdx are immediately available
-        if (positionCount >= lineIdx) {
-          options.push(opt);
+      } else if (entry.type === EntryType.CONDITIONAL) {
+        // Evaluate conditional and process the appropriate branch
+        const conditional = entry as ConditionalEntry;
+        const conditionMet = evaluateCondition(conditional.condition, hasVariable);
+        const branchEntries = conditionMet ? conditional.then : conditional.else;
+        if (branchEntries) {
+          const shouldStop = processEntries(branchEntries);
+          if (shouldStop) return true;
         }
-      }
-    } else if (entry.type === EntryType.JUMP) {
-      // Stop collecting options if we hit a jump before options
-      if (positionCount >= lineIdx && options.length === 0) {
-        break;
+      } else if (entry.type === EntryType.OPTION) {
+        const opt = entry as OptionEntry;
+        if (meetsRequiresCondition(opt)) {
+          allSceneOptions.push(opt);
+          if (positionCount >= lineIdx) {
+            options.push(opt);
+          }
+        }
+      } else if (entry.type === EntryType.JUMP) {
+        if (positionCount >= lineIdx && options.length === 0) {
+          return true; // Stop if we hit a jump before finding options
+        }
       }
     }
-  }
+    return false;
+  };
+
+  const entriesToProcess = schema.slice(scanStart);
+  processEntries(entriesToProcess);
+
+  // Debug logging
+  console.log(`getOptionsAtPosition: sceneId=${sceneId}, lineIdx=${lineIdx}, scanStart=${scanStart}`);
+  console.log(`  positionCount=${positionCount}, options.length=${options.length}, allSceneOptions.length=${allSceneOptions.length}`);
+  console.log(`  options:`, options.map(o => o.text));
 
   // If lineIdx is past all content (end of scene), return all scene options (implicit loop)
   if (options.length === 0 && lineIdx > positionCount && allSceneOptions.length > 0) {
