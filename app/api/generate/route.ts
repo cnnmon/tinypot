@@ -197,8 +197,7 @@ Respond in JSON format only:
 {
   "responseType": "TEXT_ONLY" | "LINK_SCENE" | "NEW_FORK",
   "reasoning": "<one sentence explaining your choice>",
-  "optionText": "<clean, polished version for display>",
-  "aliases": ["<alternative phrasings players might use>"],
+  "optionText": "<clean, formal choice text that encapsulates the player's intent>",
   "narrative": ["<line 1>", "<line 2>", ...],
   
   // For LINK_SCENE only:
@@ -278,24 +277,9 @@ Guidelines:
     }
     // TEXT_ONLY has no jump - loops back to current decision point
 
-    // Build aliases array from LLM response only (LLM already includes user input in its aliases)
-    // Deduplicate and exclude aliases that match the optionText
-    const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+    // No aliases by default - just use the formal option text
     const optionText = parsed.optionText || userInput;
-    const normOptionText = normalize(optionText);
-    const seenNormalized = new Set<string>([normOptionText]); // Exclude optionText itself
     const aliases: string[] = [];
-
-    // Add LLM-generated aliases, skipping duplicates and optionText matches
-    if (parsed.aliases && Array.isArray(parsed.aliases)) {
-      for (const alias of parsed.aliases) {
-        const normAlias = normalize(alias);
-        if (!seenNormalized.has(normAlias)) {
-          seenNormalized.add(normAlias);
-          aliases.push(alias);
-        }
-      }
-    }
 
     // Build new scene content for NEW_FORK
     let newScene: { label: string; content: string[] } | undefined;
