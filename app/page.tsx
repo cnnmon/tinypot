@@ -5,9 +5,13 @@ import Editor from '@/components/Editor';
 import Header from '@/components/Header';
 import ProjectsSelector from '@/components/Header/ProjectsSelector';
 import Player from '@/components/Player';
+import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { PlayerProvider } from '@/lib/player/PlayerProvider';
 import { ProjectProvider } from '@/lib/project';
+import { DEFAULT_LINES } from '@/lib/project/constants';
+import { useProjectKeys } from '@/lib/project/ProjectKeysProvider';
+import { useMutation } from 'convex/react';
 
 const EXAMPLE_PROJECT_ID = 'jd78c0k7gvsf3hpqybwcb3f1997ymxgh' as Id<'projects'>;
 
@@ -37,6 +41,27 @@ function ExampleProject() {
 }
 
 export default function Home() {
+  const createProjectMutation = useMutation(api.projects.create);
+  const { addKey } = useProjectKeys();
+  const handleNewProject = async () => {
+    try {
+      const project = await createProjectMutation({
+        authorId: 'default-author',
+        name: 'Untitled Project',
+        description: '',
+        script: DEFAULT_LINES,
+        guidebook: '',
+      });
+
+      if (project) {
+        addKey(project._id);
+        window.location.href = `/${project._id}`;
+      }
+    } catch (error) {
+      console.error('Failed to create project:', error);
+    }
+  };
+
   return (
     <div className="h-screen p-4 gap-2 flex flex-col">
       <div className="flex gap-2 items-center">
@@ -46,13 +71,15 @@ export default function Home() {
 
       <div className="flex-1 flex items-center justify-center flex-col gap-4">
         <p>
-          Look at{' '}
+          <button onClick={handleNewProject} className="px-1">
+            Create a new game
+          </button>{' '}
+          or look at the{' '}
           <button onClick={() => window.open('/help', '_blank')} className="px-1">
             help
           </button>{' '}
-          to get started. Click Projects to create your own game.
+          to get started. This is an example game:
         </p>
-        <p className="text-neutral-500">Or check out this example:</p>
         <ExampleProject />
       </div>
     </div>

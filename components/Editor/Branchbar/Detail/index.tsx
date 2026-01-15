@@ -24,18 +24,20 @@ function Body({ branch }: { branch: Branch }) {
   }
 
   // Only allow reverting the newest unresolved branch to prevent data loss
-  const newestUnresolved = unresolvedBranches.length > 0
-    ? unresolvedBranches.reduce((a, b) => (a.createdAt > b.createdAt ? a : b))
-    : null;
+  const newestUnresolved =
+    unresolvedBranches.length > 0
+      ? unresolvedBranches.reduce((a, b) => (a.createdAt > b.createdAt ? a : b))
+      : null;
   const canRevert = newestUnresolved?.id === branch.id;
 
   return (
-    <div className="space-y-2 relative h-full flex-1 flex">
+    <div className="space-y-2 relative h-full flex-1 flex flex-col">
+      <p>
+        <b>Changelog:</b> {branch.title}
+      </p>
       <p className="text-neutral-500">
-        Edit the changes until you're happy with them, then resolve to archive this branch.
-        {canRevert
-          ? ' Or revert changes to completely remove these changes.'
-          : ' Review newer branches first before reverting this one.'}
+        You're viewing the changes made in this branch in <b>Editor</b>. If you're happy with them,{' '}
+        <b>resolve</b> this branch to archive it.
       </p>
       <div className="absolute bottom-0 left-0 flex gap-2">
         <button className="bg-[#b7dcbd]!" onClick={() => approveBranch(branch.id)}>
@@ -45,7 +47,7 @@ function Body({ branch }: { branch: Branch }) {
           <>
             <p>or</p>
             <button className="bg-[#F7C7DD]!" onClick={() => rejectBranch(branch.id, true)}>
-              Revert changes
+              Discard changes
             </button>
           </>
         )}
@@ -67,7 +69,6 @@ export default function Detail({ branch }: { branch: Branch }) {
           ←<h1>My branches</h1>
         </button>
         <div className="flex gap-2 items-center">
-          <h3 className="font-medium leading-tight">{branch.title}</h3>
           <p className="text-neutral-400 text-sm">{timeAgo(branch.createdAt)} ago</p>
         </div>
       </div>
