@@ -49,7 +49,12 @@ interface ProjectContextValue {
   sceneToBranchMap: Record<SceneId, string>;
 
   // Branch actions
-  addOrMergeBranch: (branch: Branch, baseSchema: Schema, generatedSchema: Schema) => void;
+  addOrMergeBranch: (
+    branch: Branch,
+    baseSchema: Schema,
+    generatedSchema: Schema,
+    generationTitle?: string,
+  ) => void;
   approveBranch: (branchId: string) => void;
   rejectBranch: (branchId: string, shouldRevert: boolean) => void;
   isMetalearning: boolean;
