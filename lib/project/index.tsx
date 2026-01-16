@@ -56,6 +56,9 @@ interface ProjectContextValue {
 
   // Player reset trigger - changes when player should reset
   playerResetKey: number;
+
+  // Read-only mode (for play page)
+  readOnly: boolean;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -259,7 +262,7 @@ export function ProjectProvider({
 
   // Add or merge branch - one branch per playthrough
   const addOrMergeBranch = useCallback(
-    (branch: Branch, baseSchema: Schema, generatedSchema: Schema) => {
+    (branch: Branch, baseSchema: Schema, generatedSchema: Schema, generationTitle?: string) => {
       if (readOnly) return;
 
       // Check if there's already an unresolved branch for this playthrough
@@ -268,8 +271,13 @@ export function ProjectProvider({
       );
 
       if (existingBranch) {
-        // Merge new changes into existing branch
-        const mergedBranch = mergeBranchChanges(existingBranch, baseSchema, generatedSchema);
+        // Merge new changes into existing branch (concatenates titles)
+        const mergedBranch = mergeBranchChanges(
+          existingBranch,
+          baseSchema,
+          generatedSchema,
+          generationTitle,
+        );
         updateBranchMutation({
           branchId: existingBranch._id,
           title: mergedBranch.title,
@@ -324,7 +332,7 @@ export function ProjectProvider({
     [branches, schema, updateBranchMutation, startMetalearningJob],
   );
 
-  // Delete branch - optionally revert to base script
+  // Delete branch - optionally discard to base script
   // Rejects NEVER trigger metalearning (only accept with edits does)
   const rejectBranch = useCallback(
     (branchId: string, shouldRevert: boolean) => {
@@ -353,10 +361,19 @@ export function ProjectProvider({
   );
 
   // Show loading state while project data is loading
-  if (!convexProject) {
+  if (convexProject === undefined) {
     return (
       <div className="h-screen flex items-center justify-center">
         <p className="text-neutral-400">loading project...</p>
+      </div>
+    );
+  }
+
+  // Show invalid state if project doesn't exist
+  if (convexProject === null) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <p className="text-neutral-400">Invalid project ID</p>
       </div>
     );
   }
@@ -379,6 +396,7 @@ export function ProjectProvider({
         rejectBranch,
         isMetalearning,
         playerResetKey,
+        readOnly,
       }}
     >
       {children}

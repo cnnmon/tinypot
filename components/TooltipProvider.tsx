@@ -1,6 +1,14 @@
 'use client';
 
-import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 interface TooltipState {
   content: ReactNode;
@@ -26,7 +34,11 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
     visible: false,
   });
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ left: 0, top: 0, transform: 'translate(-50%, -100%) translateY(-8px)' });
+  const [position, setPosition] = useState({
+    left: 0,
+    top: 0,
+    transform: 'translate(-50%, -100%) translateY(-8px)',
+  });
 
   const show = useCallback((content: ReactNode, x: number, y: number, yBottom: number) => {
     setTooltip({ content, x, y, yBottom, visible: true });
@@ -109,4 +121,3 @@ export function useTooltipTrigger(content: ReactNode) {
 
   return { onMouseEnter, onMouseLeave: hide };
 }
-

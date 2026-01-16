@@ -45,7 +45,7 @@ export default defineSchema({
     base: v.any(), // Record<string, SchemaEntry[]>
     generated: v.any(), // Record<string, SchemaEntry[]>
     authored: v.optional(v.any()), // Record<string, SchemaEntry[]>
-    baseScript: v.optional(v.array(v.string())), // Original script for easy revert
+    baseScript: v.optional(v.array(v.string())), // Original script for easy discard
     approved: v.optional(v.boolean()),
     metalearning: v.optional(v.string()),
     createdAt: v.number(),

@@ -41,13 +41,13 @@ function Body({ branch }: { branch: Branch }) {
       </p>
       <div className="absolute bottom-0 left-0 flex gap-2">
         <button className="bg-[#b7dcbd]!" onClick={() => approveBranch(branch.id)}>
-          Resolve
+          Approve
         </button>
         {canRevert && (
           <>
             <p>or</p>
             <button className="bg-[#F7C7DD]!" onClick={() => rejectBranch(branch.id, true)}>
-              Discard changes
+              Discard branch
             </button>
           </>
         )}

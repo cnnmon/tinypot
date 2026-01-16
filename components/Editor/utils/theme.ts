@@ -15,7 +15,7 @@ export const bonsaiHighlighting = HighlightStyle.define([
 export const bonsaiTheme = EditorView.theme({
   '&': {
     height: '100%',
-    fontSize: '15px',
+    fontSize: '14px',
   },
   '.cm-scroller': {
     lineHeight: '1.5',
@@ -108,6 +108,10 @@ export const bonsaiSyntaxTheme = EditorView.theme({
     color: '#9333ea',
     fontStyle: 'italic',
   },
+  '.cm-bonsai-when': {
+    color: '#0891b2',
+    fontStyle: 'italic',
+  },
 });
 
 // Custom highlighter that applies styles based on line content
@@ -164,6 +168,9 @@ function bonsaiLineHighlighter(view: EditorView) {
     } else if (trimmed.startsWith('if ')) {
       // Choice: if Choice text | alias
       className = 'cm-bonsai-option';
+    } else if (trimmed.startsWith('when ')) {
+      // Conditional block: when [key]
+      className = 'cm-bonsai-when';
     } else if (/^\[image:\s*.+\]$/.test(trimmed)) {
       // Image metadata: [image: url]
       className = 'cm-bonsai-image';

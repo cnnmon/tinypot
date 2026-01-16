@@ -3,7 +3,7 @@
 import { isResolved } from '@/lib/branch';
 import useEditor from '@/lib/editor';
 import { useProject } from '@/lib/project';
-import { Scene, SceneId } from '@/types/branch';
+import { Branch, Scene, SceneId } from '@/types/branch';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
 import { Compartment, EditorState } from '@codemirror/state';
@@ -111,12 +111,23 @@ function sceneEntryToLine(entry: Scene[number]): string {
   }
 }
 
-export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
+export default function Editor({
+  readOnly = false,
+  branch: branchProp,
+}: {
+  readOnly?: boolean;
+  branch?: Branch | null;
+}) {
   const { script, setScript } = useEditor();
   const { branches, sceneToBranchMap, selectedBranchId } = useProject();
 
-  // Get the selected branch object for detailed highlighting
-  const selectedBranch = selectedBranchId ? branches.find((b) => b.id === selectedBranchId) : null;
+  // Use prop branch if provided, otherwise fall back to context selection
+  const selectedBranch =
+    branchProp !== undefined
+      ? branchProp
+      : selectedBranchId
+        ? (branches.find((b) => b.id === selectedBranchId) ?? null)
+        : null;
 
   // Check if viewing a rejected branch
   const isViewingRejected = useMemo(() => {
@@ -138,12 +149,19 @@ export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
+  // Track if we should sync changes to project
+  // Sync when: not read-only AND (no branch OR branch is unresolved)
+  // Use a ref so the closure in updateListener always gets the current value
+  const shouldSyncToProjectRef = useRef(!readOnly);
+  shouldSyncToProjectRef.current = !readOnly;
+
   // Initialize CodeMirror
   useEffect(() => {
     if (!editorRef.current || viewRef.current) return;
 
     const updateListener = EditorView.updateListener.of((update) => {
-      if (update.docChanged) {
+      // Only sync to project when not viewing a specific branch and not read-only
+      if (update.docChanged && shouldSyncToProjectRef.current) {
         const content = update.state.doc.toString();
         setScript(content.split('\n'));
       }
@@ -163,7 +181,7 @@ export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
         syntaxHighlighting(bonsaiHighlighting),
         updateListener,
         EditorView.lineWrapping,
-        readOnlyCompartment.of(EditorState.readOnly.of(readOnly)),
+        readOnlyCompartment.of(EditorState.readOnly.of(readOnly || isViewingRejected)),
       ],
     });
 
@@ -196,13 +214,15 @@ export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
     }
   }, [displayScript, isViewingRejected]);
 
-  // Toggle read-only mode when viewing rejected branches or when readOnly prop is set
+  // Toggle read-only mode when viewing rejected branches or readOnly prop is set
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
 
     view.dispatch({
-      effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly || isViewingRejected)),
+      effects: readOnlyCompartment.reconfigure(
+        EditorState.readOnly.of(readOnly || isViewingRejected),
+      ),
     });
   }, [readOnly, isViewingRejected]);
 
@@ -216,12 +236,15 @@ export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
     });
   }, [sceneToBranchMap, selectedBranch]);
 
+  // Check if viewing any resolved branch (approved or rejected)
+  const isViewingResolved = selectedBranch ? isResolved(selectedBranch) : false;
+
   return (
-    <div className="h-full overflow-scroll relative">
+    <div className="h-full overflow-y-scroll relative">
       <div ref={editorRef} className="h-full" />
-      {isViewingRejected && (
-        <div className="absolute top-0 px-2 py-1 text-sm bg-white rounded bordered">
-          Viewing rejected changes
+      {isViewingResolved && (
+        <div className="absolute top-0 px-2 py-1 text-sm bg-white rounded bordered m-2">
+          Read-only ({selectedBranch?.approved ? 'approved' : 'rejected'})
         </div>
       )}
     </div>

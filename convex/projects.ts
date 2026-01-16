@@ -1,10 +1,40 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+const SHARE_PREFIX = 's_';
+
+function encodeShareId(projectId: string): string {
+  const encoded = btoa(projectId);
+  return SHARE_PREFIX + encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 export const get = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
     return await ctx.db.get(projectId);
+  },
+});
+
+export const list = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("projects").collect();
+  },
+});
+
+// List public projects (not owned by user) with only name and encoded shareId
+export const listPublic = query({
+  args: { excludeIds: v.array(v.id("projects")) },
+  handler: async (ctx, { excludeIds }) => {
+    const projects = await ctx.db.query("projects").collect();
+    const excludeSet = new Set(excludeIds);
+    
+    return projects
+      .filter((p) => !excludeSet.has(p._id) && !p.name.includes('Untitled'))
+      .map((p) => ({
+        name: p.name,
+        shareId: encodeShareId(p._id),
+      }));
   },
 });
 

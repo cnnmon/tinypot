@@ -5,8 +5,12 @@ import { ConditionalEntry, EntryType, Schema, SchemaEntry } from '@/types/schema
  * - `@SCENE_NAME` - Scene declaration
  * - `goto @SCENE_NAME` - Jump to scene (or `goto @END`)
  * - `if Choice text | alias1 | alias2` - Choice with optional aliases
- * - `if [variable] Choice text` - Conditional choice (requires variable)
- * - Indented lines after `if` are the choice's response/navigation
+ * - `if Choice text -> ?key` - Choice with inline requires
+ * - `if Choice text -> +key` - Choice that sets a variable
+ * - `if Choice text -> -key` - Choice that unsets a variable
+ * - `when [variable]` - Conditional block (shows content if variable is set)
+ * - `when [!variable]` - Conditional block (shows content if variable is NOT set)
+ * - Indented lines after `if`/`when` are the block's content
  * - `[key: value]` - Metadata (image, allows, sets, unsets, requires)
  * - Regular text is narrative
  * - `*`, `**`, `***` prefixes indicate indentation levels (like Ink)
@@ -21,7 +25,7 @@ import { ConditionalEntry, EntryType, Schema, SchemaEntry } from '@/types/schema
 function convertStarsToIndent(line: string): string {
   const starMatch = line.match(/^(\*+)\s*/);
   if (!starMatch) return line;
-  
+
   const starCount = starMatch[1].length;
   const indent = '  '.repeat(starCount); // 2 spaces per star
   const content = line.slice(starMatch[0].length);
@@ -34,20 +38,48 @@ function getIndentLevel(entry: string): number {
 }
 
 /**
- * Parse choice line: if Choice text | alias1 | alias2 & [condition]
- * The condition comes at the end after & symbol
- * Returns { text, aliases, requires }
+ * Parse choice line: if Choice text | alias1 | alias2 -> ?key +key -key
+ * Effects come after -> arrow:
+ *   ?key = requires
+ *   +key = sets
+ *   -key = unsets
+ * Also supports legacy & [condition] syntax
+ * Returns { text, aliases, requires, sets, unsets }
  */
 function parseChoiceLine(line: string): {
   text: string;
   aliases?: string[];
   requires?: string;
+  sets?: string;
+  unsets?: string;
 } {
   // Remove 'if ' prefix
   let content = line.slice(3).trim();
 
-  // Check for condition at end: ... & [variable]
   let requires: string | undefined;
+  let sets: string | undefined;
+  let unsets: string | undefined;
+
+  // Check for arrow syntax: -> ?key +key -key
+  const arrowIdx = content.indexOf('->');
+  if (arrowIdx !== -1) {
+    const effectsPart = content.slice(arrowIdx + 2).trim();
+    content = content.slice(0, arrowIdx).trim();
+
+    // Parse effects: ?key, +key, -key
+    const effects = effectsPart.split(/\s+/);
+    for (const effect of effects) {
+      if (effect.startsWith('?')) {
+        requires = effect.slice(1);
+      } else if (effect.startsWith('+')) {
+        sets = effect.slice(1);
+      } else if (effect.startsWith('-')) {
+        unsets = effect.slice(1);
+      }
+    }
+  }
+
+  // Legacy: Check for condition at end: ... & [variable]
   const conditionMatch = content.match(/&\s*\[([^\]]+)\]\s*$/);
   if (conditionMatch) {
     requires = conditionMatch[1].trim();
@@ -59,15 +91,13 @@ function parseChoiceLine(line: string): {
   const text = parts[0];
   const aliases = parts.length > 1 ? parts.slice(1) : undefined;
 
-  return { text, aliases, requires };
+  return { text, aliases, requires, sets, unsets };
 }
 
 /**
  * Parse metadata line: [key: value]
  */
-function parseMetadataLine(
-  line: string,
-): { key: string; value: string } | null {
+function parseMetadataLine(line: string): { key: string; value: string } | null {
   const match = line.match(/^\[(\w+):\s*(.+)\]$/);
   if (match) {
     return { key: match[1], value: match[2] };
@@ -76,20 +106,27 @@ function parseMetadataLine(
 }
 
 /**
- * Check if line is a conditional start: [if: condition] or if [condition]
+ * Check if line is a conditional start: [if: condition], if [condition], or when [condition]
  */
 function parseConditionalLine(line: string): string | null {
-  // Support both [if: key] and if [key] syntax
+  // Support [if: key] syntax
   const bracketMatch = line.match(/^\[if:\s*(.+)\]$/);
   if (bracketMatch) {
     return bracketMatch[1].trim();
   }
-  
+
+  // Support if [key] syntax
   const ifMatch = line.match(/^if\s+\[([^\]]+)\]\s*$/);
   if (ifMatch) {
     return ifMatch[1].trim();
   }
-  
+
+  // Support when [key] syntax (preferred)
+  const whenMatch = line.match(/^when\s+\[([^\]]+)\]\s*$/);
+  if (whenMatch) {
+    return whenMatch[1].trim();
+  }
+
   return null;
 }
 
@@ -103,7 +140,7 @@ function isElseLine(line: string): boolean {
 export function parseIntoSchema(rawEntries: string[]): Schema {
   // Preprocess: convert star prefixes to space indentation
   const entries = rawEntries.map(convertStarsToIndent);
-  
+
   const schema: Schema = [];
   let i = 0;
 
@@ -150,22 +187,25 @@ export function parseIntoSchema(rawEntries: string[]): Schema {
 
       // Collect indented entries for the then block
       i++;
-      
+
       // Helper to collect a block of indented lines and parse them together
-      const collectBlock = (startIdx: number, baseIndent: number): { entries: SchemaEntry[]; endIdx: number } => {
+      const collectBlock = (
+        startIdx: number,
+        baseIndent: number,
+      ): { entries: SchemaEntry[]; endIdx: number } => {
         const blockLines: string[] = [];
         let idx = startIdx;
-        
+
         while (idx < entries.length) {
           const line = entries[idx];
           const lineTrimmed = line.trim();
-          
+
           if (!lineTrimmed) {
             blockLines.push(line);
             idx++;
             continue;
           }
-          
+
           const lineIndent = getIndentLevel(line);
           if (lineIndent > baseIndent) {
             // Dedent the line to make it relative to this block
@@ -176,12 +216,12 @@ export function parseIntoSchema(rawEntries: string[]): Schema {
             break;
           }
         }
-        
+
         // Parse the collected block as a unit
         const parsedEntries = parseIntoSchema(blockLines);
         return { entries: parsedEntries, endIdx: idx };
       };
-      
+
       while (i < entries.length) {
         const nextEntry = entries[i];
         const nextTrimmed = nextEntry.trim();
@@ -224,11 +264,19 @@ export function parseIntoSchema(rawEntries: string[]): Schema {
       continue;
     }
 
-    // Choice: if Choice text | alias1 | alias2
+    // Choice: if Choice text | alias1 | alias2 -> ?key +key -key
     if (trimmed.startsWith('if ')) {
       const optionIndent = getIndentLevel(entry);
-      const { text, aliases, requires } = parseChoiceLine(trimmed);
+      const { text, aliases, requires, sets, unsets } = parseChoiceLine(trimmed);
       const thenBlock: SchemaEntry[] = [];
+
+      // Add inline sets/unsets as metadata entries in the then block
+      if (sets) {
+        thenBlock.push({ type: EntryType.METADATA, key: 'sets', value: sets });
+      }
+      if (unsets) {
+        thenBlock.push({ type: EntryType.METADATA, key: 'unsets', value: unsets });
+      }
 
       // Collect indented entries that follow this choice
       i++;
@@ -277,9 +325,7 @@ export function parseIntoSchema(rawEntries: string[]): Schema {
       if (key === 'image') {
         const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
         const isValidImage = validExtensions.some(
-          (ext) =>
-            value.toLowerCase().endsWith(ext) ||
-            value.toLowerCase().includes(ext + '?'),
+          (ext) => value.toLowerCase().endsWith(ext) || value.toLowerCase().includes(ext + '?'),
         );
 
         if (isValidImage) {
@@ -333,8 +379,7 @@ function isRedundantAlias(existing: string, newAlias: string): boolean {
   if (normExisting === normNew) return true;
 
   // One contains the other (e.g., "run" vs "run away" or "running" vs "run")
-  if (normExisting.includes(normNew) || normNew.includes(normExisting))
-    return true;
+  if (normExisting.includes(normNew) || normNew.includes(normExisting)) return true;
 
   // Check if they share the same root words (simple stemming)
   const existingWords = new Set(normExisting.split(' '));
@@ -342,8 +387,7 @@ function isRedundantAlias(existing: string, newAlias: string): boolean {
   const sharedWords = newWords.filter((w) => existingWords.has(w));
 
   // If most words are shared, it's redundant
-  if (sharedWords.length >= Math.max(newWords.length, existingWords.size) * 0.8)
-    return true;
+  if (sharedWords.length >= Math.max(newWords.length, existingWords.size) * 0.8) return true;
 
   return false;
 }
@@ -369,11 +413,7 @@ function parseChoiceFromLine(line: string): {
  * or "if Ride a bike | Cycle" to "if Ride a bike | Cycle | Pedal"
  * Avoids adding redundant aliases that are too similar to existing ones.
  */
-export function addAliasToOption(
-  lines: string[],
-  optionText: string,
-  newAlias: string,
-): string[] {
+export function addAliasToOption(lines: string[], optionText: string, newAlias: string): string[] {
   return lines.map((line) => {
     const trimmed = line.trim();
     if (!trimmed.startsWith('if ')) return line;
@@ -390,8 +430,7 @@ export function addAliasToOption(
     if (isRedundantAlias(text, newAlias)) return line;
 
     // Check if alias is redundant with any existing alias
-    if (aliases?.some((existing) => isRedundantAlias(existing, newAlias)))
-      return line;
+    if (aliases?.some((existing) => isRedundantAlias(existing, newAlias))) return line;
 
     // Build new choice line with alias
     const indent = line.match(/^(\s*)/)?.[1] || '';
@@ -493,12 +532,12 @@ export function addGeneratedOptionToScript(
       break;
     }
   }
-  
+
   // Handle START scene: if the first line is a scene marker (like @HOME),
   // and sceneId is 'START', we should target that first scene instead
   let targetSceneId = sceneId;
   let inImplicitStart = false;
-  
+
   if (sceneId === 'START') {
     if (firstSceneMarkerIdx === 0 && firstSceneName) {
       // Script starts with @SCENE - START and that scene are the same
@@ -526,7 +565,7 @@ export function addGeneratedOptionToScript(
     // Track scene changes
     if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
       const sceneName = trimmed.slice(1).trim();
-      
+
       // If we were in implicit START, we're now leaving it
       if (inImplicitStart && inTargetScene) {
         // We're transitioning out of implicit START into a named scene
@@ -537,12 +576,12 @@ export function addGeneratedOptionToScript(
         }
         inTargetScene = false;
       }
-      
+
       // Check if entering the explicit target scene
       if (!inImplicitStart) {
         inTargetScene = sceneName === targetSceneId;
       }
-      
+
       result.push(line);
       continue;
     }
@@ -578,13 +617,8 @@ export function addGeneratedOptionToScript(
 
   // Build the new choice block with aliases if present
   const optionLine =
-    aliases.length > 0
-      ? `if ${optionText} | ${aliases.join(' | ')}`
-      : `if ${optionText}`;
-  const newOptionLines: string[] = [
-    optionLine,
-    ...thenLines.map((l) => `   ${l}`),
-  ];
+    aliases.length > 0 ? `if ${optionText} | ${aliases.join(' | ')}` : `if ${optionText}`;
+  const newOptionLines: string[] = [optionLine, ...thenLines.map((l) => `   ${l}`)];
 
   // Insert after the last choice in the target scene
   if (lastOptionEndIdx !== -1) {
@@ -595,7 +629,7 @@ export function addGeneratedOptionToScript(
     // For implicit START with scene markers, insert before first scene marker
     // For explicit scenes, insert before the next scene marker or at end
     let insertIdx = result.length;
-    
+
     if (inImplicitStart) {
       // Find first scene marker in result to insert before
       for (let i = 0; i < result.length; i++) {

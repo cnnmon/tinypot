@@ -1,20 +1,17 @@
 /**
  * Share link utilities.
- * Obfuscates project IDs so users can't easily find the editor URL.
+ * Obfuscates project IDs so users can't easily guess editor URLs.
  */
 
-const SHARE_PREFIX = 'p_';
+const SHARE_PREFIX = 's_';
 
 /**
  * Encode a project ID into a share ID.
- * Reverses and base64 encodes to obfuscate.
+ * Simple base64 encoding for obfuscation.
  */
 export function encodeShareId(projectId: string): string {
-  // Reverse the string
-  const reversed = projectId.split('').reverse().join('');
-  // Base64 encode
-  const encoded = btoa(reversed);
-  // URL-safe base64 and add prefix
+  // Base64 encode and make URL-safe
+  const encoded = btoa(projectId);
   return SHARE_PREFIX + encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
@@ -26,16 +23,15 @@ export function decodeShareId(shareId: string): string | null {
   try {
     if (!shareId.startsWith(SHARE_PREFIX)) return null;
 
-    // Remove prefix
+    // Remove prefix and restore base64 chars
     let encoded = shareId.slice(SHARE_PREFIX.length);
-    // Restore base64 padding and chars
     encoded = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    
+    // Add back padding
     const padding = (4 - (encoded.length % 4)) % 4;
     encoded += '='.repeat(padding);
 
-    // Decode and reverse
-    const reversed = atob(encoded);
-    return reversed.split('').reverse().join('');
+    return atob(encoded);
   } catch {
     return null;
   }

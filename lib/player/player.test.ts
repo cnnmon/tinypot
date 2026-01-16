@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseIntoSchema } from '../project/parser';
+import { findReplayPath } from './index';
 import { constructSceneMap } from './utils/constructSceneMap';
 import { matchInput } from './utils/matchInput';
 import { step } from './utils/step';
@@ -434,6 +435,469 @@ You're in a room.
       expect(variables.has('key')).toBe(true);
       expect(lines).toContain('you did it!');
       expect(endReached).toBe(true);
+    });
+  });
+
+  describe('findReplayPath and look around choice', () => {
+    const LOOK_AROUND_SCRIPT = `
+@HOME
+[image: https://i.imgur.com/PR6oN9P.png]
+You're in a room. You see a chair, a desk, and a plant.
+if leave & [key]
+  You did it!
+  goto @END
+if examine the desk | look at the desk
+  You lean closer to the desk.
+  goto @DESK
+if look around
+   You take a moment to survey the room more carefully. The chair sits empty beside the desk. The plant looks like it could use some water. Nothing else jumps out at you.
+   So... what now?
+`
+      .trim()
+      .split('\n');
+
+    it('should find "look around" choice in HOME scene (no goto)', () => {
+      // Find the line index of "if look around"
+      const lookAroundIdx = LOOK_AROUND_SCRIPT.findIndex((line) =>
+        line.trim().startsWith('if look around'),
+      );
+      expect(lookAroundIdx).toBeGreaterThan(-1);
+
+      // findReplayPath should return ["look around"] since it's in HOME (START equivalent)
+      // and the choice text is "look around" with no alias
+      const path = findReplayPath(LOOK_AROUND_SCRIPT, lookAroundIdx);
+      expect(path).toEqual(['look around']);
+    });
+
+    it('should match "look around" verbatim and show narrative response', async () => {
+      const schema = parseIntoSchema(LOOK_AROUND_SCRIPT);
+      const sceneMap = constructSceneMap({ schema });
+      const callbacks = {
+        setVariable: () => {},
+        unsetVariable: () => {},
+        hasVariable: () => false,
+      };
+
+      // Step through HOME to find the wait point
+      let lineIdx = 0;
+      while (true) {
+        const result = step({ schema, sceneMap, sceneId: 'HOME', lineIdx, callbacks });
+        if (result.type === 'wait') break;
+        if (result.type === 'error' || result.type === 'end') break;
+        if (result.line) {
+          const match = result.line.id.match(/^(.+)-(\d+)$/);
+          if (match) lineIdx = parseInt(match[2], 10) + 1;
+        }
+      }
+
+      // Match "look around" verbatim
+      const result = await matchInput({
+        input: 'look around',
+        schema,
+        sceneMap,
+        sceneId: 'HOME',
+        lineIdx,
+        hasVariable: () => false,
+        useFuzzyFallback: false,
+      });
+
+      expect(result.matched).toBe(true);
+      expect(result.optionText).toBe('look around');
+      // No goto, so should stay in HOME
+      expect(result.sceneId).toBe('HOME');
+      // Should have narrative responses
+      expect(result.narratives).toBeDefined();
+      expect(result.narratives!.length).toBeGreaterThan(0);
+      expect(result.narratives![0].text).toContain('survey the room');
+    });
+
+    it('should find path to DESK scene choice', () => {
+      const DESK_SCRIPT = `
+@HOME
+[image: https://i.imgur.com/PR6oN9P.png]
+You're in a room.
+if examine the desk | look at the desk
+  You lean closer to the desk.
+  goto @DESK
+@DESK
+[image: https://i.imgur.com/2Thd6hv.png]
+Oh lookee, there's a key on it. Take it?
+if take the key | yes
+  Yoink!
+  goto @KEY
+@KEY
+[sets: key]
+goto @HOME
+`
+        .trim()
+        .split('\n');
+
+      // Find "take the key" choice in DESK scene
+      const takeKeyIdx = DESK_SCRIPT.findIndex((line) => line.trim().startsWith('if take the key'));
+      expect(takeKeyIdx).toBeGreaterThan(-1);
+
+      // Path should be: go to DESK (via "look at the desk" alias), then select "take the key" (via "yes" alias)
+      const path = findReplayPath(DESK_SCRIPT, takeKeyIdx);
+      expect(path).toEqual(['look at the desk', 'yes']);
+    });
+  });
+
+  describe('comprehensive replay tests', () => {
+    const FULL_SCRIPT = `
+@HOME
+[image: https://i.imgur.com/PR6oN9P.png]
+You're in a room. You see a chair, a desk, and a plant.
+if leave & [key]
+  You did it!
+  goto @END
+if examine the desk | look at the desk
+  You lean closer to the desk.
+  goto @DESK
+if look around
+  You take a moment to survey the room more carefully.
+  So... what now?
+@DESK
+[if: !key]
+  [image: https://i.imgur.com/2Thd6hv.png]
+  Oh lookee, there's a key on it. Take it?
+  if take the key | yes
+    Yoink!
+    goto @KEY
+  if don't take the key | no
+    You step back from the desk.
+    So... what now?
+[if: key]
+  [image: https://i.imgur.com/1uOFWQr.png]
+  if what about the key
+    You're still holding the key.
+    So... what now?
+if leave | go back
+  goto @HOME
+@KEY
+[sets: key]
+goto @HOME
+`
+      .trim()
+      .split('\n');
+
+    it('should find path for clicking on scene header (@HOME)', () => {
+      const homeIdx = FULL_SCRIPT.findIndex((line) => line.trim() === '@HOME');
+      expect(homeIdx).toBe(0);
+
+      // Clicking on HOME scene should return empty path (already at start)
+      const path = findReplayPath(FULL_SCRIPT, homeIdx);
+      expect(path).toEqual([]);
+    });
+
+    it('should find path for clicking on scene header (@DESK)', () => {
+      const deskIdx = FULL_SCRIPT.findIndex((line) => line.trim() === '@DESK');
+      expect(deskIdx).toBeGreaterThan(-1);
+
+      // Clicking on DESK scene header should find path via "look at the desk"
+      const path = findReplayPath(FULL_SCRIPT, deskIdx);
+      expect(path).toEqual(['look at the desk']);
+    });
+
+    it('should find path for clicking on scene header (@KEY)', () => {
+      const keyIdx = FULL_SCRIPT.findIndex((line) => line.trim() === '@KEY');
+      expect(keyIdx).toBeGreaterThan(-1);
+
+      // Path to KEY: HOME -> DESK -> take the key
+      const path = findReplayPath(FULL_SCRIPT, keyIdx);
+      expect(path).toEqual(['look at the desk', 'yes']);
+    });
+
+    it('should find path for "look around" choice (no goto)', () => {
+      const lookAroundIdx = FULL_SCRIPT.findIndex((line) =>
+        line.trim().startsWith('if look around'),
+      );
+      expect(lookAroundIdx).toBeGreaterThan(-1);
+
+      // "look around" is in HOME, no path needed, just the choice itself
+      const path = findReplayPath(FULL_SCRIPT, lookAroundIdx);
+      expect(path).toEqual(['look around']);
+    });
+
+    it('should find path for "examine the desk" choice', () => {
+      const examineIdx = FULL_SCRIPT.findIndex((line) =>
+        line.trim().startsWith('if examine the desk'),
+      );
+      expect(examineIdx).toBeGreaterThan(-1);
+
+      // Uses first alias "look at the desk"
+      const path = findReplayPath(FULL_SCRIPT, examineIdx);
+      expect(path).toEqual(['look at the desk']);
+    });
+
+    it('should find path for "take the key" choice in DESK scene', () => {
+      const takeKeyIdx = FULL_SCRIPT.findIndex((line) => line.trim().startsWith('if take the key'));
+      expect(takeKeyIdx).toBeGreaterThan(-1);
+
+      // Path: HOME -> DESK (via "look at the desk"), then "yes" for take the key
+      const path = findReplayPath(FULL_SCRIPT, takeKeyIdx);
+      expect(path).toEqual(['look at the desk', 'yes']);
+    });
+
+    it('should find path for "don\'t take the key" choice in DESK scene', () => {
+      const dontTakeIdx = FULL_SCRIPT.findIndex((line) =>
+        line.trim().startsWith("if don't take the key"),
+      );
+      expect(dontTakeIdx).toBeGreaterThan(-1);
+
+      // Path: HOME -> DESK (via "look at the desk"), then "no" for don't take
+      const path = findReplayPath(FULL_SCRIPT, dontTakeIdx);
+      expect(path).toEqual(['look at the desk', 'no']);
+    });
+
+    it('should find path for "leave" choice in DESK scene', () => {
+      const leaveIdx = FULL_SCRIPT.findIndex((line) => line.trim().startsWith('if leave |'));
+      expect(leaveIdx).toBeGreaterThan(-1);
+
+      // Path: HOME -> DESK (via "look at the desk"), then "go back" for leave
+      const path = findReplayPath(FULL_SCRIPT, leaveIdx);
+      expect(path).toEqual(['look at the desk', 'go back']);
+    });
+
+    it('should find path for "what about the key" (conditional choice)', () => {
+      const whatAboutIdx = FULL_SCRIPT.findIndex((line) =>
+        line.trim().startsWith('if what about the key'),
+      );
+      expect(whatAboutIdx).toBeGreaterThan(-1);
+
+      // This choice is inside [if: key] conditional in DESK
+      // Path: HOME -> DESK
+      const path = findReplayPath(FULL_SCRIPT, whatAboutIdx);
+      expect(path).toEqual(['look at the desk', 'what about the key']);
+    });
+
+    describe('full replay simulation', () => {
+      it('should successfully match "look around" and get response', async () => {
+        const schema = parseIntoSchema(FULL_SCRIPT);
+        const sceneMap = constructSceneMap({ schema });
+
+        // Step through HOME to decision point
+        let lineIdx = 0;
+        const callbacks = {
+          setVariable: () => {},
+          unsetVariable: () => {},
+          hasVariable: () => false,
+        };
+
+        while (true) {
+          const result = step({ schema, sceneMap, sceneId: 'HOME', lineIdx, callbacks });
+          if (result.type === 'wait') break;
+          if (result.type === 'error' || result.type === 'end') break;
+          if (result.line) {
+            const match = result.line.id.match(/^(.+)-(\d+)$/);
+            if (match) lineIdx = parseInt(match[2], 10) + 1;
+          }
+        }
+
+        // Match "look around"
+        const result = await matchInput({
+          input: 'look around',
+          schema,
+          sceneMap,
+          sceneId: 'HOME',
+          lineIdx,
+          hasVariable: () => false,
+          useFuzzyFallback: false,
+        });
+
+        expect(result.matched).toBe(true);
+        expect(result.optionText).toBe('look around');
+        expect(result.narratives).toBeDefined();
+        expect(result.narratives!.length).toBe(2);
+        expect(result.narratives![0].text).toContain('survey the room');
+        expect(result.narratives![1].text).toContain('what now');
+      });
+
+      it('should successfully match "examine the desk" and go to DESK', async () => {
+        const schema = parseIntoSchema(FULL_SCRIPT);
+        const sceneMap = constructSceneMap({ schema });
+
+        // Step through HOME to decision point
+        let lineIdx = 0;
+        const callbacks = {
+          setVariable: () => {},
+          unsetVariable: () => {},
+          hasVariable: () => false,
+        };
+
+        while (true) {
+          const result = step({ schema, sceneMap, sceneId: 'HOME', lineIdx, callbacks });
+          if (result.type === 'wait') break;
+          if (result.type === 'error' || result.type === 'end') break;
+          if (result.line) {
+            const match = result.line.id.match(/^(.+)-(\d+)$/);
+            if (match) lineIdx = parseInt(match[2], 10) + 1;
+          }
+        }
+
+        // Match "examine the desk"
+        const result = await matchInput({
+          input: 'examine the desk',
+          schema,
+          sceneMap,
+          sceneId: 'HOME',
+          lineIdx,
+          hasVariable: () => false,
+          useFuzzyFallback: false,
+        });
+
+        expect(result.matched).toBe(true);
+        expect(result.optionText).toBe('examine the desk');
+        expect(result.sceneId).toBe('DESK');
+      });
+
+      it('should match "look at the desk" alias', async () => {
+        const schema = parseIntoSchema(FULL_SCRIPT);
+        const sceneMap = constructSceneMap({ schema });
+
+        let lineIdx = 0;
+        const callbacks = {
+          setVariable: () => {},
+          unsetVariable: () => {},
+          hasVariable: () => false,
+        };
+
+        while (true) {
+          const result = step({ schema, sceneMap, sceneId: 'HOME', lineIdx, callbacks });
+          if (result.type === 'wait') break;
+          if (result.type === 'error' || result.type === 'end') break;
+          if (result.line) {
+            const match = result.line.id.match(/^(.+)-(\d+)$/);
+            if (match) lineIdx = parseInt(match[2], 10) + 1;
+          }
+        }
+
+        // Match using alias
+        const result = await matchInput({
+          input: 'look at the desk',
+          schema,
+          sceneMap,
+          sceneId: 'HOME',
+          lineIdx,
+          hasVariable: () => false,
+          useFuzzyFallback: false,
+        });
+
+        expect(result.matched).toBe(true);
+        expect(result.optionText).toBe('examine the desk');
+        expect(result.sceneId).toBe('DESK');
+      });
+
+      it('should match "yes" for take the key in DESK scene', async () => {
+        const schema = parseIntoSchema(FULL_SCRIPT);
+        const sceneMap = constructSceneMap({ schema });
+
+        // Step through DESK (without key)
+        let lineIdx = 0;
+        const callbacks = {
+          setVariable: () => {},
+          unsetVariable: () => {},
+          hasVariable: () => false,
+        };
+
+        while (true) {
+          const result = step({ schema, sceneMap, sceneId: 'DESK', lineIdx, callbacks });
+          if (result.type === 'wait') break;
+          if (result.type === 'error' || result.type === 'end') break;
+          if (result.line) {
+            const match = result.line.id.match(/^(.+)-(\d+)$/);
+            if (match) lineIdx = parseInt(match[2], 10) + 1;
+          }
+        }
+
+        const result = await matchInput({
+          input: 'yes',
+          schema,
+          sceneMap,
+          sceneId: 'DESK',
+          lineIdx,
+          hasVariable: () => false,
+          useFuzzyFallback: false,
+        });
+
+        expect(result.matched).toBe(true);
+        expect(result.optionText).toBe('take the key');
+        expect(result.sceneId).toBe('KEY');
+      });
+
+      it('should match "no" for don\'t take the key in DESK scene', async () => {
+        const schema = parseIntoSchema(FULL_SCRIPT);
+        const sceneMap = constructSceneMap({ schema });
+
+        let lineIdx = 0;
+        const callbacks = {
+          setVariable: () => {},
+          unsetVariable: () => {},
+          hasVariable: () => false,
+        };
+
+        while (true) {
+          const result = step({ schema, sceneMap, sceneId: 'DESK', lineIdx, callbacks });
+          if (result.type === 'wait') break;
+          if (result.type === 'error' || result.type === 'end') break;
+          if (result.line) {
+            const match = result.line.id.match(/^(.+)-(\d+)$/);
+            if (match) lineIdx = parseInt(match[2], 10) + 1;
+          }
+        }
+
+        const result = await matchInput({
+          input: 'no',
+          schema,
+          sceneMap,
+          sceneId: 'DESK',
+          lineIdx,
+          hasVariable: () => false,
+          useFuzzyFallback: false,
+        });
+
+        expect(result.matched).toBe(true);
+        expect(result.optionText).toBe("don't take the key");
+        // No goto, stays in DESK
+        expect(result.sceneId).toBe('DESK');
+        expect(result.narratives).toBeDefined();
+        expect(result.narratives![0].text).toContain('step back');
+      });
+
+      it('should match "go back" for leave in DESK scene', async () => {
+        const schema = parseIntoSchema(FULL_SCRIPT);
+        const sceneMap = constructSceneMap({ schema });
+
+        let lineIdx = 0;
+        const callbacks = {
+          setVariable: () => {},
+          unsetVariable: () => {},
+          hasVariable: () => false,
+        };
+
+        while (true) {
+          const result = step({ schema, sceneMap, sceneId: 'DESK', lineIdx, callbacks });
+          if (result.type === 'wait') break;
+          if (result.type === 'error' || result.type === 'end') break;
+          if (result.line) {
+            const match = result.line.id.match(/^(.+)-(\d+)$/);
+            if (match) lineIdx = parseInt(match[2], 10) + 1;
+          }
+        }
+
+        const result = await matchInput({
+          input: 'go back',
+          schema,
+          sceneMap,
+          sceneId: 'DESK',
+          lineIdx,
+          hasVariable: () => false,
+          useFuzzyFallback: false,
+        });
+
+        expect(result.matched).toBe(true);
+        expect(result.optionText).toBe('leave');
+        expect(result.sceneId).toBe('HOME');
+      });
     });
   });
 });

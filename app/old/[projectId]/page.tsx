@@ -4,9 +4,7 @@ import Box from '@/components/Box';
 import Editor from '@/components/Editor';
 import Branchbar from '@/components/Editor/Branchbar';
 import Header from '@/components/Header';
-import ProjectsSelector from '@/components/Header/ProjectsSelector';
 import Player from '@/components/Player';
-import { useTooltipTrigger } from '@/components/TooltipProvider';
 import { Id } from '@/convex/_generated/dataModel';
 import usePlayer from '@/lib/player';
 import { PlayerProvider } from '@/lib/player/PlayerProvider';
@@ -29,9 +27,6 @@ function ProjectContent() {
   }, [project.id]);
 
   /* Tooltips */
-  const jumpBackTooltip = useTooltipTrigger('Undo');
-  const restartTooltip = useTooltipTrigger('Restart');
-
   const handleMouseDown = useCallback(() => {
     isDragging.current = true;
     document.body.style.cursor = 'col-resize';
@@ -64,7 +59,6 @@ function ProjectContent() {
       <div className="flex items-center justify-between">
         <div className="flex gap-2 items-center">
           <Header />
-          <ProjectsSelector />
         </div>
         <div className="flex gap-1">
           <button onClick={() => window.open('/help', '_blank')} className="px-1">
@@ -85,7 +79,7 @@ function ProjectContent() {
         >
           <div className="p-3 h-full flex flex-col justify-between">
             <div className="flex items-center justify-between gap-1">
-              <h1 className="cursor-default">Guidebook</h1>
+              <h1 className="cursor-default">guidebook</h1>
             </div>
             {isMetalearning && (
               <span className="text-neutral-800/40 animate-pulse">(Updating guidebook...)</span>
@@ -147,7 +141,6 @@ export default function ProjectPage() {
       <div className="h-screen p-4 gap-2 flex flex-col">
         <div className="flex gap-2 items-center">
           <Header />
-          <ProjectsSelector />
         </div>
         <div className="flex-1 flex items-center justify-center">
           <p className="text-neutral-400">

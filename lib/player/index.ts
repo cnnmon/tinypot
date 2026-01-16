@@ -17,6 +17,126 @@ import {
 } from './utils/index';
 import { getAllowsForScene, getOptionsAtPosition } from './utils/matchInput/utils';
 
+/**
+ * Find the path of choices to reach a target line in the script.
+ * Returns an array of choice texts (using first alias if available).
+ */
+export function findReplayPath(script: string[], targetLineIdx: number): string[] {
+  // Find which scene the target line is in
+  let targetScene = 'START';
+  for (let i = targetLineIdx; i >= 0; i--) {
+    const line = script[i].trim();
+    if (line.startsWith('@')) {
+      targetScene = line.slice(1);
+      break;
+    }
+  }
+
+  // If target is in START, no choices needed to get there
+  if (targetScene === 'START') {
+    // Check if the target line itself is a choice (not a conditional)
+    const targetLine = script[targetLineIdx]?.trim();
+    if (targetLine?.startsWith('if ')) {
+      const afterIf = targetLine.slice(3).trim();
+      if (!afterIf.startsWith('[')) {
+        const parts = afterIf.split('|').map((p) => p.trim());
+        return [parts[1] || parts[0]]; // Use first alias or text
+      }
+    }
+    return [];
+  }
+
+  // Build a map of scenes and what choices lead to them
+  const sceneChoices: Map<string, { from: string; choice: string }[]> = new Map();
+  let currentScene = 'START';
+  let firstScene: string | null = null;
+
+  for (let i = 0; i < script.length; i++) {
+    const line = script[i].trim();
+
+    if (line.startsWith('@')) {
+      currentScene = line.slice(1);
+      if (!firstScene) firstScene = currentScene;
+      continue;
+    }
+
+    if (line.startsWith('if ')) {
+      const afterIf = line.slice(3).trim();
+      // Skip conditional blocks: "if [key]" or "if [!key]"
+      if (afterIf.startsWith('[')) continue;
+
+      const parts = afterIf.split('|').map((p) => p.trim());
+      const choiceInput = parts[1] || parts[0]; // First alias or text
+
+      // Look for goto in the next few indented lines
+      for (let j = i + 1; j < script.length; j++) {
+        const nextLine = script[j];
+        const nextTrimmed = nextLine.trim();
+
+        // Stop if we hit a non-indented line or new scene
+        if (nextTrimmed.startsWith('@') || nextTrimmed.startsWith('if ')) break;
+        if (!nextLine.match(/^\s/) && nextTrimmed) break;
+
+        if (nextTrimmed.startsWith('goto @')) {
+          const dest = nextTrimmed.slice(6).trim();
+          if (!sceneChoices.has(dest)) sceneChoices.set(dest, []);
+          sceneChoices.get(dest)!.push({ from: currentScene, choice: choiceInput });
+          break;
+        }
+      }
+    }
+  }
+
+  // BFS to find path from START to targetScene
+  // If the first scene is at the start (no content before it), treat it as equivalent to START
+  const visited = new Set<string>();
+  const startScenes = firstScene ? ['START', firstScene] : ['START'];
+  const queue: { scene: string; path: string[] }[] = startScenes.map((s) => ({
+    scene: s,
+    path: [],
+  }));
+
+  while (queue.length > 0) {
+    const { scene, path } = queue.shift()!;
+    if (scene === targetScene) {
+      // Check if the target line itself is a choice (not a conditional)
+      const targetLine = script[targetLineIdx]?.trim();
+      if (targetLine?.startsWith('if ')) {
+        const afterIf = targetLine.slice(3).trim();
+        if (!afterIf.startsWith('[')) {
+          const parts = afterIf.split('|').map((p) => p.trim());
+          return [...path, parts[1] || parts[0]];
+        }
+      }
+      return path;
+    }
+
+    if (visited.has(scene)) continue;
+    visited.add(scene);
+
+    // Find all scenes reachable from this scene
+    for (const [dest, routes] of sceneChoices) {
+      for (const route of routes) {
+        if (route.from === scene && !visited.has(dest)) {
+          queue.push({ scene: dest, path: [...path, route.choice] });
+        }
+      }
+    }
+  }
+
+  // Fallback: if target is a choice (not conditional), just return that choice
+  const targetLine = script[targetLineIdx]?.trim();
+  if (targetLine?.startsWith('if ')) {
+    const afterIf = targetLine.slice(3).trim();
+    if (!afterIf.startsWith('[')) {
+      const parts = afterIf.split('|').map((p) => p.trim());
+      return [parts[1] || parts[0]];
+    }
+  }
+
+  return [];
+}
+
 export enum Status {
   RUNNING = 'running',
   WAITING = 'waiting',
@@ -39,6 +159,9 @@ export default function usePlayer() {
 
   // Track previous reset key to detect changes
   const prevResetKeyRef = useRef(playerResetKey);
+
+  // Replay queue for auto-submitting choices
+  const replayQueueRef = useRef<string[]>([]);
 
   /* Dynamic states */
   const sceneMap = useMemo(
@@ -113,11 +236,11 @@ export default function usePlayer() {
   const handleNext = useCallback(() => {
     // Prevent double execution
     if (isSteppingRef.current) return;
-    
+
     // Prevent Strict Mode duplicates by tracking processed positions
     const positionKey = `${currentSceneId}-${currentLineIdx}`;
     if (lastProcessedRef.current === positionKey) return;
-    
+
     isSteppingRef.current = true;
     lastProcessedRef.current = positionKey;
 
@@ -147,7 +270,7 @@ export default function usePlayer() {
       // 'continue' type - add line and let the state update trigger next step
       addLine(nextMove.line);
     }
-    
+
     isSteppingRef.current = false;
   }, [state, currentSceneId, currentLineIdx, sceneMap, addLine, playthrough.snapshot, variables]);
 
@@ -156,6 +279,74 @@ export default function usePlayer() {
       handleNext();
     }
   }, [status, handleNext]);
+
+  // Fast matching for replay - skips LLM but shows narratives and processes metadata
+  const handleReplayMatch = useCallback(
+    async (input: string) => {
+      const result = await matchInput({
+        input,
+        schema: playthrough.snapshot,
+        sceneMap,
+        sceneId: currentSceneId,
+        lineIdx: currentLineIdx,
+        useFuzzyFallback: false,
+        hasVariable: variables.has,
+      });
+
+      if (result.matched) {
+        // Add player's choice line
+        addLine({
+          id: 'player',
+          sender: Sender.PLAYER,
+          text: input,
+        });
+
+        // Process metadata (sets/unsets) from the option's then block
+        if (result.metadata) {
+          for (const meta of result.metadata) {
+            if (meta.key === 'sets') {
+              variables.set(meta.value);
+            } else if (meta.key === 'unsets') {
+              variables.unset(meta.value);
+            }
+          }
+        }
+
+        // Add narratives from the option's then block
+        if (result.narratives) {
+          for (const narrative of result.narratives) {
+            addLine({
+              id: 'option-response',
+              sender: Sender.NARRATOR,
+              text: narrative.text,
+            });
+          }
+        }
+
+        if (result.sceneId === 'END') {
+          setState((prev) => ({ ...prev, status: Status.ENDED }));
+          return;
+        }
+        if (result.sceneId) {
+          lastProcessedRef.current = null;
+          setState({
+            currentSceneId: result.sceneId,
+            currentLineIdx: result.lineIdx ?? 0,
+            status: Status.RUNNING,
+          });
+        }
+      }
+    },
+    [playthrough.snapshot, sceneMap, currentSceneId, currentLineIdx, variables, addLine],
+  );
+
+  // Process replay queue when waiting for input
+  useEffect(() => {
+    if (status === Status.WAITING && replayQueueRef.current.length > 0) {
+      const nextChoice = replayQueueRef.current.shift()!;
+      handleReplayMatch(nextChoice);
+    }
+  }, [status, handleReplayMatch]);
 
   /* Player actions */
   const handleSubmit = useCallback(
@@ -211,6 +402,17 @@ export default function usePlayer() {
             sender: Sender.SYSTEM,
             text: `(Matched to "${result.optionText}" from cached alias "${result.cachedMatch.matchedAlias}")`,
           });
+        }
+
+        // Process metadata (sets/unsets) from the option's then block
+        if (result.metadata) {
+          for (const meta of result.metadata) {
+            if (meta.key === 'sets') {
+              variables.set(meta.value);
+            } else if (meta.key === 'unsets') {
+              variables.unset(meta.value);
+            }
+          }
         }
 
         // Add narratives from the option's `then` block
@@ -284,6 +486,7 @@ export default function usePlayer() {
 
           if (data.success && data.generatedOption) {
             const { text: optionText, aliases, then: thenLines, newScene } = data.generatedOption;
+            const generationTitle = data.title; // Short title like "Check key"
 
             // Capture base schema before applying generation
             const baseSchema = parseIntoSchema(project.script);
@@ -309,11 +512,12 @@ export default function usePlayer() {
               baseSchema,
               generatedSchema,
               project.script,
+              generationTitle,
             );
 
             // Only create/merge branch if there are actual changes
             if (branch.sceneIds.length > 0) {
-              addOrMergeBranch(branch, baseSchema, generatedSchema);
+              addOrMergeBranch(branch, baseSchema, generatedSchema, generationTitle);
             }
 
             setProject({ script: updatedScript });
@@ -408,6 +612,48 @@ export default function usePlayer() {
     lastProcessedRef.current = null;
   }
 
+  // Replay from a specific line, starting at the appropriate scene
+  // If choiceText is provided, queue it to be selected
+  // If preserveVariables is true, keep current variables instead of resetting
+  function replay(targetLineIdx: number, choiceText?: string, preserveVariables?: boolean) {
+    const targetLine = project.script[targetLineIdx]?.trim();
+    let startSceneId = 'START';
+
+    if (targetLine?.startsWith('@')) {
+      // Target is a scene - start directly there
+      startSceneId = targetLine.slice(1);
+      replayQueueRef.current = choiceText ? [choiceText] : [];
+    } else {
+      // Target is a choice - find which scene it's in and start there
+      for (let i = targetLineIdx; i >= 0; i--) {
+        const line = project.script[i]?.trim();
+        if (line?.startsWith('@')) {
+          startSceneId = line.slice(1);
+          break;
+        }
+      }
+      // Queue the choice to be selected
+      replayQueueRef.current = choiceText ? [choiceText] : [];
+    }
+
+    // Restart at the target scene, optionally preserve variables
+    setPlaythrough({
+      ...playthrough,
+      snapshot: JSON.parse(JSON.stringify(schema)),
+      lines: [],
+      createdAt: Date.now(),
+    });
+    setState({
+      status: Status.RUNNING,
+      currentSceneId: startSceneId,
+      currentLineIdx: 0,
+    });
+    if (!preserveVariables) {
+      variables.reset();
+    }
+    lastProcessedRef.current = null;
+  }
+
   // Jump to a specific point in history, slicing lines from there
   function handleJumpTo(historyIdx: number) {
     const slicedLines = playthrough.lines.slice(0, historyIdx);
@@ -445,15 +691,28 @@ export default function usePlayer() {
     // If no player lines, do nothing
   }
 
+  // Update a specific line's text (for inline editing)
+  function updateLineText(lineIdx: number, newText: string) {
+    setPlaythrough((prev) => ({
+      ...prev,
+      lines: prev.lines.map((line, i) => (i === lineIdx ? { ...line, text: newText } : line)),
+    }));
+  }
+
   return {
     status,
     lines: playthrough.lines,
     variables: variables.getAll(),
+    setVariable: variables.set,
+    unsetVariable: variables.unset,
+    hasVariable: variables.has,
     currentSceneId,
     handleNext,
     handleSubmit,
     handleRestart,
     handleJumpTo,
     handleJumpBack,
+    replay,
+    updateLineText,
   };
 }

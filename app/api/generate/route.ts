@@ -27,6 +27,7 @@ export type GenerationType = 'TEXT_ONLY' | 'LINK_SCENE' | 'NEW_FORK';
 export interface GenerateResponse {
   success: boolean;
   type: GenerationType;
+  title: string; // Short descriptive title for this generation (e.g., "Check key", "Look around")
   generatedOption: {
     text: string; // The option text (normalized from user input)
     aliases: string[]; // Alternative phrasings that should match this option
@@ -111,6 +112,7 @@ export async function POST(req: Request) {
     return Response.json({
       success: false,
       type: 'TEXT_ONLY',
+      title: '',
       generatedOption: null,
       error: 'No input provided',
     } satisfies GenerateResponse);
@@ -136,8 +138,8 @@ export async function POST(req: Request) {
 
   const variablesContext =
     currentVariables && currentVariables.length > 0
-      ? `\nCURRENT VARIABLES SET: ${currentVariables.join(', ')}`
-      : '';
+      ? `\nCURRENT PLAYER VARIABLES: ${currentVariables.join(', ')}\n(These are items/flags the player has acquired during gameplay)`
+      : '\nCURRENT PLAYER VARIABLES: (none)';
 
   const response = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
@@ -191,7 +193,22 @@ SYNTAX RULES (use these exactly):
 - Scene declarations: @SCENE_NAME
 - Navigation: goto @SCENE_NAME (or goto @END)
 - Choices: if Choice text | alias1 | alias2
+- Choices with effects: if Choice text -> +key (sets variable) or -> -key (unsets) or -> ?key (requires)
+- Conditional blocks: when [key] / when [!key] for content shown only when variable is/isn't set
 - Metadata: [key: value]
+
+VARIABLE SYSTEM:
+Variables are flags/items the player acquires (like "key", "sword", "talked_to_guard").
+- Use "+variablename" to SET a variable when player takes an action (e.g., picking up an item)
+- Use "-variablename" to UNSET a variable (e.g., using up an item)
+- Use "?variablename" to REQUIRE a variable (choice only available if player has it)
+- Use "when [variablename]" blocks to show different content based on what player has
+
+Example: if use key on door -> ?key means this choice requires the "key" variable.
+Example: if take the sword -> +sword means taking it sets the "sword" variable.
+
+Consider: Does this action require an item/flag the player should have obtained earlier?
+If so, add -> ?variablename to require it. If this action grants something, add -> +variablename.
 
 Respond in JSON format only:
 {
@@ -199,6 +216,11 @@ Respond in JSON format only:
   "reasoning": "<one sentence explaining your choice>",
   "optionText": "<clean, formal choice text that encapsulates the player's intent>",
   "narrative": ["<line 1>", "<line 2>", ...],
+  
+  // Variable effects (optional, use when appropriate):
+  "setsVariable": "<variable name to SET when this choice is taken>",
+  "unsetsVariable": "<variable name to UNSET>",
+  "requiresVariable": "<variable name required for this choice - player must have it>",
   
   // For LINK_SCENE only:
   "targetScene": "<existing scene label to jump to>",
@@ -216,7 +238,10 @@ Guidelines:
 - For NEW_FORK: create a memorable scene label and 2-4 lines of content
 - Match the author's tone and style
 - Keep narrative punchy and evocative
-- Use "goto @SCENE_NAME" syntax for navigation`,
+- Use "goto @SCENE_NAME" syntax for navigation
+- Consider variables: Does this action require something the player should have? Use requiresVariable.
+  Does it give them something? Use setsVariable. Does it use up something? Use unsetsVariable.
+- Look at existing patterns in the project to see how variables are used`,
       },
     ],
   });
@@ -229,6 +254,7 @@ Guidelines:
       return Response.json({
         success: false,
         type: 'TEXT_ONLY',
+        title: '',
         generatedOption: null,
         error: 'Failed to parse generation response',
       } satisfies GenerateResponse);
@@ -277,8 +303,15 @@ Guidelines:
     }
     // TEXT_ONLY has no jump - loops back to current decision point
 
-    // No aliases by default - just use the formal option text
-    const optionText = parsed.optionText || userInput;
+    // Build option text with variable effects using arrow syntax
+    const cleanOptionText = parsed.optionText || userInput;
+    const effects: string[] = [];
+    if (parsed.requiresVariable) effects.push(`?${parsed.requiresVariable}`);
+    if (parsed.setsVariable) effects.push(`+${parsed.setsVariable}`);
+    if (parsed.unsetsVariable) effects.push(`-${parsed.unsetsVariable}`);
+    // Full option text includes effects for the script
+    const optionTextWithEffects =
+      effects.length > 0 ? `${cleanOptionText} -> ${effects.join(' ')}` : cleanOptionText;
     const aliases: string[] = [];
 
     // Build new scene content for NEW_FORK
@@ -310,11 +343,18 @@ Guidelines:
       }
     }
 
+    // Create a short title from the option text (capitalize, truncate)
+    const shortTitle =
+      cleanOptionText.charAt(0).toUpperCase() +
+      cleanOptionText.slice(1, 30) +
+      (cleanOptionText.length > 30 ? '...' : '');
+
     return Response.json({
       success: true,
       type: responseType,
+      title: shortTitle,
       generatedOption: {
-        text: parsed.optionText || userInput,
+        text: optionTextWithEffects,
         aliases,
         then: thenLines,
         newScene,
@@ -324,6 +364,7 @@ Guidelines:
     return Response.json({
       success: false,
       type: 'TEXT_ONLY',
+      title: '',
       generatedOption: null,
       error: 'Failed to generate content',
     } satisfies GenerateResponse);

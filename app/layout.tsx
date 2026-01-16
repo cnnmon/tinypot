@@ -1,12 +1,12 @@
 import ConvexClientProvider from '@/components/ConvexClientProvider';
 import { TooltipProvider } from '@/components/TooltipProvider';
-import { ProjectKeysProvider } from '@/lib/project/ProjectKeysProvider';
+import { ProjectsProvider } from '@/lib/project/ProjectsProvider';
 import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'bonsai',
-  description: 'to grow your bonsai',
+  description: 'shape a game that grows by itself',
 };
 
 export default function RootLayout({
@@ -18,9 +18,9 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <ConvexClientProvider>
-          <ProjectKeysProvider>
+          <ProjectsProvider>
             <TooltipProvider>{children}</TooltipProvider>
-          </ProjectKeysProvider>
+          </ProjectsProvider>
         </ConvexClientProvider>
       </body>
     </html>

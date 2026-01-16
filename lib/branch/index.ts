@@ -175,18 +175,20 @@ function computeSchemaDiff(
 /**
  * Create a branch by comparing base and generated schemas.
  * Only stores scenes that changed.
+ * @param title - Short descriptive title for this generation (e.g., "Check key")
  */
 export function createBranch(
   playthroughId: string,
   baseSchema: Schema,
   generatedSchema: Schema,
   baseScript: string[],
+  title?: string,
 ): Branch {
   const { base, generated, affectedSceneIds } = computeSchemaDiff(baseSchema, generatedSchema);
 
   return {
     id: crypto.randomUUID(),
-    title: generateBranchTitle(affectedSceneIds),
+    title: title || generateBranchTitle(affectedSceneIds),
     playthroughId,
     sceneIds: affectedSceneIds,
     base,
@@ -200,11 +202,13 @@ export function createBranch(
  * Merge new changes into an existing branch.
  * Uses the CURRENT state (before this generation) as the new base,
  * so only the latest changes are highlighted as "new".
+ * @param newTitle - Short descriptive title for this new generation
  */
 export function mergeBranchChanges(
   existingBranch: Branch,
   baseSchema: Schema,
   generatedSchema: Schema,
+  newTitle?: string,
 ): Branch {
   const {
     base: newBase,
@@ -232,9 +236,14 @@ export function mergeBranchChanges(
     }
   }
 
+  // Concatenate titles: "Check key, Look around"
+  const combinedTitle = newTitle
+    ? existingBranch.title + ', ' + newTitle
+    : existingBranch.title;
+
   return {
     ...existingBranch,
-    title: generateBranchTitle(newAffectedIds), // Title reflects only NEW changes
+    title: combinedTitle,
     sceneIds: updatedSceneIds,
     base: updatedBase,
     generated: updatedGenerated,

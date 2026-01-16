@@ -4,10 +4,12 @@ import Item from './Item';
 
 export default function List() {
   const { branches, unresolvedBranches, setSelectedBranchId } = useProject();
-  
-  // Sort unresolved branches newest first - must revert in this order
-  const sortedUnresolvedBranches = [...unresolvedBranches].sort((a, b) => b.createdAt - a.createdAt);
-  
+
+  // Sort unresolved branches newest first - must discard in this order
+  const sortedUnresolvedBranches = [...unresolvedBranches].sort(
+    (a, b) => b.createdAt - a.createdAt,
+  );
+
   const resolvedBranches = branches
     .filter((b) => isResolved(b))
     .sort((a, b) => b.createdAt - a.createdAt); // Recent first
