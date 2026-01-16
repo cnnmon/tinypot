@@ -9,7 +9,7 @@ export default function HelpPage() {
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold">How it Works</h1>
           <p className="text-neutral-600">
-            Tinypot is a tool for creating interactive fiction through a mix of manual authoring and
+            Bonsai is a tool for creating interactive fiction through a mix of manual authoring and
             AI-assisted generation.
           </p>
         </div>

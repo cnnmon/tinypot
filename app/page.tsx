@@ -8,15 +8,8 @@ import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const router = useRouter();
-  const {
-    createProject,
-    deleteProject,
-    renameProject,
-    projectKeys,
-    projects,
-    publicProjects,
-    isLoading,
-  } = useProjects();
+  const { createProject, deleteProject, renameProject, projectKeys, projects, isLoading } =
+    useProjects();
 
   const yourProjects = projects.filter((p) => projectKeys.includes(p._id));
 
@@ -27,12 +20,20 @@ export default function Home() {
       </div>
 
       <div className="flex-1 flex justify-start flex-col gap-4">
-        <button
-          onClick={() => createProject()}
-          className="w-fit bg-[var(--mint)] hover:bg-black hover:text-white"
-        >
-          + New game
-        </button>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => createProject()}
+            className="w-fit bg-[var(--mint)] hover:bg-black hover:text-white"
+          >
+            + new game
+          </button>
+          <button
+            onClick={() => router.push('/help')}
+            className="w-fit hover:bg-black hover:text-white"
+          >
+            help
+          </button>
+        </div>
         <div>
           <h1>Your games</h1>
           {isLoading && (
