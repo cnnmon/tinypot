@@ -2,7 +2,6 @@
 
 import Header from '@/components/Header';
 import { useProjects } from '@/lib/project/ProjectsProvider';
-import { decodeShareId } from '@/lib/share';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 
@@ -91,7 +90,7 @@ export default function Home() {
             ].map((project) => (
               <button
                 key={project.shareId}
-                onClick={() => router.push(`/edit/${decodeShareId(project.shareId)}`)}
+                onClick={() => router.push(`/play/${project.shareId}`)}
                 className="w-fit"
               >
                 {project.name}
