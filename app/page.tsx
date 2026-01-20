@@ -88,7 +88,7 @@ export default function Home() {
               <button
                 key={project.shareId}
                 onClick={() => router.push(`/play/${project.shareId}`)}
-                className="w-fit"
+                className="text-left hover:bg-gray-100 cursor-pointer"
               >
                 {project.name}
               </button>
