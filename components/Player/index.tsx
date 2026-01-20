@@ -52,7 +52,7 @@ export default function Player() {
       </div>
 
       {/* Lines */}
-      <div className="space-y-2 flex flex-col relative justify-between h-full pt-3">
+      <div className="space-y-2 flex flex-col relative justify-between pt-3">
         <div ref={scrollRef} className="flex flex-col gap-2 h-full overflow-scroll">
           {lines.map((line, i) => {
             const isPlayer = line.sender === Sender.PLAYER;

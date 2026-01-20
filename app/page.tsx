@@ -46,27 +46,24 @@ export default function Home() {
             {yourProjects.map((project) => (
               <div
                 key={project._id}
-                className="flex items-center justify-between gap-1 group hover:bg-gray-100"
+                onClick={() => router.push(`/edit/${project._id}`)}
+                className="flex items-center justify-between gap-1 group hover:bg-gray-100 cursor-pointer"
               >
-                <button
-                  onClick={() => router.push(`/edit/${project._id}`)}
-                  className="w-fit flex items-center justify-between gap-1"
-                >
-                  {project.name}
-                </button>
+                <span>{project.name}</span>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    onClick={() =>
+                    onClick={(e) => {
+                      e.stopPropagation();
                       renameProject(
                         project._id,
                         prompt('Enter new name', project.name) ?? project.name,
-                      )
-                    }
+                      );
+                    }}
                   >
                     <PencilIcon className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={async (e) => {
+                    onClick={(e) => {
                       e.stopPropagation();
                       if (confirm(`Are you sure you want to delete ${project.name}?`)) {
                         deleteProject(project._id);
