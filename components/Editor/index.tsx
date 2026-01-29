@@ -15,12 +15,7 @@ import {
   branchHighlightTheme,
   setBranchHighlight,
 } from './utils/branchHighlight';
-import {
-  bonsaiHighlighting,
-  bonsaiSyntaxTheme,
-  bonsaiTheme,
-  lineHighlighterPlugin,
-} from './utils/theme';
+import { bonsaiHighlighting, bonsaiSyntaxTheme, bonsaiTheme, lineHighlighterPlugin } from './utils/theme';
 
 // Compartment for dynamically toggling read-only mode
 const readOnlyCompartment = new Compartment();
@@ -134,7 +129,7 @@ export default function Editor({
     return selectedBranch ? isResolved(selectedBranch) && selectedBranch.approved === false : false;
   }, [selectedBranch]);
 
-  // For rejected branches, reconstruct the script with generated content
+  // For rejected branches, reconstruct with generated content
   const displayScript = useMemo(() => {
     if (isViewingRejected && selectedBranch?.baseScript && selectedBranch.generated) {
       return reconstructScriptWithGenerated(
@@ -205,7 +200,7 @@ export default function Editor({
     const currentContent = view.state.doc.toString();
     const newContent = displayScript.join('\n');
 
-    // Always update when viewing rejected (to show generated content)
+    // Always update when viewing rejected (to show snapshot content)
     // Otherwise only update when not focused
     if (currentContent !== newContent && (isViewingRejected || !view.hasFocus)) {
       view.dispatch({
@@ -220,9 +215,7 @@ export default function Editor({
     if (!view) return;
 
     view.dispatch({
-      effects: readOnlyCompartment.reconfigure(
-        EditorState.readOnly.of(readOnly || isViewingRejected),
-      ),
+      effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly || isViewingRejected)),
     });
   }, [readOnly, isViewingRejected]);
 

@@ -49,13 +49,7 @@ function quadraticPoint(p0: Point, p1: Point, p2: Point, t: number): Point {
   };
 }
 
-export default function Branch({
-  width = 65,
-  height = 71,
-  seed,
-  color = 'currentColor',
-  className,
-}: BranchProps) {
+export default function Branch({ width = 65, height = 71, seed, color = 'currentColor', className }: BranchProps) {
   const paths = useMemo(() => {
     const random = seededRandom(seed);
     const lines: string[] = [];
@@ -73,9 +67,7 @@ export default function Branch({
       end: { x: baseX + curve, y: tipY },
     };
 
-    lines.push(
-      `M ${stem.start.x} ${stem.start.y} Q ${stem.ctrl.x} ${stem.ctrl.y} ${stem.end.x} ${stem.end.y}`,
-    );
+    lines.push(`M ${stem.start.x} ${stem.start.y} Q ${stem.ctrl.x} ${stem.ctrl.y} ${stem.end.x} ${stem.end.y}`);
 
     // Pick decoration type randomly
     const pickDecoration = (): 'leaf' | 'flower' => {

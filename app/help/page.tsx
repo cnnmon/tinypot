@@ -9,8 +9,8 @@ export default function HelpPage() {
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-bold">How it Works</h1>
           <p className="text-neutral-600">
-            Bonsai is a tool for creating interactive fiction through a mix of manual authoring and
-            AI-assisted generation.
+            Bonsai is a tool for creating interactive fiction through a mix of manual authoring and AI-assisted
+            generation.
           </p>
         </div>
 
@@ -26,8 +26,8 @@ export default function HelpPage() {
               <div>
                 <p className="font-medium">Author your story</p>
                 <p className="text-sm text-neutral-600">
-                  Write directly in the script editor using markup, or playtest and click on any
-                  text to edit it permanently.
+                  Write directly in the script editor using markup, or playtest and click on any text to edit it
+                  permanently.
                 </p>
               </div>
             </div>
@@ -39,8 +39,8 @@ export default function HelpPage() {
               <div>
                 <p className="font-medium">Play to explore</p>
                 <p className="text-sm text-neutral-600">
-                  Navigate your story as a player. Your input will match defined choices, or the AI
-                  will generate new branches. Other players can explore too!
+                  Navigate your story as a player. Your input will match defined choices, or the AI will generate new
+                  branches. Other players can explore too!
                 </p>
               </div>
             </div>
@@ -52,8 +52,8 @@ export default function HelpPage() {
               <div>
                 <p className="font-medium">Prune your branches</p>
                 <p className="text-sm text-neutral-600">
-                  Review AI-generated changes, edit them, then approve or discard. Only the latest
-                  unresolved branch can be discarded, so work through them in order.
+                  Review AI-generated changes, edit them, then approve or discard. Only the latest unresolved branch can
+                  be discarded, so work through them in order.
                 </p>
               </div>
             </div>
@@ -65,8 +65,8 @@ export default function HelpPage() {
               <div>
                 <p className="font-medium">Check the guidebook</p>
                 <p className="text-sm text-neutral-600">
-                  The guidebook automatically learns your preferences from edits. Check it
-                  occasionally to ensure it&apos;s on track, or edit it directly.
+                  The guidebook automatically learns your preferences from edits. Check it occasionally to ensure
+                  it&apos;s on track, or edit it directly.
                 </p>
               </div>
             </div>
@@ -122,19 +122,18 @@ The flowers sway gently.`}
           <div>
             <h3 className="font-medium">Variable Effects</h3>
             <p className="text-sm text-neutral-600 mb-2">
-              Use <code>-&gt;</code> after a choice to add effects: <code>+var</code> sets,{' '}
-              <code>-var</code> unsets, <code>?var</code> requires.
+              Use <code>+var</code> to set a variable, <code>-var</code> to unset, and <code>& ?var</code> after a
+              choice to require it.
             </p>
             <pre className="bg-white/60 p-3 rounded text-sm font-mono border">
-              {`if take the key -> +key
+              {`if take the key
+    +key
     Yoink! You pocket the key.
 
-if unlock the door -> ?key
+if unlock the door & ?key
+    -key
     You use your key to unlock it.
-    goto @SECRET_ROOM
-
-if drop the key -> -key
-    You toss the key aside.`}
+    goto @SECRET_ROOM`}
             </pre>
           </div>
 
@@ -142,14 +141,15 @@ if drop the key -> -key
           <div>
             <h3 className="font-medium">Conditional Blocks</h3>
             <p className="text-sm text-neutral-600 mb-2">
-              Use <code>when [var]</code> to show content only when a variable is set. Use{' '}
-              <code>when [!var]</code> for the opposite.
+              Use <code>when [var]</code> to show content only when a variable is set. Use <code>when [!var]</code> for
+              the opposite.
             </p>
             <pre className="bg-white/60 p-3 rounded text-sm font-mono border">
               {`@DESK
 when [!key]
     There's a key on the desk.
-    if take it -> +key
+    if take it
+        +key
         You grab the key.
 
 when [key]
@@ -174,13 +174,14 @@ The garden is beautiful.`}
           <div>
             <h3 className="font-medium">Indentation</h3>
             <p className="text-sm text-neutral-600 mb-2">
-              Use tabs to nest content under choices and conditions. Everything indented under an{' '}
-              <code>if</code> or <code>when</code> belongs to that block.
+              Use tabs to nest content under choices and conditions. Everything indented under an <code>if</code> or{' '}
+              <code>when</code> belongs to that block.
             </p>
             <pre className="bg-white/60 p-3 rounded text-sm font-mono border">
               {`when [!key]
     Oh lookee, there's a key!
-    if take it | yes -> +key
+    if take it | yes
+        +key
         Yoink!
     if leave it | no
         You step back.`}
@@ -197,10 +198,7 @@ The garden is beautiful.`}
             </li>
             <li>Synonyms in choices make your game more forgiving to players.</li>
             <li>Generated branches appear in the branch panel — review and prune regularly.</li>
-            <li>
-              The guidebook learns from your edits to generated content, making future generations
-              better.
-            </li>
+            <li>The guidebook learns from your edits to generated content, making future generations better.</li>
           </ul>
         </section>
       </div>

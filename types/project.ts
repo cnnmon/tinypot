@@ -1,9 +1,7 @@
-/**
- * Types for projects.
- */
+import { Id } from '@/convex/_generated/dataModel';
 
 export type Project = {
-  id: string;
+  id: Id<'projects'>;
   authorId: string;
   name: string;
   description: string;

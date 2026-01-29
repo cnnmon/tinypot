@@ -6,367 +6,174 @@
 
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
-import {
-  captureAuthoredScenes,
-  computeSceneToBranchMap,
-  isResolved,
-  mergeBranchChanges,
-  recordsEqual,
-} from '@/lib/branch';
-import { runJob } from '@/lib/jobs';
-import { MetalearningResult, runMetalearning } from '@/lib/jobs/metalearning';
-import { Branch, SceneId } from '@/types/branch';
-import { Schema } from '@/types/schema';
+import { Branch } from '@/types/branch';
+import { Entity } from '@/types/entities';
+import { Project } from '@/types/project';
+import { Version } from '@/types/version';
 import { useMutation, useQuery } from 'convex/react';
-import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { DEFAULT_LINES } from './constants';
-import { parseIntoSchema } from './parser';
 
-// Branch with Convex ID
-interface ConvexBranch extends Branch {
-  _id: Id<'branches'>;
-}
+type SaveStatus = 'idle' | 'saving' | 'saved';
 
 interface ProjectContextValue {
-  projectId: Id<'projects'>;
-  project: {
-    id: string;
+  project: Project;
+  updateProject: (updates: Partial<Project>, creator?: Entity.AUTHOR | Entity.SYSTEM) => void;
+  versions: Version[];
+  saveStatus: SaveStatus;
+  selectedVersionId: string | null;
+  setSelectedVersionId: (id: string | null) => void;
+  /** Get the diff scripts for a selected version: [before, after] */
+  getDiffScripts: () => { before: string[]; after: string[] } | null;
+  // Legacy branch fields (empty stubs for Editor compatibility)
+  branches: Branch[];
+  sceneToBranchMap: Record<string, string>;
+  selectedBranchId: string | null;
+}
+
+const ProjectContext = createContext<ProjectContextValue | null>(null);
+
+// Debounce delay for creating versions (ms)
+const VERSION_DEBOUNCE_MS = 2000;
+
+export function ProjectProvider({ children, projectId }: { children: ReactNode; projectId: Id<'projects'> }) {
+  // Convex queries
+  const convexProject = useQuery(api.projects.get, { projectId });
+  // @ts-expect-error - versions module may not be in generated types yet
+  const convexVersions = useQuery(api.versions?.list, { projectId }) as
+    | { _id: Id<'versions'>; creator: string; createdAt: number; snapshot: { script: string[]; guidebook: string } }[]
+    | undefined;
+  const updateProjectMutation = useMutation(api.projects.update);
+  // @ts-expect-error - versions module may not be in generated types yet
+  const createVersionMutation = useMutation(api.versions?.create) as
+    | ((args: {
+        projectId: Id<'projects'>;
+        creator: string;
+        snapshot: { script: string[]; guidebook: string };
+      }) => Promise<unknown>)
+    | undefined;
+
+  // Save status for UI feedback
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const versionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedSnapshotRef = useRef<{ script: string[]; guidebook: string } | null>(null);
+
+  // Selected version for diff viewing
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+
+  // Local project state - only initialize AFTER convexProject is loaded
+  // This prevents the DEFAULT_LINES from ever being used when we have real data
+  const [project, setProject] = useState<{
     authorId: string;
     name: string;
     description: string;
     script: string[];
     guidebook: string;
-  };
-  setProject: (updates: { name?: string; script?: string[]; guidebook?: string }) => void;
-  recordGuidebookChanges: (oldGuidebook: string, newGuidebook: string) => void;
-  schema: Schema;
+  } | null>(null);
 
-  // Branch state
-  branches: ConvexBranch[];
-  unresolvedBranches: ConvexBranch[];
-  selectedBranchId: string | null;
-  setSelectedBranchId: (id: string | null) => void;
-  sceneToBranchMap: Record<SceneId, string>;
+  // Sync from Convex when data arrives
+  useEffect(() => {
+    if (convexProject) {
+      setProject({
+        authorId: convexProject.authorId,
+        name: convexProject.name,
+        description: convexProject.description,
+        script: convexProject.script,
+        guidebook: convexProject.guidebook,
+      });
+    }
+  }, [convexProject]);
 
-  // Branch actions
-  addOrMergeBranch: (
-    branch: Branch,
-    baseSchema: Schema,
-    generatedSchema: Schema,
-    generationTitle?: string,
-  ) => void;
-  approveBranch: (branchId: string) => void;
-  rejectBranch: (branchId: string, shouldRevert: boolean) => void;
-  isMetalearning: boolean;
+  // Initialize lastSavedSnapshot from most recent version or current project
+  useEffect(() => {
+    if (lastSavedSnapshotRef.current) return; // Already initialized
+    if (convexVersions && convexVersions.length > 0) {
+      lastSavedSnapshotRef.current = convexVersions[0].snapshot;
+    } else if (convexProject) {
+      lastSavedSnapshotRef.current = { script: convexProject.script, guidebook: convexProject.guidebook };
+    }
+  }, [convexVersions, convexProject]);
 
-  // Player reset trigger - changes when player should reset
-  playerResetKey: number;
+  // Transform Convex versions to our Version type
+  const versions: Version[] = (convexVersions ?? []).map((v) => ({
+    id: v._id,
+    creator: v.creator as Entity.AUTHOR | Entity.SYSTEM,
+    createdAt: v.createdAt,
+    snapshot: v.snapshot,
+  }));
 
-  // Read-only mode (for play page)
-  readOnly: boolean;
-}
+  // Track pending creator for debounced version creation
+  const pendingCreatorRef = useRef<Entity.AUTHOR | Entity.SYSTEM>(Entity.AUTHOR);
 
-const ProjectContext = createContext<ProjectContextValue | null>(null);
+  // Update project with debounced version creation
+  const updateProject = useCallback(
+    (updates: Partial<Project>, creator: Entity.AUTHOR | Entity.SYSTEM = Entity.AUTHOR) => {
+      const newProject = { ...project, ...updates };
+      setProject(newProject);
+      pendingCreatorRef.current = creator;
 
-export function ProjectProvider({
-  children,
-  projectId,
-  readOnly = false,
-}: {
-  children: ReactNode;
-  projectId: Id<'projects'>;
-  readOnly?: boolean;
-}) {
-  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
-  const [isMetalearning, setIsMetalearning] = useState(false);
-  const [playerResetKey, setPlayerResetKey] = useState(0);
+      // Show saving status
+      setSaveStatus('saving');
 
-  // Convex mutations
-  const updateProjectMutation = useMutation(api.projects.update);
-  const createBranchMutation = useMutation(api.branches.create);
-  const updateBranchMutation = useMutation(api.branches.update);
-  const createGuidebookChangeMutation = useMutation(api.guidebookChanges.create);
-  const createManyGuidebookChangesMutation = useMutation(api.guidebookChanges.createMany);
+      // Clear existing timeouts
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (versionTimeoutRef.current) clearTimeout(versionTimeoutRef.current);
 
-  // Convex queries
-  const convexProject = useQuery(api.projects.get, { projectId });
-  const convexBranches = useQuery(api.branches.list, { projectId });
+      // Debounce the actual save
+      saveTimeoutRef.current = setTimeout(() => {
+        updateProjectMutation({
+          projectId,
+          ...newProject,
+        });
+        setSaveStatus('saved');
 
-  // Local state for optimistic updates
-  const [localScript, setLocalScript] = useState<string[] | null>(null);
-  const [localGuidebook, setLocalGuidebook] = useState<string | null>(null);
+        // Reset to idle after a bit
+        setTimeout(() => setSaveStatus('idle'), 1500);
+      }, 300);
 
-  // Derive project from Convex data or defaults
-  const project = useMemo(() => {
+      // Debounce version creation (longer delay)
+      versionTimeoutRef.current = setTimeout(() => {
+        const snapshot = { script: newProject.script, guidebook: newProject.guidebook };
+        const lastSnapshot = lastSavedSnapshotRef.current;
+
+        // Only create version if content actually changed
+        if (
+          !lastSnapshot ||
+          lastSnapshot.script.join('\n') !== snapshot.script.join('\n') ||
+          lastSnapshot.guidebook !== snapshot.guidebook
+        ) {
+          createVersionMutation?.({
+            projectId,
+            creator: pendingCreatorRef.current,
+            snapshot,
+          });
+          lastSavedSnapshotRef.current = snapshot;
+        }
+      }, VERSION_DEBOUNCE_MS);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [project, projectId, updateProjectMutation],
+  );
+
+  // Get diff scripts for selected version: compare previous version to this one
+  const getDiffScripts = useCallback((): { before: string[]; after: string[] } | null => {
+    if (!selectedVersionId) return null;
+    const versionIdx = versions.findIndex((v) => v.id === selectedVersionId);
+    if (versionIdx === -1) return null;
+
+    const selectedVersion = versions[versionIdx];
+    // Versions are sorted desc (newest first), so "before" is the next item in array
+    const previousVersion = versions[versionIdx + 1];
+
     return {
-      id: projectId,
-      authorId: convexProject?.authorId ?? 'default-author',
-      name: convexProject?.name ?? 'My Project',
-      description: convexProject?.description ?? '',
-      script: localScript ?? convexProject?.script ?? DEFAULT_LINES,
-      guidebook: localGuidebook ?? convexProject?.guidebook ?? '',
+      before: previousVersion?.snapshot.script ?? [],
+      after: selectedVersion.snapshot.script,
     };
-  }, [convexProject, projectId, localScript, localGuidebook]);
-
-  const guidebook = project.guidebook;
-
-  // Update project (name, script, or guidebook)
-  const setProject = useCallback(
-    (updates: { name?: string; script?: string[]; guidebook?: string }) => {
-      // Skip mutations in read-only mode
-      if (readOnly) return;
-
-      // Optimistic update for script and guidebook
-      if (updates.script !== undefined) setLocalScript(updates.script);
-      if (updates.guidebook !== undefined) setLocalGuidebook(updates.guidebook);
-
-      // Persist to Convex
-      updateProjectMutation({
-        projectId,
-        ...updates,
-      });
-    },
-    [projectId, updateProjectMutation, readOnly],
-  );
-
-  // Record guidebook changes for analytics (call on blur with baseline value)
-  const recordGuidebookChanges = useCallback(
-    (oldGuidebook: string, newGuidebook: string) => {
-      if (readOnly) return;
-      if (oldGuidebook === newGuidebook) return;
-
-      const oldLines = oldGuidebook
-        .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0);
-      const newLines = newGuidebook
-        .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0);
-
-      // Compute changes
-      type Change = {
-        action: 'add' | 'update' | 'delete';
-        rule: string;
-        previousRule?: string;
-      };
-      const changes: Change[] = [];
-
-      // Find deleted and updated rules
-      for (const oldRule of oldLines) {
-        if (!newLines.includes(oldRule)) {
-          // Check if it was updated (fuzzy match by position or similarity)
-          const oldIdx = oldLines.indexOf(oldRule);
-          if (oldIdx < newLines.length && !oldLines.includes(newLines[oldIdx])) {
-            // Rule at same position changed - likely an update
-            changes.push({ action: 'update', rule: newLines[oldIdx], previousRule: oldRule });
-          } else {
-            changes.push({ action: 'delete', rule: oldRule });
-          }
-        }
-      }
-
-      // Find added rules (not in old, not already marked as update target)
-      const updateTargets = new Set(
-        changes.filter((c) => c.action === 'update').map((c) => c.rule),
-      );
-      for (const newRule of newLines) {
-        if (!oldLines.includes(newRule) && !updateTargets.has(newRule)) {
-          changes.push({ action: 'add', rule: newRule });
-        }
-      }
-
-      // Record changes if any
-      if (changes.length > 0) {
-        createManyGuidebookChangesMutation({
-          projectId,
-          changes,
-          source: 'manual',
-        });
-      }
-    },
-    [createManyGuidebookChangesMutation, projectId, readOnly],
-  );
-
-  // Schema from project script
-  const schema = useMemo(() => {
-    return parseIntoSchema(project.script);
-  }, [project.script]);
-
-  // Convert Convex branches to our Branch type
-  const branches: ConvexBranch[] = useMemo(() => {
-    if (!convexBranches) return [];
-    return convexBranches.map((b) => ({
-      _id: b._id,
-      id: b._id, // Use Convex ID as the branch ID
-      title: b.title,
-      playthroughId: b.playthroughId,
-      sceneIds: b.sceneIds,
-      base: b.base as Branch['base'],
-      generated: b.generated as Branch['generated'],
-      authored: b.authored as Branch['authored'],
-      baseScript: b.baseScript,
-      approved: b.approved,
-      metalearning: b.metalearning,
-      createdAt: b.createdAt,
-    }));
-  }, [convexBranches]);
-
-  // Compute unresolved branches
-  const unresolvedBranches = useMemo(() => {
-    return branches.filter((b) => !isResolved(b));
-  }, [branches]);
-
-  // Compute scene-to-branch mapping for highlighting
-  const sceneToBranchMap = useMemo(() => {
-    return computeSceneToBranchMap(unresolvedBranches);
-  }, [unresolvedBranches]);
-
-  // Kick off metalearning job after branch resolution
-  const startMetalearningJob = useCallback(
-    (resolvedBranch: ConvexBranch) => {
-      setIsMetalearning(true);
-
-      runJob(
-        `metalearning-${resolvedBranch.id}`,
-        () => runMetalearning(resolvedBranch._id, resolvedBranch, guidebook),
-        {
-          onComplete: (result: MetalearningResult) => {
-            // Use the intelligently updated guidebook
-            setProject({ guidebook: result.updatedGuidebook });
-
-            // Update branch with the new rule (for display)
-            updateBranchMutation({
-              branchId: resolvedBranch._id,
-              metalearning: result.newRule || '',
-            });
-
-            // Record guidebook change for analytics
-            if (result.action !== 'none' && result.newRule) {
-              createGuidebookChangeMutation({
-                projectId,
-                branchId: resolvedBranch._id,
-                action: result.action,
-                rule: result.newRule,
-                previousRule: result.previousRule,
-                source: 'metalearning',
-              });
-            }
-
-            setIsMetalearning(false);
-          },
-          onError: (error) => {
-            console.error('Metalearning failed:', error);
-            setIsMetalearning(false);
-          },
-        },
-      );
-    },
-    [guidebook, setProject, updateBranchMutation, createGuidebookChangeMutation, projectId],
-  );
-
-  // Add or merge branch - one branch per playthrough
-  const addOrMergeBranch = useCallback(
-    (branch: Branch, baseSchema: Schema, generatedSchema: Schema, generationTitle?: string) => {
-      if (readOnly) return;
-
-      // Check if there's already an unresolved branch for this playthrough
-      const existingBranch = branches.find(
-        (b) => b.playthroughId === branch.playthroughId && !isResolved(b),
-      );
-
-      if (existingBranch) {
-        // Merge new changes into existing branch (concatenates titles)
-        const mergedBranch = mergeBranchChanges(
-          existingBranch,
-          baseSchema,
-          generatedSchema,
-          generationTitle,
-        );
-        updateBranchMutation({
-          branchId: existingBranch._id,
-          title: mergedBranch.title,
-          sceneIds: mergedBranch.sceneIds,
-          base: mergedBranch.base,
-          generated: mergedBranch.generated,
-        });
-        setSelectedBranchId(existingBranch.id);
-      } else {
-        // Create new branch
-        createBranchMutation({
-          projectId,
-          playthroughId: branch.playthroughId,
-          title: branch.title,
-          sceneIds: branch.sceneIds,
-          base: branch.base,
-          generated: branch.generated,
-          baseScript: branch.baseScript,
-          createdAt: branch.createdAt,
-        }).then((newBranch) => {
-          if (newBranch) {
-            setSelectedBranchId(newBranch._id);
-          }
-        });
-      }
-    },
-    [projectId, branches, updateBranchMutation, createBranchMutation, readOnly],
-  );
-
-  // Approve branch - capture authored scenes and mark as approved
-  const approveBranch = useCallback(
-    (branchId: string) => {
-      const branch = branches.find((b) => b.id === branchId);
-      if (!branch) return;
-
-      const authored = captureAuthoredScenes(branch, schema);
-
-      updateBranchMutation({
-        branchId: branch._id,
-        authored,
-        approved: true,
-      });
-
-      setSelectedBranchId(null);
-
-      // Only run metalearning if there are meaningful edits (authored differs from generated)
-      const hasMeaningfulEdits = !recordsEqual(authored, branch.generated);
-      if (hasMeaningfulEdits) {
-        startMetalearningJob({ ...branch, authored, approved: true });
-      }
-    },
-    [branches, schema, updateBranchMutation, startMetalearningJob],
-  );
-
-  // Delete branch - optionally discard to base script
-  // Rejects NEVER trigger metalearning (only accept with edits does)
-  const rejectBranch = useCallback(
-    (branchId: string, shouldRevert: boolean) => {
-      const branch = branches.find((b) => b.id === branchId);
-      if (!branch) return;
-
-      if (shouldRevert && branch.baseScript) {
-        // Revert to original script before generation
-        setProject({ script: branch.baseScript });
-      }
-
-      const authored = shouldRevert ? { ...branch.base } : captureAuthoredScenes(branch, schema);
-
-      updateBranchMutation({
-        branchId: branch._id,
-        authored,
-        approved: false,
-      });
-
-      setSelectedBranchId(null);
-
-      // Reset the player
-      setPlayerResetKey((k) => k + 1);
-    },
-    [branches, schema, setProject, updateBranchMutation],
-  );
+  }, [selectedVersionId, versions]);
 
   // Show loading state while project data is loading
-  if (convexProject === undefined) {
+  if (convexProject === undefined || project === null) {
     return (
       <div className="h-screen flex items-center justify-center">
         <p className="text-neutral-400">loading project...</p>
@@ -386,22 +193,20 @@ export function ProjectProvider({
   return (
     <ProjectContext.Provider
       value={{
-        projectId,
-        project,
-        setProject,
-        recordGuidebookChanges,
-        schema,
-        branches,
-        unresolvedBranches,
-        selectedBranchId,
-        setSelectedBranchId,
-        sceneToBranchMap,
-        addOrMergeBranch,
-        approveBranch,
-        rejectBranch,
-        isMetalearning,
-        playerResetKey,
-        readOnly,
+        project: {
+          id: projectId,
+          ...project,
+        },
+        updateProject,
+        versions,
+        saveStatus,
+        selectedVersionId,
+        setSelectedVersionId,
+        getDiffScripts,
+        // Legacy branch fields (empty stubs for Editor compatibility)
+        branches: [],
+        sceneToBranchMap: {},
+        selectedBranchId: null,
       }}
     >
       {children}

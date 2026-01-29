@@ -7,32 +7,28 @@ import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const router = useRouter();
-  const { createProject, deleteProject, renameProject, projectKeys, projects, isLoading } =
-    useProjects();
+  const { createProject, deleteProject, renameProject, projectKeys, projects, isLoading } = useProjects();
 
   const yourProjects = projects.filter((p) => projectKeys.includes(p._id));
 
   return (
-    <div className="h-screen p-4 gap-2 flex flex-col">
+    <div className="h-screen p-4 gap-2 flex flex-col items-center">
+      <div className="w-full max-w-2xl">
       <div className="flex gap-2 items-center">
         <Header />
       </div>
 
       <div className="flex-1 flex justify-start flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={() => createProject()}
-            className="w-fit bg-[var(--mint)] hover:bg-black hover:text-white"
-          >
+        <p>bonsai is a tool for creating & playing interactive fiction in natural language. <a href="/help" className="text-blue-500 hover:text-blue-700">read more about how it works here</a>.</p>
+
+        <hr className="border-t-1 border-gray-200" />
+
+        <div className="flex gap-4">
+          <button onClick={() => createProject()} className="w-fit text-blue-500 hover:text-blue-700">
             + new game
           </button>
-          <button
-            onClick={() => router.push('/help')}
-            className="w-fit hover:bg-black hover:text-white"
-          >
-            help
-          </button>
         </div>
+
         <div>
           <h1>Your games</h1>
           {isLoading && (
@@ -54,10 +50,7 @@ export default function Home() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      renameProject(
-                        project._id,
-                        prompt('Enter new name', project.name) ?? project.name,
-                      );
+                      renameProject(project._id, prompt('Enter new name', project.name) ?? project.name);
                     }}
                   >
                     <PencilIcon className="w-4 h-4" />
@@ -95,6 +88,7 @@ export default function Home() {
             ))}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

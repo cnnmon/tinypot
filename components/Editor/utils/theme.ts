@@ -112,6 +112,12 @@ export const bonsaiSyntaxTheme = EditorView.theme({
     color: '#0891b2',
     fontStyle: 'italic',
   },
+  '.cm-bonsai-set': {
+    color: '#16a34a',
+  },
+  '.cm-bonsai-unset': {
+    color: '#dc2626',
+  },
 });
 
 // Custom highlighter that applies styles based on line content
@@ -156,10 +162,7 @@ function bonsaiLineHighlighter(view: EditorView) {
       // Remove @ prefix if present
       const cleanTarget = gotoTarget.startsWith('@') ? gotoTarget.slice(1) : gotoTarget;
       const isValidTarget =
-        !cleanTarget ||
-        sceneMap.has(cleanTarget) ||
-        cleanTarget === 'start' ||
-        cleanTarget === 'end';
+        !cleanTarget || sceneMap.has(cleanTarget) || cleanTarget === 'start' || cleanTarget === 'end';
       if (!isValidTarget) {
         className = 'cm-bonsai-scene-start'; // Use red color for invalid goto
       } else {
@@ -177,6 +180,12 @@ function bonsaiLineHighlighter(view: EditorView) {
     } else if (/^\[\w+:\s*.+\]$/.test(trimmed)) {
       // Other metadata: [key: value]
       className = 'cm-bonsai-metadata';
+    } else if (/^\+\w+$/.test(trimmed)) {
+      // Variable set: +key
+      className = 'cm-bonsai-set';
+    } else if (/^-\w+$/.test(trimmed)) {
+      // Variable unset: -key
+      className = 'cm-bonsai-unset';
     } else if (/^\s+/.test(text) && trimmed.length > 0) {
       // Any leading whitespace (tab, spaces, or mix) = indented content
       className = 'cm-bonsai-indent';

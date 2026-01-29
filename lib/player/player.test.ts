@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseIntoSchema } from '../project/parser';
+import { DEFAULT_LINES } from '../project/constants';
 import { findReplayPath } from './index';
 import { constructSceneMap } from './utils/constructSceneMap';
 import { matchInput } from './utils/matchInput';
@@ -34,6 +35,156 @@ goto @HOME
 `
   .trim()
   .split('\n');
+
+describe('Image metadata in lines', () => {
+  it('should populate metadata.imageUrl for [image: url] entries', () => {
+    const IMAGE_SCRIPT = `
+@HOME
+[image: https://i.imgur.com/PR6oN9P.png]
+Welcome to the room.
+`.trim().split('\n');
+
+    const schema = parseIntoSchema(IMAGE_SCRIPT);
+    const sceneMap = constructSceneMap({ schema });
+    const callbacks = {
+      setVariable: () => {},
+      unsetVariable: () => {},
+      hasVariable: () => false,
+    };
+
+    // First step should be the image
+    const result = step({ schema, sceneMap, sceneId: 'HOME', lineIdx: 0, callbacks });
+
+    expect(result.type).toBe('continue');
+    expect(result.line).toBeDefined();
+    expect(result.line?.metadata?.imageUrl).toBe('https://i.imgur.com/PR6oN9P.png');
+    expect(result.line?.text).toBe(''); // Image lines have empty text
+  });
+
+  it('should not have metadata for regular narrative lines', () => {
+    const NARRATIVE_SCRIPT = `
+@HOME
+This is just text.
+`.trim().split('\n');
+
+    const schema = parseIntoSchema(NARRATIVE_SCRIPT);
+    const sceneMap = constructSceneMap({ schema });
+    const callbacks = {
+      setVariable: () => {},
+      unsetVariable: () => {},
+      hasVariable: () => false,
+    };
+
+    const result = step({ schema, sceneMap, sceneId: 'HOME', lineIdx: 0, callbacks });
+
+    expect(result.type).toBe('continue');
+    expect(result.line?.text).toBe('This is just text.');
+    expect(result.line?.metadata).toBeUndefined();
+  });
+});
+
+describe('Player uses correct script (not hardcoded default)', () => {
+  it('should NOT output "The fire burns brightly" when using a custom script', () => {
+    // Custom script with completely different content
+    const CUSTOM_SCRIPT = `
+@START
+Welcome to a magical forest.
+if explore
+  You venture deeper into the woods.
+  goto @FOREST
+@FOREST
+The trees whisper ancient secrets.
+`.trim().split('\n');
+
+    const schema = parseIntoSchema(CUSTOM_SCRIPT);
+    const sceneMap = constructSceneMap({ schema });
+    const callbacks = {
+      setVariable: () => {},
+      unsetVariable: () => {},
+      hasVariable: () => false,
+    };
+
+    // Collect all lines from stepping through
+    const lines: string[] = [];
+    let sceneId = 'START';
+    let lineIdx = 0;
+    let stepCount = 0;
+
+    while (stepCount < 20) {
+      stepCount++;
+      const result = step({ schema, sceneMap, sceneId, lineIdx, callbacks });
+      if (result.type === 'wait' || result.type === 'end' || result.type === 'error') break;
+      if (result.line) {
+        lines.push(result.line.text);
+        const match = result.line.id.match(/^(.+)-(\d+)$/);
+        if (match) {
+          sceneId = match[1];
+          lineIdx = parseInt(match[2], 10) + 1;
+        }
+      }
+    }
+
+    // Verify we got the custom content
+    expect(lines).toContain('Welcome to a magical forest.');
+    // Verify we did NOT get the default content
+    expect(lines).not.toContain('The fire burns brightly.');
+    expect(lines.join(' ')).not.toContain('fire');
+  });
+
+  it('should confirm DEFAULT_LINES contains "The fire burns brightly"', () => {
+    // This test documents what the default is
+    expect(DEFAULT_LINES.join('\n')).toContain('The fire burns brightly.');
+  });
+
+  it('should parse and step through a completely custom script', () => {
+    const MY_SCRIPT = `
+@INTRO
+You stand at the edge of a cliff.
+The wind howls around you.
+if jump
+  You leap into the unknown.
+  goto @FALL
+if turn back
+  You decide this was a bad idea.
+  goto @END
+@FALL
+Falling... falling...
+goto @END
+`.trim().split('\n');
+
+    const schema = parseIntoSchema(MY_SCRIPT);
+    const sceneMap = constructSceneMap({ schema });
+    const callbacks = {
+      setVariable: () => {},
+      unsetVariable: () => {},
+      hasVariable: () => false,
+    };
+
+    // Step through and collect output
+    const lines: string[] = [];
+    let sceneId = 'INTRO';
+    let lineIdx = 0;
+    let stepCount = 0;
+
+    while (stepCount < 20) {
+      stepCount++;
+      const result = step({ schema, sceneMap, sceneId, lineIdx, callbacks });
+      if (result.type === 'wait' || result.type === 'end' || result.type === 'error') break;
+      if (result.line) {
+        lines.push(result.line.text);
+        const match = result.line.id.match(/^(.+)-(\d+)$/);
+        if (match) {
+          sceneId = match[1];
+          lineIdx = parseInt(match[2], 10) + 1;
+        }
+      }
+    }
+
+    expect(lines).toContain('You stand at the edge of a cliff.');
+    expect(lines).toContain('The wind howls around you.');
+    expect(lines).not.toContain('The fire burns brightly.');
+  });
+});
 
 describe('Player flow - desk key scenario', () => {
   const schema = parseIntoSchema(TEST_SCRIPT);
@@ -458,9 +609,7 @@ if look around
 
     it('should find "look around" choice in HOME scene (no goto)', () => {
       // Find the line index of "if look around"
-      const lookAroundIdx = LOOK_AROUND_SCRIPT.findIndex((line) =>
-        line.trim().startsWith('if look around'),
-      );
+      const lookAroundIdx = LOOK_AROUND_SCRIPT.findIndex((line) => line.trim().startsWith('if look around'));
       expect(lookAroundIdx).toBeGreaterThan(-1);
 
       // findReplayPath should return ["look around"] since it's in HOME (START equivalent)
@@ -608,9 +757,7 @@ goto @HOME
     });
 
     it('should find path for "look around" choice (no goto)', () => {
-      const lookAroundIdx = FULL_SCRIPT.findIndex((line) =>
-        line.trim().startsWith('if look around'),
-      );
+      const lookAroundIdx = FULL_SCRIPT.findIndex((line) => line.trim().startsWith('if look around'));
       expect(lookAroundIdx).toBeGreaterThan(-1);
 
       // "look around" is in HOME, no path needed, just the choice itself
@@ -619,9 +766,7 @@ goto @HOME
     });
 
     it('should find path for "examine the desk" choice', () => {
-      const examineIdx = FULL_SCRIPT.findIndex((line) =>
-        line.trim().startsWith('if examine the desk'),
-      );
+      const examineIdx = FULL_SCRIPT.findIndex((line) => line.trim().startsWith('if examine the desk'));
       expect(examineIdx).toBeGreaterThan(-1);
 
       // Uses first alias "look at the desk"
@@ -639,9 +784,7 @@ goto @HOME
     });
 
     it('should find path for "don\'t take the key" choice in DESK scene', () => {
-      const dontTakeIdx = FULL_SCRIPT.findIndex((line) =>
-        line.trim().startsWith("if don't take the key"),
-      );
+      const dontTakeIdx = FULL_SCRIPT.findIndex((line) => line.trim().startsWith("if don't take the key"));
       expect(dontTakeIdx).toBeGreaterThan(-1);
 
       // Path: HOME -> DESK (via "look at the desk"), then "no" for don't take
@@ -659,9 +802,7 @@ goto @HOME
     });
 
     it('should find path for "what about the key" (conditional choice)', () => {
-      const whatAboutIdx = FULL_SCRIPT.findIndex((line) =>
-        line.trim().startsWith('if what about the key'),
-      );
+      const whatAboutIdx = FULL_SCRIPT.findIndex((line) => line.trim().startsWith('if what about the key'));
       expect(whatAboutIdx).toBeGreaterThan(-1);
 
       // This choice is inside [if: key] conditional in DESK

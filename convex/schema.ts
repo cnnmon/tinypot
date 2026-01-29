@@ -1,3 +1,4 @@
+import { Entity } from '@/types/entities';
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
@@ -37,30 +38,14 @@ export default defineSchema({
     createdAt: v.number(),
   }).index('by_project', ['projectId']),
 
-  branches: defineTable({
+  versions: defineTable({
+    // Checkpoints
     projectId: v.id('projects'),
-    playthroughId: v.string(), // Using string for now since playthroughs may be ephemeral
-    title: v.string(),
-    sceneIds: v.array(v.string()),
-    base: v.any(), // Record<string, SchemaEntry[]>
-    generated: v.any(), // Record<string, SchemaEntry[]>
-    authored: v.optional(v.any()), // Record<string, SchemaEntry[]>
-    baseScript: v.optional(v.array(v.string())), // Original script for easy discard
-    approved: v.optional(v.boolean()),
-    metalearning: v.optional(v.string()),
+    creator: v.union(v.literal(Entity.AUTHOR), v.literal(Entity.SYSTEM)),
     createdAt: v.number(),
-  })
-    .index('by_project', ['projectId'])
-    .index('by_playthrough', ['playthroughId']),
-
-  // Tracks all guidebook changes for analytics
-  guidebookChanges: defineTable({
-    projectId: v.id('projects'),
-    branchId: v.optional(v.id('branches')), // null if manual edit
-    action: v.union(v.literal('add'), v.literal('update'), v.literal('delete')),
-    rule: v.string(),
-    previousRule: v.optional(v.string()), // for updates
-    source: v.union(v.literal('metalearning'), v.literal('manual')),
-    createdAt: v.number(),
+    snapshot: v.object({
+      script: v.array(v.string()),
+      guidebook: v.string(),
+    }),
   }).index('by_project', ['projectId']),
 });

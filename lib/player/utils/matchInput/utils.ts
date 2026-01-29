@@ -234,10 +234,7 @@ export interface FuzzyMatchResult {
 /**
  * Use AI to match user input to options when keyword matching fails
  */
-export async function matchOptionFuzzy(
-  input: string,
-  options: OptionEntry[],
-): Promise<FuzzyMatchResult> {
+export async function matchOptionFuzzy(input: string, options: OptionEntry[]): Promise<FuzzyMatchResult> {
   try {
     const response = await fetch('/api/match', {
       method: 'POST',
@@ -265,10 +262,7 @@ export async function matchOptionFuzzy(
  * Evaluate a condition string against current variables.
  * Supports negation with ! prefix.
  */
-function evaluateCondition(
-  condition: string,
-  hasVariable?: (variable: string) => boolean,
-): boolean {
+function evaluateCondition(condition: string, hasVariable?: (variable: string) => boolean): boolean {
   if (!hasVariable) return true;
   const trimmed = condition.trim();
   if (trimmed.startsWith('!')) {

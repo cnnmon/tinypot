@@ -144,9 +144,7 @@ function buildBranchDecorations(view: EditorView): DecorationSet {
       const generatedScene = selectedBranch.generated[currentSceneId];
 
       const baseKeys = baseScene ? sceneToComparisonKeys(baseScene) : new Set<string>();
-      const generatedKeys = generatedScene
-        ? sceneToComparisonKeys(generatedScene)
-        : new Set<string>();
+      const generatedKeys = generatedScene ? sceneToComparisonKeys(generatedScene) : new Set<string>();
 
       // Determine line type based on presence in base vs generated
       let lineClass = 'cm-branch-scene'; // Default: gray (affected scene)

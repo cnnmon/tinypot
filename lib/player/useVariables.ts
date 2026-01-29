@@ -59,4 +59,3 @@ export function useVariables(): VariablesState {
     getAll,
   };
 }
-

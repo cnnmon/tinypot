@@ -40,7 +40,10 @@ function formatScenes(scenes: Record<SceneId, Scene>): string {
   const parts: string[] = [];
   for (const sceneId of Object.keys(scenes)) {
     const scene = scenes[sceneId];
-    const content = scene.map((e) => formatEntry(e)).filter(Boolean).join('\n');
+    const content = scene
+      .map((e) => formatEntry(e))
+      .filter(Boolean)
+      .join('\n');
     parts.push(`# ${sceneId}\n${content}`);
   }
   return parts.join('\n\n');
@@ -98,10 +101,7 @@ export async function runMetalearning(
   branch: Branch,
   existingGuidebook: string,
 ): Promise<MetalearningResult> {
-  const { updatedGuidebook, newRule, action, previousRule } = await analyzeChanges(
-    branch,
-    existingGuidebook,
-  );
+  const { updatedGuidebook, newRule, action, previousRule } = await analyzeChanges(branch, existingGuidebook);
 
   return {
     branchId,

@@ -1,4 +1,5 @@
-import { Line, Sender } from '@/types/playthrough';
+import { Entity } from '@/types/entities';
+import { Line } from '@/types/playthrough';
 import {
   ConditionalEntry,
   EntryType,
@@ -11,14 +12,14 @@ import {
 } from '@/types/schema';
 import { getScanStart } from './getScanStart';
 
-function makeLineId(sceneId: string, lineIdx: number): string {
+function makeLineId(sceneId: string, lineIdx: number): `${string}-${number}` {
   return `${sceneId}-${lineIdx}`;
 }
 
 function makeErrorLine(errorType: string, message: string): Line {
   return {
-    id: `error-${errorType}`,
-    sender: Sender.SYSTEM,
+    id: `error-${errorType}` as `${string}-${number}`,
+    sender: Entity.SYSTEM,
     text: message,
   };
 }
@@ -52,7 +53,7 @@ interface BuildPositionsResult {
 }
 
 function buildScenePositions(
-  schema: Schema, 
+  schema: Schema,
   scanStart: number,
   hasVariable?: (variable: string) => boolean,
 ): BuildPositionsResult {
@@ -91,7 +92,7 @@ function buildScenePositions(
         const conditional = entry as ConditionalEntry;
         const conditionMet = evaluateCondition(conditional.condition, hasVariable);
         const branchEntries = conditionMet ? conditional.then : conditional.else;
-        
+
         if (branchEntries) {
           // Recursively process the conditional's entries
           const target = processEntries(branchEntries);
@@ -110,7 +111,7 @@ function buildScenePositions(
   // Process main entries starting from scanStart
   const entriesToProcess = schema.slice(scanStart);
   jumpTarget = processEntries(entriesToProcess);
-  
+
   if (jumpTarget === null && pendingOptions) {
     positions.push({ type: 'wait' });
   }
@@ -122,18 +123,15 @@ function buildScenePositions(
  * Evaluate a condition based on variable state.
  * Supports negation with ! prefix.
  */
-function evaluateCondition(
-  condition: string,
-  hasVariable?: (variable: string) => boolean,
-): boolean {
+function evaluateCondition(condition: string, hasVariable?: (variable: string) => boolean): boolean {
   const trimmed = condition.trim();
-  
+
   // Check for negation
   if (trimmed.startsWith('!')) {
     const varName = trimmed.slice(1).trim();
     return !hasVariable?.(varName);
   }
-  
+
   return hasVariable?.(trimmed) ?? false;
 }
 
@@ -234,9 +232,9 @@ export function step({
         type: 'continue',
         line: {
           id: makeLineId(currentScene, currentLineIdx),
-          sender: Sender.NARRATOR,
-          text: pos.text!,
-          ...(pos.type === 'image' && { type: 'image' as const }),
+          sender: Entity.AUTHOR,
+          text: pos.type === 'image' ? '' : pos.text!,
+          ...(pos.type === 'image' && { metadata: { imageUrl: pos.text } }),
         },
       };
     }

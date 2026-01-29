@@ -2,9 +2,10 @@
 
 import Box from '@/components/Box';
 import Editor from '@/components/Editor';
-import Branchbar from '@/components/Editor/Branchbar';
 import Header from '@/components/Header';
 import Player from '@/components/Player';
+import VersionHistory from '@/components/VersionHistory';
+import VersionViewer from '@/components/VersionViewer';
 import { Id } from '@/convex/_generated/dataModel';
 import { PlayerProvider } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
@@ -14,10 +15,12 @@ import { useCallback, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 function ProjectContent() {
-  const { project, setProject, recordGuidebookChanges, isMetalearning } = useProject();
+  const { project, updateProject, versions, saveStatus, selectedVersionId, setSelectedVersionId, getDiffScripts } =
+    useProject();
   const [leftWidth, setLeftWidth] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const diffScripts = getDiffScripts();
 
   const handleShare = useCallback(() => {
     const shareUrl = getShareUrl(project.id);
@@ -50,7 +53,7 @@ function ProjectContent() {
   }, []);
 
   const guidebook = project.guidebook;
-  const [guidebookBaseline, setGuidebookBaseline] = useState(guidebook);
+  const isMetalearning = false;
 
   return (
     <div className="h-screen p-4 gap-2 flex flex-col">
@@ -79,36 +82,47 @@ function ProjectContent() {
             <div className="flex items-center justify-between gap-1">
               <h1 className="cursor-default">guidebook</h1>
             </div>
-            {isMetalearning && (
-              <span className="text-neutral-800/40 animate-pulse">(Updating guidebook...)</span>
-            )}
+            {isMetalearning && <span className="text-neutral-800/40 animate-pulse">(Updating guidebook...)</span>}
             <textarea
               value={guidebook}
               placeholder="Always generate content based on this prompt..."
               className="w-full h-full"
-              onFocus={() => setGuidebookBaseline(guidebook)}
-              onChange={(e) => setProject({ guidebook: e.target.value })}
-              onBlur={() => recordGuidebookChanges(guidebookBaseline, guidebook)}
+              onChange={(e) => updateProject({ guidebook: e.target.value })}
             />
           </div>
         </Box>
 
-        <Box className="max-h-45 overflow-auto select-none bg-gradient-to-b from-[var(--sunflower)] to-white">
+        <Box className="max-h-45 min-w-40 overflow-auto select-none bg-gradient-to-b from-[var(--sunflower)] to-white">
           <div className="p-3 h-full">
-            <Branchbar />
+            <VersionHistory
+              versions={versions}
+              currentSnapshot={{ script: project.script, guidebook: project.guidebook }}
+              saveStatus={saveStatus}
+              selectedVersionId={selectedVersionId}
+              onSelectVersion={setSelectedVersionId}
+            />
           </div>
         </Box>
       </div>
 
-      <div
-        ref={containerRef}
-        className="flex flex-row min-h-[calc(100%-210px)] h-[calc(100%-210px)] pb-5"
-      >
+      <div ref={containerRef} className="flex flex-row min-h-[calc(100%-210px)] h-[calc(100%-210px)] pb-5">
         <Box style={{ width: `${leftWidth}%` }}>
           <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
-            <b>Editor</b>
+            <b>{diffScripts ? 'Version viewer (read-only)' : 'Editor'}</b>
+            {diffScripts && (
+              <button
+                onClick={() => setSelectedVersionId(null)}
+                className="text-sm text-neutral-500 hover:text-neutral-800"
+              >
+                ← back to current
+              </button>
+            )}
           </div>
-          <Editor />
+          {diffScripts ? (
+            <VersionViewer script={diffScripts.after} previousScript={diffScripts.before} />
+          ) : (
+            <Editor />
+          )}
         </Box>
         <div
           onMouseDown={handleMouseDown}
@@ -141,9 +155,7 @@ export default function ProjectPage() {
           <Header />
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-neutral-400">
-            Invalid project ID. Please select a project from the dropdown.
-          </p>
+          <p className="text-neutral-400">Invalid project ID. Please select a project from the dropdown.</p>
         </div>
       </div>
     );

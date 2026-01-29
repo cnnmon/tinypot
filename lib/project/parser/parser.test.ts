@@ -38,13 +38,7 @@ describe('addGeneratedOptionToScript', () => {
     it('should add option in scene with no existing choices', () => {
       const lines = ['@ROOM', 'You are in a room.', '@HALLWAY', 'A long hallway.'];
 
-      const result = addGeneratedOptionToScript(
-        lines,
-        'ROOM',
-        'examine the room',
-        [],
-        ['Nothing special.'],
-      );
+      const result = addGeneratedOptionToScript(lines, 'ROOM', 'examine the room', [], ['Nothing special.']);
 
       expect(result).toEqual([
         '@ROOM',
@@ -94,11 +88,7 @@ describe('addGeneratedOptionToScript', () => {
     });
 
     it('should add option in implicit START scene with no existing choices', () => {
-      const lines = [
-        '[image: https://example.com/room.png]',
-        "You're in a mysterious room.",
-        'The door is locked.',
-      ];
+      const lines = ['[image: https://example.com/room.png]', "You're in a mysterious room.", 'The door is locked.'];
 
       const result = addGeneratedOptionToScript(
         lines,
@@ -128,13 +118,7 @@ describe('addGeneratedOptionToScript', () => {
         '   You pick up the key.',
       ];
 
-      const result = addGeneratedOptionToScript(
-        lines,
-        'START',
-        'examine the walls',
-        [],
-        ['The walls are bare.'],
-      );
+      const result = addGeneratedOptionToScript(lines, 'START', 'examine the walls', [], ['The walls are bare.']);
 
       // New option should be added after 'look around' option, before @DESK
       expect(result).toEqual([
@@ -270,13 +254,7 @@ describe('addGeneratedOptionToScript', () => {
         '  You lean closer.',
       ];
 
-      const result = addGeneratedOptionToScript(
-        lines,
-        'HOME',
-        'look around',
-        [],
-        ['You scan the room.'],
-      );
+      const result = addGeneratedOptionToScript(lines, 'HOME', 'look around', [], ['You scan the room.']);
 
       expect(result).toEqual([
         '',
@@ -345,16 +323,10 @@ describe('addAliasToOption - nested options', () => {
 
 describe('parseIntoSchema - star syntax for indentation', () => {
   it('should convert * to one level of indentation', () => {
-    const lines = [
-      '@DESK',
-      'Take the key?',
-      'if take the key',
-      '* Yoink!',
-      '* goto @HOME',
-    ];
+    const lines = ['@DESK', 'Take the key?', 'if take the key', '* Yoink!', '* goto @HOME'];
 
     const schema = parseIntoSchema(lines);
-    
+
     expect(schema.length).toBe(3); // SCENE, NARRATIVE, OPTION
     const option = schema[2];
     if (option.type === EntryType.OPTION) {
@@ -363,17 +335,10 @@ describe('parseIntoSchema - star syntax for indentation', () => {
   });
 
   it('should convert ** to two levels of indentation', () => {
-    const lines = [
-      '@DESK',
-      '[if: !key]',
-      '* Take the key?',
-      '* if take the key',
-      '** Yoink!',
-      '** goto @HOME',
-    ];
+    const lines = ['@DESK', '[if: !key]', '* Take the key?', '* if take the key', '** Yoink!', '** goto @HOME'];
 
     const schema = parseIntoSchema(lines);
-    
+
     // SCENE, CONDITIONAL
     expect(schema.length).toBe(2);
     const conditional = schema[1];
@@ -394,12 +359,12 @@ describe('parseIntoSchema - star syntax for indentation', () => {
       '@ROOM',
       'if look around',
       '  You see a key.', // 2 space indent
-      '* if [key]',       // 1 star = 2 spaces (same level as above)
+      '* if [key]', // 1 star = 2 spaces (same level as above)
       '** You already have the key.', // 2 stars = 4 spaces (nested in conditional)
     ];
 
     const schema = parseIntoSchema(lines);
-    
+
     expect(schema.length).toBe(2); // SCENE, OPTION
     const option = schema[1];
     if (option.type === EntryType.OPTION) {

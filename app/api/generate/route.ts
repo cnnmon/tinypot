@@ -130,9 +130,7 @@ export async function POST(req: Request) {
 
   const worldContext = worldBible ? `\nWorld/Style Guide:\n${worldBible}\n` : '';
 
-  const guidebookContext = guidebook
-    ? `\nAUTHOR PREFERENCES (follow these closely):\n${guidebook}\n`
-    : '';
+  const guidebookContext = guidebook ? `\nAUTHOR PREFERENCES (follow these closely):\n${guidebook}\n` : '';
 
   const constraintsContext = buildConstraintsPrompt(allowsConfig);
 
@@ -193,22 +191,31 @@ SYNTAX RULES (use these exactly):
 - Scene declarations: @SCENE_NAME
 - Navigation: goto @SCENE_NAME (or goto @END)
 - Choices: if Choice text | alias1 | alias2
-- Choices with effects: if Choice text -> +key (sets variable) or -> -key (unsets) or -> ?key (requires)
+- Choices with requires: if Choice text & ?key (choice only available if player has key)
+- Set variable: +key (as its own indented line inside a choice block)
+- Unset variable: -key (as its own indented line inside a choice block)
 - Conditional blocks: when [key] / when [!key] for content shown only when variable is/isn't set
 - Metadata: [key: value]
 
 VARIABLE SYSTEM:
 Variables are flags/items the player acquires (like "key", "sword", "talked_to_guard").
-- Use "+variablename" to SET a variable when player takes an action (e.g., picking up an item)
-- Use "-variablename" to UNSET a variable (e.g., using up an item)
-- Use "?variablename" to REQUIRE a variable (choice only available if player has it)
+- Use "+variablename" as a standalone line to SET a variable when player takes an action
+- Use "-variablename" as a standalone line to UNSET a variable (e.g., using up an item)
+- Use "& ?variablename" after a choice to REQUIRE a variable (choice only available if player has it)
 - Use "when [variablename]" blocks to show different content based on what player has
 
-Example: if use key on door -> ?key means this choice requires the "key" variable.
-Example: if take the sword -> +sword means taking it sets the "sword" variable.
+Example requiring a variable:
+if use key on door & ?key
+    -key
+    The door unlocks with a click.
+
+Example setting a variable:
+if take the sword
+    +sword
+    You grab the sword.
 
 Consider: Does this action require an item/flag the player should have obtained earlier?
-If so, add -> ?variablename to require it. If this action grants something, add -> +variablename.
+If so, add & ?variablename to require it. If this action grants something, add +variablename as a line in the then block.
 
 Respond in JSON format only:
 {
@@ -303,16 +310,16 @@ Guidelines:
     }
     // TEXT_ONLY has no jump - loops back to current decision point
 
-    // Build option text with variable effects using arrow syntax
+    // Build option text - requires uses & ?key syntax, sets/unsets go in then block
     const cleanOptionText = parsed.optionText || userInput;
-    const effects: string[] = [];
-    if (parsed.requiresVariable) effects.push(`?${parsed.requiresVariable}`);
-    if (parsed.setsVariable) effects.push(`+${parsed.setsVariable}`);
-    if (parsed.unsetsVariable) effects.push(`-${parsed.unsetsVariable}`);
-    // Full option text includes effects for the script
-    const optionTextWithEffects =
-      effects.length > 0 ? `${cleanOptionText} -> ${effects.join(' ')}` : cleanOptionText;
+    const optionTextWithEffects = parsed.requiresVariable
+      ? `${cleanOptionText} & ?${parsed.requiresVariable}`
+      : cleanOptionText;
     const aliases: string[] = [];
+
+    // Add sets/unsets as standalone lines at the start of the then block
+    if (parsed.setsVariable) thenLines.unshift(`+${parsed.setsVariable}`);
+    if (parsed.unsetsVariable) thenLines.unshift(`-${parsed.unsetsVariable}`);
 
     // Build new scene content for NEW_FORK
     let newScene: { label: string; content: string[] } | undefined;

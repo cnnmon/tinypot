@@ -5,13 +5,13 @@ import { ConditionalEntry, EntryType, Schema, SchemaEntry } from '@/types/schema
  * - `@SCENE_NAME` - Scene declaration
  * - `goto @SCENE_NAME` - Jump to scene (or `goto @END`)
  * - `if Choice text | alias1 | alias2` - Choice with optional aliases
- * - `if Choice text -> ?key` - Choice with inline requires
- * - `if Choice text -> +key` - Choice that sets a variable
- * - `if Choice text -> -key` - Choice that unsets a variable
+ * - `if Choice text & ?key` - Choice with requires condition (only available if player has key)
+ * - `+key` - Sets a variable (standalone line)
+ * - `-key` - Unsets a variable (standalone line)
  * - `when [variable]` - Conditional block (shows content if variable is set)
  * - `when [!variable]` - Conditional block (shows content if variable is NOT set)
  * - Indented lines after `if`/`when` are the block's content
- * - `[key: value]` - Metadata (image, allows, sets, unsets, requires)
+ * - `[key: value]` - Metadata (image, allows, sets, unsets)
  * - Regular text is narrative
  * - `*`, `**`, `***` prefixes indicate indentation levels (like Ink)
  */
@@ -38,52 +38,36 @@ function getIndentLevel(entry: string): number {
 }
 
 /**
- * Parse choice line: if Choice text | alias1 | alias2 -> ?key +key -key
- * Effects come after -> arrow:
- *   ?key = requires
- *   +key = sets
- *   -key = unsets
- * Also supports legacy & [condition] syntax
- * Returns { text, aliases, requires, sets, unsets }
+ * Parse choice line: if Choice text | alias1 | alias2 & ?key
+ * Requires condition comes after &:
+ *   & ?key = requires (choice only available if player has key)
+ * Sets/unsets are now standalone lines (+key, -key)
+ * Returns { text, aliases, requires }
  */
 function parseChoiceLine(line: string): {
   text: string;
   aliases?: string[];
   requires?: string;
-  sets?: string;
-  unsets?: string;
 } {
   // Remove 'if ' prefix
   let content = line.slice(3).trim();
 
   let requires: string | undefined;
-  let sets: string | undefined;
-  let unsets: string | undefined;
 
-  // Check for arrow syntax: -> ?key +key -key
-  const arrowIdx = content.indexOf('->');
-  if (arrowIdx !== -1) {
-    const effectsPart = content.slice(arrowIdx + 2).trim();
-    content = content.slice(0, arrowIdx).trim();
-
-    // Parse effects: ?key, +key, -key
-    const effects = effectsPart.split(/\s+/);
-    for (const effect of effects) {
-      if (effect.startsWith('?')) {
-        requires = effect.slice(1);
-      } else if (effect.startsWith('+')) {
-        sets = effect.slice(1);
-      } else if (effect.startsWith('-')) {
-        unsets = effect.slice(1);
-      }
-    }
+  // Check for & ?key syntax (requires condition)
+  const requiresMatch = content.match(/&\s*\?(\w+)\s*$/);
+  if (requiresMatch) {
+    requires = requiresMatch[1];
+    content = content.slice(0, content.lastIndexOf('&')).trim();
   }
 
   // Legacy: Check for condition at end: ... & [variable]
-  const conditionMatch = content.match(/&\s*\[([^\]]+)\]\s*$/);
-  if (conditionMatch) {
-    requires = conditionMatch[1].trim();
-    content = content.slice(0, content.lastIndexOf('&')).trim();
+  if (!requires) {
+    const conditionMatch = content.match(/&\s*\[([^\]]+)\]\s*$/);
+    if (conditionMatch) {
+      requires = conditionMatch[1].trim();
+      content = content.slice(0, content.lastIndexOf('&')).trim();
+    }
   }
 
   // Split by | to get text and aliases
@@ -91,7 +75,7 @@ function parseChoiceLine(line: string): {
   const text = parts[0];
   const aliases = parts.length > 1 ? parts.slice(1) : undefined;
 
-  return { text, aliases, requires, sets, unsets };
+  return { text, aliases, requires };
 }
 
 /**
@@ -189,10 +173,7 @@ export function parseIntoSchema(rawEntries: string[]): Schema {
       i++;
 
       // Helper to collect a block of indented lines and parse them together
-      const collectBlock = (
-        startIdx: number,
-        baseIndent: number,
-      ): { entries: SchemaEntry[]; endIdx: number } => {
+      const collectBlock = (startIdx: number, baseIndent: number): { entries: SchemaEntry[]; endIdx: number } => {
         const blockLines: string[] = [];
         let idx = startIdx;
 
@@ -264,19 +245,11 @@ export function parseIntoSchema(rawEntries: string[]): Schema {
       continue;
     }
 
-    // Choice: if Choice text | alias1 | alias2 -> ?key +key -key
+    // Choice: if Choice text | alias1 | alias2 & ?key
     if (trimmed.startsWith('if ')) {
       const optionIndent = getIndentLevel(entry);
-      const { text, aliases, requires, sets, unsets } = parseChoiceLine(trimmed);
+      const { text, aliases, requires } = parseChoiceLine(trimmed);
       const thenBlock: SchemaEntry[] = [];
-
-      // Add inline sets/unsets as metadata entries in the then block
-      if (sets) {
-        thenBlock.push({ type: EntryType.METADATA, key: 'sets', value: sets });
-      }
-      if (unsets) {
-        thenBlock.push({ type: EntryType.METADATA, key: 'unsets', value: unsets });
-      }
 
       // Collect indented entries that follow this choice
       i++;
@@ -313,6 +286,19 @@ export function parseIntoSchema(rawEntries: string[]): Schema {
         ...(requires && { requires }),
         then: thenBlock,
       });
+      continue;
+    }
+
+    // Variable set/unset: +key or -key (standalone lines)
+    if (trimmed.match(/^[+-]\w+$/)) {
+      const isSet = trimmed.startsWith('+');
+      const key = trimmed.slice(1);
+      schema.push({
+        type: EntryType.METADATA,
+        key: isSet ? 'sets' : 'unsets',
+        value: key,
+      });
+      i++;
       continue;
     }
 
@@ -616,8 +602,7 @@ export function addGeneratedOptionToScript(
   }
 
   // Build the new choice block with aliases if present
-  const optionLine =
-    aliases.length > 0 ? `if ${optionText} | ${aliases.join(' | ')}` : `if ${optionText}`;
+  const optionLine = aliases.length > 0 ? `if ${optionText} | ${aliases.join(' | ')}` : `if ${optionText}`;
   const newOptionLines: string[] = [optionLine, ...thenLines.map((l) => `   ${l}`)];
 
   // Insert after the last choice in the target scene

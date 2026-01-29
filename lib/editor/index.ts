@@ -5,14 +5,14 @@ import { useProject } from '../project';
 import { parseIntoSchema } from '../project/parser';
 
 export default function useEditor() {
-  const { project, setProject } = useProject();
+  const { project, updateProject } = useProject();
 
   const schema = useMemo(() => {
     return parseIntoSchema(project.script);
   }, [project.script]);
 
   function setScript(newScript: string[]) {
-    setProject({ script: newScript });
+    updateProject({ script: newScript });
   }
 
   return {

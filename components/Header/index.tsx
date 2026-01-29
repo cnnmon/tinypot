@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import BranchDesign from '../Editor/Branchbar/BranchDesign';
+import BranchDesign from '../BranchDesign';
 
 export default function Header() {
   const router = useRouter();
@@ -22,13 +22,7 @@ export default function Header() {
         <p>bonsai</p>
         <div className="relative flex justify-center items-center mb-1">
           <BranchDesign seed={randomNumber} width={25} height={25} />
-          <Image
-            alt="plantpot"
-            src="/icons/PlantPot.svg"
-            width={15}
-            height={15}
-            className="absolute top-[12px]"
-          />
+          <Image alt="plantpot" src="/icons/PlantPot.svg" width={15} height={15} className="absolute top-[12px]" />
         </div>
       </div>
     </>

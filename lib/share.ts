@@ -26,7 +26,7 @@ export function decodeShareId(shareId: string): string | null {
     // Remove prefix and restore base64 chars
     let encoded = shareId.slice(SHARE_PREFIX.length);
     encoded = encoded.replace(/-/g, '+').replace(/_/g, '/');
-    
+
     // Add back padding
     const padding = (4 - (encoded.length % 4)) % 4;
     encoded += '='.repeat(padding);
@@ -47,4 +47,3 @@ export function getShareUrl(projectId: string): string {
   }
   return `/play/${shareId}`;
 }
-

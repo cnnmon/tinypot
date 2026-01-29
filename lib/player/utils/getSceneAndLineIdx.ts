@@ -5,13 +5,7 @@ import { Line } from '@/types/playthrough';
  * current SCENE and LINE IDX are
  * to initialize the game state and continue from the right place.
  */
-export function getSceneAndLineIdx({
-  lines,
-  sceneMap,
-}: {
-  lines: Line[];
-  sceneMap: Record<string, number>;
-}) {
+export function getSceneAndLineIdx({ lines, sceneMap }: { lines: Line[]; sceneMap: Record<string, number> }) {
   // Find the first line with a valid ID (not player lines)
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];

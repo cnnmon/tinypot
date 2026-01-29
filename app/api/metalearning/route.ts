@@ -25,8 +25,7 @@ export interface MetalearningResponse {
  * - Adding a new rule if novel
  */
 export async function POST(req: Request) {
-  const { generated, authored, approved, existingGuidebook }: MetalearningRequest =
-    await req.json();
+  const { generated, authored, approved, existingGuidebook }: MetalearningRequest = await req.json();
 
   if (!generated || !authored) {
     return Response.json({
@@ -126,7 +125,11 @@ JSON response:`,
     }
 
     // Check if a similar rule already exists (safety net)
-    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim();
     const newRuleNorm = normalize(parsed.rule);
     const newRuleWords = new Set(newRuleNorm.split(/\s+/));
 

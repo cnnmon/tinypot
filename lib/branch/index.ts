@@ -237,9 +237,7 @@ export function mergeBranchChanges(
   }
 
   // Concatenate titles: "Check key, Look around"
-  const combinedTitle = newTitle
-    ? existingBranch.title + ', ' + newTitle
-    : existingBranch.title;
+  const combinedTitle = newTitle ? existingBranch.title + ', ' + newTitle : existingBranch.title;
 
   return {
     ...existingBranch,
@@ -277,10 +275,7 @@ export function computeSceneToBranchMap(unresolvedBranches: Branch[]): Record<Sc
 /**
  * Capture current scene states from schema for branch closure.
  */
-export function captureAuthoredScenes(
-  branch: Branch,
-  currentSchema: Schema,
-): Record<SceneId, Scene> {
+export function captureAuthoredScenes(branch: Branch, currentSchema: Schema): Record<SceneId, Scene> {
   const currentScenes = extractScenesFromSchema(currentSchema);
   const authored: Record<SceneId, Scene> = {};
 

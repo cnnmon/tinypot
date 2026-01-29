@@ -112,13 +112,9 @@ describe('branchHighlight', () => {
       ];
 
       // Test each line (using new syntax)
-      expect(
-        getLineHighlight('[image: https://example.com/image.jpg]', baseScene, generatedScene),
-      ).toBe('gray');
+      expect(getLineHighlight('[image: https://example.com/image.jpg]', baseScene, generatedScene)).toBe('gray');
 
-      expect(getLineHighlight("you're stuck in the office", baseScene, generatedScene)).toBe(
-        'gray',
-      );
+      expect(getLineHighlight("you're stuck in the office", baseScene, generatedScene)).toBe('gray');
 
       // Original option with MORE aliases now - should still be gray
       expect(
@@ -126,9 +122,7 @@ describe('branchHighlight', () => {
       ).toBe('gray');
 
       // New option - should be yellow
-      expect(
-        getLineHighlight("if ask why you're here | why am i here?", baseScene, generatedScene),
-      ).toBe('yellow');
+      expect(getLineHighlight("if ask why you're here | why am i here?", baseScene, generatedScene)).toBe('yellow');
     });
 
     it('should handle option without aliases', () => {
@@ -172,9 +166,7 @@ describe('branchHighlight', () => {
       ];
 
       // Line that was edited by human after generation
-      expect(getLineHighlight('Completely new human text.', baseScene, generatedScene)).toBe(
-        'green',
-      );
+      expect(getLineHighlight('Completely new human text.', baseScene, generatedScene)).toBe('green');
 
       // Original stays gray
       expect(getLineHighlight('Original text.', baseScene, generatedScene)).toBe('gray');
@@ -219,26 +211,17 @@ describe('branchHighlight', () => {
       ];
 
       // Image - should be gray (was in base)
-      const imageLine =
-        '[image: https://i.pinimg.com/1200x/cf/e7/8f/cfe78fdd9f980d84eb8b3d8e479b5985.jpg]';
+      const imageLine = '[image: https://i.pinimg.com/1200x/cf/e7/8f/cfe78fdd9f980d84eb8b3d8e479b5985.jpg]';
       expect(getLineHighlight(imageLine, baseScene, generatedScene)).toBe('gray');
 
       // Narrative - should be gray
-      expect(
-        getLineHighlight(
-          "you're stuck in the office, and the door is locked.",
-          baseScene,
-          generatedScene,
-        ),
-      ).toBe('gray');
+      expect(getLineHighlight("you're stuck in the office, and the door is locked.", baseScene, generatedScene)).toBe(
+        'gray',
+      );
 
       // ORIGINAL option with MORE aliases - should be gray (was in base)
       expect(
-        getLineHighlight(
-          'if do nothing | wait | stand still | do nothing at all',
-          baseScene,
-          generatedScene,
-        ),
+        getLineHighlight('if do nothing | wait | stand still | do nothing at all', baseScene, generatedScene),
       ).toBe('gray');
 
       // Its then block narrative - should be gray
@@ -254,15 +237,11 @@ describe('branchHighlight', () => {
       ).toBe('yellow');
 
       // Its then block narrative - should be yellow
-      expect(getLineHighlight("you don't remember exactly.", baseScene, generatedScene)).toBe(
-        'yellow',
-      );
+      expect(getLineHighlight("you don't remember exactly.", baseScene, generatedScene)).toBe('yellow');
     });
 
     it('should debug: log comparison keys', () => {
-      const baseScene: Scene = [
-        { type: EntryType.OPTION, text: 'do nothing', aliases: ['wait'], then: [] },
-      ];
+      const baseScene: Scene = [{ type: EntryType.OPTION, text: 'do nothing', aliases: ['wait'], then: [] }];
 
       const baseKeys = sceneToComparisonKeys(baseScene);
       console.log('Base keys:', [...baseKeys]);
@@ -277,9 +256,7 @@ describe('branchHighlight', () => {
 
     it('should handle merged branch correctly - only latest changes are yellow', () => {
       // Base now reflects state BEFORE the latest generation (includes previous gen)
-      const baseScene: Scene = [
-        { type: EntryType.OPTION, text: 'do nothing', aliases: ['wait'], then: [] },
-      ];
+      const baseScene: Scene = [{ type: EntryType.OPTION, text: 'do nothing', aliases: ['wait'], then: [] }];
 
       const generatedScene: Scene = [
         { type: EntryType.OPTION, text: 'do nothing', aliases: ['wait'], then: [] },
@@ -310,9 +287,7 @@ describe('branchHighlight', () => {
     });
 
     it('should handle images', () => {
-      expect(lineToComparisonKey('[image: https://example.com/pic.jpg]')).toBe(
-        'image:https://example.com/pic.jpg',
-      );
+      expect(lineToComparisonKey('[image: https://example.com/pic.jpg]')).toBe('image:https://example.com/pic.jpg');
     });
 
     it('should handle gotos', () => {

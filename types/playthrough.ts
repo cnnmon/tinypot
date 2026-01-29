@@ -1,14 +1,5 @@
-/**
- * Types for user playthroughs.
- */
-
-import { Schema } from './schema';
-
-export enum Sender {
-  NARRATOR = 'narrator',
-  PLAYER = 'player',
-  SYSTEM = 'system',
-}
+import { Id } from '@/convex/_generated/dataModel';
+import { Entity } from './entities';
 
 /**
  * Each LINE is ID'd by SCENE-lineIdx underneath the #SCENE-NAME.
@@ -16,20 +7,18 @@ export enum Sender {
  * without keeping a currentLineIdx elsewhere.
  */
 export interface Line {
-  id: string; // SCENE-lineIdx
-  sender: Sender;
-  text: string;
-  type?: 'text' | 'image'; // optional for backwards compat
+  id: `${string}-${number}`; // SCENE-lineIdx
+  sender: Entity.AUTHOR | Entity.SYSTEM | Entity.PLAYER;
+  text: string; // content
+  metadata?: {
+    imageUrl?: string;
+  };
 }
 
 export interface Playthrough {
-  id: string;
+  id: Id<'playthroughs'>;
   projectId: string;
   lines: Line[];
   createdAt: number; // timestamp
-  /**
-   * When playthrough first starts, snapshot the schema.
-   * Do not let any changes pass in for now!
-   */
-  snapshot: Schema;
+  versionId: Id<'versions'>;
 }

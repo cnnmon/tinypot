@@ -68,7 +68,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       });
       if (project) {
         addKey(project._id);
-        window.location.href = `/${project._id}`;
+        window.location.href = `/edit/${project._id}`;
       }
       return project?._id ?? undefined;
     } catch (error) {

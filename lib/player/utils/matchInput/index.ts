@@ -1,11 +1,6 @@
 import { Schema } from '@/types/schema';
 import { HandleInputResult, MatchInfo } from './types';
-import {
-  buildResultFromOption,
-  getOptionsAtPosition,
-  matchOption,
-  matchOptionFuzzy,
-} from './utils';
+import { buildResultFromOption, getOptionsAtPosition, matchOption, matchOptionFuzzy } from './utils';
 
 /**
  * Handle player input by matching it to available options
@@ -51,12 +46,18 @@ export async function matchInput({
 
     if (fuzzyResult.matched && fuzzyResult.optionIndex !== null) {
       const fuzzyMatchedOption = options[fuzzyResult.optionIndex];
-      return buildResultFromOption(fuzzyMatchedOption, sceneId, lineIdx, {
-        fuzzyMatch: {
-          confidence: fuzzyResult.confidence,
-          suggestedAlias: input, // Use original input as alias, not the AI's normalized version
+      return buildResultFromOption(
+        fuzzyMatchedOption,
+        sceneId,
+        lineIdx,
+        {
+          fuzzyMatch: {
+            confidence: fuzzyResult.confidence,
+            suggestedAlias: input, // Use original input as alias, not the AI's normalized version
+          },
         },
-      }, hasVariable);
+        hasVariable,
+      );
     }
   }
 

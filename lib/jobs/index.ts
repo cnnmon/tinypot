@@ -42,12 +42,12 @@ export function runJob<T>(
     onComplete: options?.onComplete,
     onError: options?.onError,
   };
-  
+
   jobs.set(id, entry as JobEntry<unknown>);
-  
+
   // Start execution immediately
   job.status = 'running';
-  
+
   executor()
     .then((result) => {
       job.status = 'completed';
@@ -59,7 +59,7 @@ export function runJob<T>(
       job.error = error instanceof Error ? error : new Error(String(error));
       entry.onError?.(job.error);
     });
-  
+
   return id;
 }
 
@@ -68,7 +68,7 @@ export function runJob<T>(
  */
 export function getJob<T = unknown>(id: string): Job<T> | null {
   const entry = jobs.get(id);
-  return entry?.job as Job<T> ?? null;
+  return (entry?.job as Job<T>) ?? null;
 }
 
 /**
@@ -85,4 +85,3 @@ export function isJobRunning(id: string): boolean {
 export function clearJob(id: string): void {
   jobs.delete(id);
 }
-

@@ -26,7 +26,7 @@ export default function Button({
         'rounded-lg bordered px-3 py-2 transition-colors',
         variantStyles[variant],
         disabled && 'opacity-50 cursor-not-allowed',
-        className
+        className,
       )}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
@@ -36,13 +36,7 @@ export default function Button({
   );
 }
 
-export function IconButton({
-  children,
-  onClick,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-}) {
+export function IconButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button
       className="rounded-full bg-black text-white bordered w-8 h-8 flex items-center justify-center hover:bg-white hover:text-black transition-colors"

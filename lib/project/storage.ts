@@ -17,16 +17,16 @@ export function getProjectKeys(): string[] {
   if (typeof window === 'undefined') return [];
   const data = localStorage.getItem(PROJECT_KEYS_STORAGE);
   if (!data) return [];
-  
+
   const keys: string[] = JSON.parse(data);
   // Filter out invalid legacy IDs
   const validKeys = keys.filter(isValidConvexId);
-  
+
   // If we filtered some out, update localStorage
   if (validKeys.length !== keys.length) {
     localStorage.setItem(PROJECT_KEYS_STORAGE, JSON.stringify(validKeys));
   }
-  
+
   return validKeys;
 }
 
@@ -49,4 +49,3 @@ export function getCurrentProjectKey(): string | null {
   const keys = getProjectKeys();
   return keys.length > 0 ? keys[0] : null;
 }
-
