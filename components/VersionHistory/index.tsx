@@ -2,7 +2,6 @@
 
 import { Entity } from '@/types/entities';
 import { Version } from '@/types/version';
-import { useRef } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 interface VersionHistoryProps {
@@ -21,10 +20,68 @@ function formatRelativeTime(timestamp: number): string {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (minutes > 0) return `${minutes}m ago`;
-  return 'just now';
+  if (days > 0) return `${days}d`;
+  if (hours > 0) return `${hours}h`;
+  if (minutes > 0) return `${minutes}m`;
+  return 'now';
+}
+
+/** Extract scene names from a script */
+function getSceneNames(script: string[]): Set<string> {
+  const scenes = new Set<string>();
+  for (const line of script) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
+      scenes.add(trimmed.slice(1).trim());
+    }
+  }
+  return scenes;
+}
+
+/** Describe what changed between two snapshots */
+function describeChanges(
+  current: { script: string[]; guidebook: string },
+  previous: { script: string[]; guidebook: string } | null,
+): string {
+  if (!previous) {
+    const scenes = getSceneNames(current.script);
+    if (scenes.size === 0) return 'created';
+    return `added ${Array.from(scenes).slice(0, 2).join(', ')}`;
+  }
+
+  const currentScenes = getSceneNames(current.script);
+  const previousScenes = getSceneNames(previous.script);
+
+  // Find added scenes
+  const added: string[] = [];
+  for (const scene of currentScenes) {
+    if (!previousScenes.has(scene)) {
+      added.push(scene);
+    }
+  }
+
+  // Find edited scenes (scenes that exist in both but have different content)
+  const edited: string[] = [];
+  for (const scene of currentScenes) {
+    if (previousScenes.has(scene)) {
+      // Simple check: if overall script changed and scene exists in both, it might be edited
+      if (current.script.join('\n') !== previous.script.join('\n')) {
+        edited.push(scene);
+      }
+    }
+  }
+
+  // Build description
+  const parts: string[] = [];
+  if (added.length > 0) {
+    parts.push(`+${added.slice(0, 2).join(', ')}`);
+  }
+  if (edited.length > 0 && added.length === 0) {
+    // Only show edited if nothing was added (to keep it short)
+    parts.push(`~${edited.slice(0, 1).join(', ')}`);
+  }
+
+  return parts.length > 0 ? parts.join(' ') : 'edited';
 }
 
 /** Check if two snapshots have identical content */
@@ -80,35 +137,6 @@ export function coalesceVersions(versions: Version[], windowMs = SESSION_WINDOW_
   return result;
 }
 
-/**
- * Smart coalesce: only coalesce versions that existed on page load.
- * New versions added during the session are shown individually.
- * Also filters out versions identical to current.
- */
-function useSmartCoalesce(
-  versions: Version[],
-  currentSnapshot: { script: string[]; guidebook: string },
-): Version[] {
-  // Capture version IDs present on initial mount
-  const initialIdsRef = useRef<Set<string> | null>(null);
-  if (initialIdsRef.current === null) {
-    initialIdsRef.current = new Set(versions.map((v) => v.id));
-  }
-
-  const initialIds = initialIdsRef.current;
-
-  // Filter out versions that match current state
-  const filteredVersions = versions.filter((v) => !snapshotsEqual(v.snapshot, currentSnapshot));
-
-  // Split into initial versions (coalesce these) and new versions (show individually)
-  const initialVersions = filteredVersions.filter((v) => initialIds.has(v.id));
-  const newVersions = filteredVersions.filter((v) => !initialIds.has(v.id));
-
-  // Coalesce only the initial versions, show new ones as-is
-  const coalescedInitial = coalesceVersions(initialVersions);
-  return [...newVersions, ...coalescedInitial];
-}
-
 export default function VersionHistory({
   versions,
   currentSnapshot,
@@ -116,7 +144,10 @@ export default function VersionHistory({
   selectedVersionId,
   onSelectVersion,
 }: VersionHistoryProps) {
-  const coalesced = useSmartCoalesce(versions, currentSnapshot);
+  // Build version items with change descriptions
+  // Include current state as the first item if it differs from latest version
+  const hasUnsavedChanges = versions.length === 0 || !snapshotsEqual(currentSnapshot, versions[0].snapshot);
+
   return (
     <div className="flex flex-col h-full gap-2">
       {/* Save status indicator */}
@@ -135,33 +166,46 @@ export default function VersionHistory({
       </div>
 
       {/* Version list */}
-      <div className="flex-1 overflow-auto space-y-1">
-        {/* Current (live) option */}
-        <button
-          onClick={() => onSelectVersion(null)}
-          className={twMerge(
-            'w-full text-left px-2 py-1 hover:bg-[var(--mint)]/50',
-            selectedVersionId === null && 'bg-[var(--mint)]',
-          )}
-        >
-          <span className="text-neutral-700">current</span>
-        </button>
-
-        {coalesced.map((version) => (
+      <div className="flex-1 overflow-auto space-y-1 text-sm">
+        {/* Current unsaved state (only if different from latest version) */}
+        {hasUnsavedChanges && (
           <button
-            key={version.id}
-            onClick={() => onSelectVersion(version.id)}
+            onClick={() => onSelectVersion(null)}
             className={twMerge(
               'w-full text-left px-2 py-1 hover:bg-[var(--mint)]/50',
-              selectedVersionId === version.id && 'bg-[var(--mint)]',
+              selectedVersionId === null && 'bg-[var(--mint)]',
             )}
           >
-            <span className="text-neutral-500 mr-2">{formatRelativeTime(version.createdAt)}</span>
-            <span className={version.creator === Entity.SYSTEM ? 'text-orange-600' : 'text-neutral-700'}>
-              {version.creator === Entity.SYSTEM ? 'ai' : 'you'}
-            </span>
+            <span className="text-neutral-400">unsaved</span>
           </button>
-        ))}
+        )}
+
+        {/* Saved versions with change descriptions */}
+        {versions.map((version, idx) => {
+          const previousVersion = versions[idx + 1] ?? null;
+          const changeDesc = describeChanges(version.snapshot, previousVersion?.snapshot ?? null);
+          const isAI = version.creator === Entity.SYSTEM;
+
+          return (
+            <button
+              key={version.id}
+              onClick={() => onSelectVersion(version.id)}
+              className={twMerge(
+                'w-full text-left px-2 py-1 hover:bg-[var(--mint)]/50',
+                selectedVersionId === version.id ? 'bg-[var(--mint)]' : '',
+              )}
+            >
+              <span className="text-neutral-400">{formatRelativeTime(version.createdAt)}</span>
+              <span className="text-neutral-300 mx-1">/</span>
+              <span className={isAI ? 'text-orange-600' : 'text-neutral-700'}>{isAI ? 'ai' : 'you'}</span>
+              <span className="text-neutral-400 ml-1">({changeDesc})</span>
+            </button>
+          );
+        })}
+
+        {versions.length === 0 && !hasUnsavedChanges && (
+          <p className="text-neutral-400 px-2">no versions yet</p>
+        )}
       </div>
     </div>
   );

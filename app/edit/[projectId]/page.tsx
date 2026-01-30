@@ -108,7 +108,7 @@ function ProjectContent() {
       <div ref={containerRef} className="flex flex-row min-h-[calc(100%-210px)] h-[calc(100%-210px)] pb-5">
         <Box style={{ width: `${leftWidth}%` }}>
           <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
-            <b>{diffScripts ? 'Version viewer (read-only)' : 'Editor'}</b>
+            <b>{diffScripts ? 'Version' : 'Editor'}</b>
             {diffScripts && (
               <button
                 onClick={() => setSelectedVersionId(null)}

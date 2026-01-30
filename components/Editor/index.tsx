@@ -150,13 +150,19 @@ export default function Editor({
   const shouldSyncToProjectRef = useRef(!readOnly);
   shouldSyncToProjectRef.current = !readOnly;
 
+  // Track when we're syncing external changes to avoid triggering saves
+  const isSyncingExternalRef = useRef(false);
+
   // Initialize CodeMirror
   useEffect(() => {
     if (!editorRef.current || viewRef.current) return;
 
     const updateListener = EditorView.updateListener.of((update) => {
-      // Only sync to project when not viewing a specific branch and not read-only
-      if (update.docChanged && shouldSyncToProjectRef.current) {
+      // Only sync to project when:
+      // - document changed
+      // - not read-only
+      // - not syncing external changes (to avoid overwriting AI-authored versions)
+      if (update.docChanged && shouldSyncToProjectRef.current && !isSyncingExternalRef.current) {
         const content = update.state.doc.toString();
         setScript(content.split('\n'));
       }
@@ -203,8 +209,14 @@ export default function Editor({
     // Always update when viewing rejected (to show snapshot content)
     // Otherwise only update when not focused
     if (currentContent !== newContent && (isViewingRejected || !view.hasFocus)) {
+      // Mark that we're syncing external changes so updateListener doesn't trigger saves
+      isSyncingExternalRef.current = true;
       view.dispatch({
         changes: { from: 0, to: currentContent.length, insert: newContent },
+      });
+      // Reset after microtask to ensure updateListener sees the flag
+      queueMicrotask(() => {
+        isSyncingExternalRef.current = false;
       });
     }
   }, [displayScript, isViewingRejected]);

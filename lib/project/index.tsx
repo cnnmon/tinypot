@@ -85,15 +85,27 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     }
   }, [convexProject]);
 
-  // Initialize lastSavedSnapshot from most recent version or current project
+  // Track if we've saved the initial version
+  const hasCreatedInitialVersionRef = useRef(false);
+
+  // Initialize lastSavedSnapshot and save initial version if none exists
   useEffect(() => {
     if (lastSavedSnapshotRef.current) return; // Already initialized
+
     if (convexVersions && convexVersions.length > 0) {
       lastSavedSnapshotRef.current = convexVersions[0].snapshot;
-    } else if (convexProject) {
-      lastSavedSnapshotRef.current = { script: convexProject.script, guidebook: convexProject.guidebook };
+    } else if (convexProject && !hasCreatedInitialVersionRef.current) {
+      // No versions exist - create the initial version as SYSTEM
+      const snapshot = { script: convexProject.script, guidebook: convexProject.guidebook };
+      lastSavedSnapshotRef.current = snapshot;
+      hasCreatedInitialVersionRef.current = true;
+      createVersionMutation?.({
+        projectId,
+        creator: Entity.SYSTEM,
+        snapshot,
+      });
     }
-  }, [convexVersions, convexProject]);
+  }, [convexVersions, convexProject, projectId, createVersionMutation]);
 
   // Transform Convex versions to our Version type
   const versions: Version[] = (convexVersions ?? []).map((v) => ({

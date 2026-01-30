@@ -70,12 +70,6 @@ export default function VersionViewer({ script, previousScript }: VersionViewerP
   return (
     <div className="h-full overflow-y-scroll relative">
       <div ref={containerRef} className="h-full" />
-      {/* Centered watermark */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <span className="text-4xl font-light text-black/[0.04] uppercase tracking-widest select-none">
-          read-only
-        </span>
-      </div>
     </div>
   );
 }
