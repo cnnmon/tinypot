@@ -57,7 +57,7 @@ export default function PlayPage() {
   }
 
   return (
-    <ProjectProvider projectId={projectId as Id<'projects'>} readOnly>
+    <ProjectProvider projectId={projectId as Id<'projects'>}>
       <PlayerProvider>
         <PlayContent />
       </PlayerProvider>

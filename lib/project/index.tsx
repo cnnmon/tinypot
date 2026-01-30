@@ -12,7 +12,6 @@ import { Project } from '@/types/project';
 import { Version } from '@/types/version';
 import { useMutation, useQuery } from 'convex/react';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { DEFAULT_LINES } from './constants';
 
 type SaveStatus = 'idle' | 'saving' | 'saved';
 
@@ -39,12 +38,10 @@ const VERSION_DEBOUNCE_MS = 2000;
 export function ProjectProvider({ children, projectId }: { children: ReactNode; projectId: Id<'projects'> }) {
   // Convex queries
   const convexProject = useQuery(api.projects.get, { projectId });
-  // @ts-expect-error - versions module may not be in generated types yet
   const convexVersions = useQuery(api.versions?.list, { projectId }) as
     | { _id: Id<'versions'>; creator: string; createdAt: number; snapshot: { script: string[]; guidebook: string } }[]
     | undefined;
   const updateProjectMutation = useMutation(api.projects.update);
-  // @ts-expect-error - versions module may not be in generated types yet
   const createVersionMutation = useMutation(api.versions?.create) as
     | ((args: {
         projectId: Id<'projects'>;
@@ -122,7 +119,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
   const updateProject = useCallback(
     (updates: Partial<Project>, creator: Entity.AUTHOR | Entity.SYSTEM = Entity.AUTHOR) => {
       const newProject = { ...project, ...updates };
-      setProject(newProject);
+      setProject(newProject as Project);
       pendingCreatorRef.current = creator;
 
       // Show saving status
@@ -152,15 +149,15 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         // Only create version if content actually changed
         if (
           !lastSnapshot ||
-          lastSnapshot.script.join('\n') !== snapshot.script.join('\n') ||
+          lastSnapshot.script?.join('\n') !== snapshot.script?.join('\n') ||
           lastSnapshot.guidebook !== snapshot.guidebook
         ) {
           createVersionMutation?.({
             projectId,
             creator: pendingCreatorRef.current,
-            snapshot,
+            snapshot: snapshot as { script: string[]; guidebook: string },
           });
-          lastSavedSnapshotRef.current = snapshot;
+          lastSavedSnapshotRef.current = snapshot as { script: string[]; guidebook: string };
         }
       }, VERSION_DEBOUNCE_MS);
     },
