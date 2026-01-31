@@ -90,22 +90,28 @@ function parseMetadataLine(line: string): { key: string; value: string } | null 
 }
 
 /**
- * Check if line is a conditional start: [if: condition], if [condition], or when [condition]
+ * Check if line is a conditional start: when key, when !key (preferred), or legacy [if: condition], if [condition], when [condition]
  */
 function parseConditionalLine(line: string): string | null {
-  // Support [if: key] syntax
+  // Preferred: when key or when !key (no brackets)
+  const whenSimpleMatch = line.match(/^when\s+(!?\w+)\s*$/);
+  if (whenSimpleMatch) {
+    return whenSimpleMatch[1].trim();
+  }
+
+  // Legacy: Support [if: key] syntax
   const bracketMatch = line.match(/^\[if:\s*(.+)\]$/);
   if (bracketMatch) {
     return bracketMatch[1].trim();
   }
 
-  // Support if [key] syntax
+  // Legacy: Support if [key] syntax
   const ifMatch = line.match(/^if\s+\[([^\]]+)\]\s*$/);
   if (ifMatch) {
     return ifMatch[1].trim();
   }
 
-  // Support when [key] syntax (preferred)
+  // Legacy: Support when [key] syntax
   const whenMatch = line.match(/^when\s+\[([^\]]+)\]\s*$/);
   if (whenMatch) {
     return whenMatch[1].trim();

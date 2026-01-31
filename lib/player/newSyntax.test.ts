@@ -22,7 +22,7 @@ if grab the fire
     +fire
     Ouch!
 @BIKE
-when [fire]
+when fire
     You are biking with fire in your hands.
 You feel the wind in your hair.
 goto @END

@@ -12,6 +12,7 @@ import { Project } from '@/types/project';
 import { Version } from '@/types/version';
 import { useMutation, useQuery } from 'convex/react';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { detectFeedbackFromVersions, formatGuidebookFeedback } from '../version/feedback';
 
 type SaveStatus = 'idle' | 'saving' | 'saved';
 
@@ -32,14 +33,14 @@ interface ProjectContextValue {
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
-// Debounce delay for creating versions (ms)
-const VERSION_DEBOUNCE_MS = 2000;
+// Session window for coalescing author versions (1 hour)
+const SESSION_WINDOW_MS = 60 * 60 * 1000;
 
 export function ProjectProvider({ children, projectId }: { children: ReactNode; projectId: Id<'projects'> }) {
   // Convex queries
   const convexProject = useQuery(api.projects.get, { projectId });
   const convexVersions = useQuery(api.versions?.list, { projectId }) as
-    | { _id: Id<'versions'>; creator: string; createdAt: number; snapshot: { script: string[]; guidebook: string } }[]
+    | { _id: Id<'versions'>; creator: string; createdAt: number; updatedAt?: number; snapshot: { script: string[]; guidebook: string } }[]
     | undefined;
   const updateProjectMutation = useMutation(api.projects.update);
   const createVersionMutation = useMutation(api.versions?.create) as
@@ -49,12 +50,16 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         snapshot: { script: string[]; guidebook: string };
       }) => Promise<unknown>)
     | undefined;
+  const updateVersionMutation = useMutation(api.versions?.update) as
+    | ((args: {
+        versionId: Id<'versions'>;
+        snapshot: { script: string[]; guidebook: string };
+      }) => Promise<unknown>)
+    | undefined;
 
   // Save status for UI feedback
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const versionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSavedSnapshotRef = useRef<{ script: string[]; guidebook: string } | null>(null);
 
   // Selected version for diff viewing
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
@@ -85,20 +90,18 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
   // Track if we've saved the initial version
   const hasCreatedInitialVersionRef = useRef(false);
 
-  // Initialize lastSavedSnapshot and save initial version if none exists
+  // Initialize and save initial version if none exists (using AUTHOR, not SYSTEM)
   useEffect(() => {
-    if (lastSavedSnapshotRef.current) return; // Already initialized
+    // Skip if already created or versions are still loading
+    if (hasCreatedInitialVersionRef.current || convexVersions === undefined) return;
 
-    if (convexVersions && convexVersions.length > 0) {
-      lastSavedSnapshotRef.current = convexVersions[0].snapshot;
-    } else if (convexProject && !hasCreatedInitialVersionRef.current) {
-      // No versions exist - create the initial version as SYSTEM
+    if (convexVersions.length === 0 && convexProject) {
+      // No versions exist - create the initial version as AUTHOR
       const snapshot = { script: convexProject.script, guidebook: convexProject.guidebook };
-      lastSavedSnapshotRef.current = snapshot;
       hasCreatedInitialVersionRef.current = true;
       createVersionMutation?.({
         projectId,
-        creator: Entity.SYSTEM,
+        creator: Entity.AUTHOR,
         snapshot,
       });
     }
@@ -109,60 +112,114 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     id: v._id,
     creator: v.creator as Entity.AUTHOR | Entity.SYSTEM,
     createdAt: v.createdAt,
+    updatedAt: v.updatedAt,
     snapshot: v.snapshot,
   }));
 
-  // Track pending creator for debounced version creation
-  const pendingCreatorRef = useRef<Entity.AUTHOR | Entity.SYSTEM>(Entity.AUTHOR);
+  // Helper to check if snapshots are equal
+  const snapshotsEqual = useCallback(
+    (a: { script: string[]; guidebook: string }, b: { script: string[]; guidebook: string }) => {
+      return a.script.join('\n') === b.script.join('\n') && a.guidebook === b.guidebook;
+    },
+    [],
+  );
 
-  // Update project with debounced version creation
+  // Track version IDs we've already processed for feedback to avoid duplicates
+  const processedFeedbackRef = useRef<Set<string>>(new Set());
+
+  // Update project with smart version management
   const updateProject = useCallback(
     (updates: Partial<Project>, creator: Entity.AUTHOR | Entity.SYSTEM = Entity.AUTHOR) => {
       const newProject = { ...project, ...updates };
       setProject(newProject as Project);
-      pendingCreatorRef.current = creator;
 
       // Show saving status
       setSaveStatus('saving');
 
-      // Clear existing timeouts
+      // Clear existing save timeout
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      if (versionTimeoutRef.current) clearTimeout(versionTimeoutRef.current);
 
-      // Debounce the actual save
+      // Debounce project save (to DB)
       saveTimeoutRef.current = setTimeout(() => {
         updateProjectMutation({
           projectId,
           ...newProject,
         });
         setSaveStatus('saved');
-
-        // Reset to idle after a bit
         setTimeout(() => setSaveStatus('idle'), 1500);
       }, 300);
 
-      // Debounce version creation (longer delay)
-      versionTimeoutRef.current = setTimeout(() => {
-        const snapshot = { script: newProject.script, guidebook: newProject.guidebook };
-        const lastSnapshot = lastSavedSnapshotRef.current;
+      // Version saving - immediate for AI, coalesced for author
+      const snapshot = { script: newProject.script, guidebook: newProject.guidebook } as {
+        script: string[];
+        guidebook: string;
+      };
+      const latestVersion = versions[0];
 
-        // Only create version if content actually changed
-        if (
-          !lastSnapshot ||
-          lastSnapshot.script?.join('\n') !== snapshot.script?.join('\n') ||
-          lastSnapshot.guidebook !== snapshot.guidebook
-        ) {
-          createVersionMutation?.({
-            projectId,
-            creator: pendingCreatorRef.current,
-            snapshot: snapshot as { script: string[]; guidebook: string },
-          });
-          lastSavedSnapshotRef.current = snapshot as { script: string[]; guidebook: string };
+      // Skip if content is identical to latest version
+      if (latestVersion && snapshotsEqual(snapshot, latestVersion.snapshot)) {
+        return;
+      }
+
+      if (creator === Entity.SYSTEM) {
+        // AI edits: always create new version immediately
+        createVersionMutation?.({ projectId, creator, snapshot });
+      } else {
+        // Author edits: coalesce with last version if within 1 hour and last was author
+        const now = Date.now();
+        const lastUpdated = latestVersion?.updatedAt ?? latestVersion?.createdAt ?? 0;
+        const canCoalesce =
+          latestVersion &&
+          latestVersion.creator === Entity.AUTHOR &&
+          now - lastUpdated < SESSION_WINDOW_MS;
+
+        if (canCoalesce && updateVersionMutation) {
+          // Update the existing version
+          updateVersionMutation({ versionId: latestVersion.id, snapshot });
+        } else {
+          // Create new version
+          createVersionMutation?.({ projectId, creator, snapshot });
+
+          // Check for AI→Author feedback pattern if creating a new author version
+          // after an AI version (latestVersion is AI, new version is author)
+          if (latestVersion?.creator === Entity.SYSTEM) {
+            const feedbackKey = `${latestVersion.id}`;
+            if (!processedFeedbackRef.current.has(feedbackKey)) {
+              processedFeedbackRef.current.add(feedbackKey);
+
+              // Build virtual "new author version" for comparison
+              const virtualAuthorVersion: Version = {
+                id: 'pending' as Id<'versions'>,
+                creator: Entity.AUTHOR as Entity.AUTHOR,
+                createdAt: now,
+                snapshot,
+              };
+
+              const feedback = detectFeedbackFromVersions([virtualAuthorVersion, latestVersion]);
+              if (feedback?.type) {
+                // Append feedback to guidebook
+                const feedbackText = formatGuidebookFeedback(feedback.type, feedback.branch);
+                const updatedGuidebook = newProject.guidebook
+                  ? `${newProject.guidebook}\n${feedbackText}`
+                  : feedbackText;
+
+                // Save guidebook update as a separate version
+                createVersionMutation?.({
+                  projectId,
+                  creator: Entity.SYSTEM,
+                  snapshot: { script: newProject.script as string[], guidebook: updatedGuidebook },
+                });
+
+                // Update local state
+                setProject((prev) => (prev ? { ...prev, guidebook: updatedGuidebook } : prev));
+              }
+            }
+          }
         }
-      }, VERSION_DEBOUNCE_MS);
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [project, projectId, updateProjectMutation],
+    [project, projectId, updateProjectMutation, versions, snapshotsEqual],
   );
 
   // Get diff scripts for selected version: compare previous version to this one

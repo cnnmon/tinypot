@@ -141,18 +141,18 @@ if unlock the door & ?key
           <div>
             <h3 className="font-medium">Conditional Blocks</h3>
             <p className="text-sm text-neutral-600 mb-2">
-              Use <code>when [var]</code> to show content only when a variable is set. Use <code>when [!var]</code> for
-              the opposite.
+              Use <code>when var</code> to show content only when a variable is set, or{' '}
+              <code>when !var</code> when it&apos;s not.
             </p>
             <pre className="bg-white/60 p-3 rounded text-sm font-mono border">
               {`@DESK
-when [!key]
+when !key
     There's a key on the desk.
     if take it
         +key
         You grab the key.
 
-when [key]
+when key
     The desk is empty now.`}
             </pre>
           </div>
@@ -178,7 +178,7 @@ The garden is beautiful.`}
               <code>when</code> belongs to that block.
             </p>
             <pre className="bg-white/60 p-3 rounded text-sm font-mono border">
-              {`when [!key]
+              {`when !key
     Oh lookee, there's a key!
     if take it | yes
         +key

@@ -12,5 +12,6 @@ export interface Version {
   id: Id<'versions'>;
   creator: Entity.AUTHOR | Entity.SYSTEM;
   createdAt: number;
+  updatedAt?: number; // When the version was last updated (for coalescing)
   snapshot: Pick<Project, 'script' | 'guidebook'>;
 }

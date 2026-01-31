@@ -9,7 +9,7 @@ export const DEFAULT_LINES = [
   '\t+fire',
   '\tOuch!',
   '@BIKE',
-  'when [fire]',
+  'when fire',
   '\tYou are biking with fire in your hands.',
   'You feel the wind in your hair.',
   'goto @END',

@@ -4,6 +4,7 @@ import { isResolved } from '@/lib/branch';
 import useEditor from '@/lib/editor';
 import { useProject } from '@/lib/project';
 import { Branch, Scene, SceneId } from '@/types/branch';
+import { Entity } from '@/types/entities';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
 import { Compartment, EditorState } from '@codemirror/state';
@@ -113,7 +114,7 @@ export default function Editor({
   readOnly?: boolean;
   branch?: Branch | null;
 }) {
-  const { script, setScript } = useEditor();
+  const { script, setScript, cursorLine, currentLineBlame, updateCursorLine } = useEditor();
   const { branches, sceneToBranchMap, selectedBranchId } = useProject();
 
   // Use prop branch if provided, otherwise fall back to context selection
@@ -153,6 +154,10 @@ export default function Editor({
   // Track when we're syncing external changes to avoid triggering saves
   const isSyncingExternalRef = useRef(false);
 
+  // Track updateCursorLine in a ref so we can use it in the listener
+  const updateCursorLineRef = useRef(updateCursorLine);
+  updateCursorLineRef.current = updateCursorLine;
+
   // Initialize CodeMirror
   useEffect(() => {
     if (!editorRef.current || viewRef.current) return;
@@ -165,6 +170,13 @@ export default function Editor({
       if (update.docChanged && shouldSyncToProjectRef.current && !isSyncingExternalRef.current) {
         const content = update.state.doc.toString();
         setScript(content.split('\n'));
+      }
+
+      // Track cursor position for blame display
+      if (update.selectionSet || update.docChanged) {
+        const pos = update.state.selection.main.head;
+        const line = update.state.doc.lineAt(pos).number - 1; // 0-indexed
+        updateCursorLineRef.current(line);
       }
     });
 
@@ -244,14 +256,30 @@ export default function Editor({
   // Check if viewing any resolved branch (approved or rejected)
   const isViewingResolved = selectedBranch ? isResolved(selectedBranch) : false;
 
+  // Get blame label for display
+  const blameLabel = currentLineBlame === Entity.SYSTEM ? 'ai' : currentLineBlame === Entity.AUTHOR ? 'you' : null;
+
   return (
-    <div className="h-full overflow-y-scroll relative">
+    <div className="h-full overflow-y-scroll relative bg-zinc-100">
       <div ref={editorRef} className="h-full" />
       {isViewingResolved && (
         <div className="absolute top-0 px-2 py-1 text-sm bg-white rounded bordered m-2">
           Read-only ({selectedBranch?.approved ? 'approved' : 'rejected'})
         </div>
       )}
+      {/* Line indicator with blame */}
+      <div className="absolute w-full bottom-0 p-2 text-right text-sm bg-gradient-to-b from-[#EBF7D2] border-t-2">
+        <span className="opacity-50">line {cursorLine + 1}/{script.length}</span>
+        {blameLabel && (
+          <>
+            <span className="opacity-50 mx-2">·</span>
+            <span className="opacity-50">last edit:</span>{' '}
+            <span className={currentLineBlame === Entity.SYSTEM ? 'text-orange-600' : 'text-neutral-700'}>
+              {blameLabel}
+            </span>
+          </>
+        )}
+      </div>
     </div>
   );
 }

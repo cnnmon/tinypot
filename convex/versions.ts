@@ -23,11 +23,30 @@ export const create = mutation({
     }),
   },
   handler: async (ctx, { projectId, creator, snapshot }) => {
+    const now = Date.now();
     const versionId = await ctx.db.insert('versions', {
       projectId,
       creator,
-      createdAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       snapshot,
+    });
+    return await ctx.db.get(versionId);
+  },
+});
+
+export const update = mutation({
+  args: {
+    versionId: v.id('versions'),
+    snapshot: v.object({
+      script: v.array(v.string()),
+      guidebook: v.string(),
+    }),
+  },
+  handler: async (ctx, { versionId, snapshot }) => {
+    await ctx.db.patch(versionId, {
+      snapshot,
+      updatedAt: Date.now(),
     });
     return await ctx.db.get(versionId);
   },

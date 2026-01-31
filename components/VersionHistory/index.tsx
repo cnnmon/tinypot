@@ -166,39 +166,27 @@ export default function VersionHistory({
       </div>
 
       {/* Version list */}
-      <div className="flex-1 overflow-auto space-y-1 text-sm">
-        {/* Current unsaved state (only if different from latest version) */}
-        {hasUnsavedChanges && (
-          <button
-            onClick={() => onSelectVersion(null)}
-            className={twMerge(
-              'w-full text-left px-2 py-1 hover:bg-[var(--mint)]/50',
-              selectedVersionId === null && 'bg-[var(--mint)]',
-            )}
-          >
-            <span className="text-neutral-400">unsaved</span>
-          </button>
-        )}
-
+      <div className="flex-1 overflow-auto space-y-1">
         {/* Saved versions with change descriptions */}
         {versions.map((version, idx) => {
           const previousVersion = versions[idx + 1] ?? null;
           const changeDesc = describeChanges(version.snapshot, previousVersion?.snapshot ?? null);
           const isAI = version.creator === Entity.SYSTEM;
+          const isSelected = selectedVersionId === version.id;
 
           return (
             <button
               key={version.id}
-              onClick={() => onSelectVersion(version.id)}
+              onClick={() => onSelectVersion(isSelected ? null : version.id)}
               className={twMerge(
-                'w-full text-left px-2 py-1 hover:bg-[var(--mint)]/50',
-                selectedVersionId === version.id ? 'bg-[var(--mint)]' : '',
+                'w-full text-left hover:bg-[var(--mint)]/30',
+                isSelected ? 'bg-[var(--mint)]/50' : '',
               )}
             >
-              <span className="text-neutral-400">{formatRelativeTime(version.createdAt)}</span>
-              <span className="text-neutral-300 mx-1">/</span>
-              <span className={isAI ? 'text-orange-600' : 'text-neutral-700'}>{isAI ? 'ai' : 'you'}</span>
-              <span className="text-neutral-400 ml-1">({changeDesc})</span>
+              <span>{formatRelativeTime(version.createdAt)}</span>
+              <span className="mx-1">/</span>
+              <span className={isAI ? 'text-orange-600' : ''}>{isAI ? 'ai' : 'you'}</span>
+              <span className="ml-1 opacity-50">({changeDesc})</span>
             </button>
           );
         })}

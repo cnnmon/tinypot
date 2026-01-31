@@ -108,13 +108,13 @@ function ProjectContent() {
       <div ref={containerRef} className="flex flex-row min-h-[calc(100%-210px)] h-[calc(100%-210px)] pb-5">
         <Box style={{ width: `${leftWidth}%` }}>
           <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
-            <b>{diffScripts ? 'Version' : 'Editor'}</b>
+            <b>{diffScripts ? `version ${selectedVersionId?.slice(1, 5)}` : 'editor'}</b>
             {diffScripts && (
               <button
                 onClick={() => setSelectedVersionId(null)}
-                className="text-sm text-neutral-500 hover:text-neutral-800"
+                className="text-neutral-500 hover:text-neutral-800"
               >
-                ← back to current
+                ← back to editing
               </button>
             )}
           </div>
@@ -130,7 +130,7 @@ function ProjectContent() {
         />
         <Box style={{ width: `${100 - leftWidth}%` }}>
           <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
-            <h1>Player</h1>
+            <h1>player</h1>
           </div>
           <div className="h-[calc(100%-60px)] overflow-scroll m-2 relative">
             <Player />

@@ -43,6 +43,7 @@ export default defineSchema({
     projectId: v.id('projects'),
     creator: v.union(v.literal(Entity.AUTHOR), v.literal(Entity.SYSTEM)),
     createdAt: v.number(),
+    updatedAt: v.optional(v.number()), // When the version was last updated (for coalescing)
     snapshot: v.object({
       script: v.array(v.string()),
       guidebook: v.string(),
