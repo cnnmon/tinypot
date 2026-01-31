@@ -179,14 +179,15 @@ export default function VersionHistory({
               key={version.id}
               onClick={() => onSelectVersion(isSelected ? null : version.id)}
               className={twMerge(
-                'w-full text-left hover:bg-[var(--mint)]/30',
+                'w-full flex hover:bg-[var(--mint)]/30 justify-between',
                 isSelected ? 'bg-[var(--mint)]/50' : '',
               )}
             >
-              <span>{formatRelativeTime(version.createdAt)}</span>
-              <span className="mx-1">/</span>
-              <span className={isAI ? 'text-orange-600' : ''}>{isAI ? 'ai' : 'you'}</span>
-              <span className="ml-1 opacity-50">({changeDesc})</span>
+              <div>
+                <span className={isAI ? 'text-orange-600' : ''}>{isAI ? 'ai' : 'you'}</span>
+                <span className="ml-1 opacity-50">({changeDesc})</span>
+              </div>
+              <span className="opacity-50">{formatRelativeTime(version.createdAt)}</span>
             </button>
           );
         })}

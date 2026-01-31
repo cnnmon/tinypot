@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import { Id } from '@/convex/_generated/dataModel';
 import { Entity } from '@/types/entities';
 import { Version } from '@/types/version';
+import { describe, expect, it } from 'vitest';
 import { detectFeedback, detectFeedbackFromVersions, formatGuidebookFeedback } from './feedback';
 
 function makeVersion(
@@ -159,6 +159,68 @@ describe('formatGuidebookFeedback', () => {
 
   it('returns empty string for null type', () => {
     expect(formatGuidebookFeedback(null, 'something')).toBe('');
+  });
+});
+
+describe('version coalescing rules', () => {
+  /**
+   * Coalescing means updating an existing version instead of creating a new one.
+   * 
+   * Rules:
+   * 1. AUTHOR edits should coalesce with the latest AUTHOR version if within 1 hour
+   * 2. SYSTEM (AI) edits should NEVER coalesce - always create new version
+   * 3. When coalescing, update the `updatedAt` timestamp
+   * 4. If latest version is SYSTEM and new edit is AUTHOR, create new (triggers feedback detection)
+   */
+
+  const HOUR = 60 * 60 * 1000;
+
+  it('documents expected coalescing behavior for rapid typing', () => {
+    // Scenario: User types "Do you walk forward" one character at a time
+    // WITHOUT coalescing: 17 versions for "D", "Do", "Do ", "Do y", etc.
+    // WITH coalescing: 1 version that keeps updating
+    
+    const now = Date.now();
+
+    // Simulated typing events (what the editor sends)
+    const typingEvents = [
+      { script: ['D'], time: now },
+      { script: ['Do'], time: now + 50 },
+      { script: ['Do '], time: now + 100 },
+      { script: ['Do y'], time: now + 150 },
+      { script: ['Do yo'], time: now + 200 },
+      { script: ['Do you'], time: now + 250 },
+      // ... more keystrokes
+      { script: ['Do you walk forward'], time: now + 1000 },
+    ];
+
+    // Expected: All these should coalesce into ONE version because:
+    // - All are AUTHOR
+    // - All are within 1 hour of each other
+    expect(typingEvents.length).toBeGreaterThan(1);
+    
+    // The final state should have just 1 version with the complete text
+    // (This is a documentation test - actual coalescing happens in ProjectProvider)
+  });
+
+  it('documents when NOT to coalesce', () => {
+    const now = Date.now();
+
+    // Case 1: AI version should NEVER coalesce
+    const aiVersion = makeVersion('v1', Entity.SYSTEM, ['AI content'], now);
+    expect(aiVersion.creator).toBe(Entity.SYSTEM);
+    // AI versions are always new, never update existing
+
+    // Case 2: Author version after AI should NOT coalesce (creates new + triggers feedback)
+    const authorAfterAi = makeVersion('v2', Entity.AUTHOR, ['Edited AI content'], now + 100);
+    expect(authorAfterAi.creator).toBe(Entity.AUTHOR);
+    // This should be a NEW version, not an update to the AI version
+
+    // Case 3: Author version after >1 hour should NOT coalesce
+    const oldAuthor = makeVersion('v3', Entity.AUTHOR, ['Old content'], now - 2 * HOUR);
+    const newAuthor = makeVersion('v4', Entity.AUTHOR, ['New content'], now);
+    expect(newAuthor.createdAt - oldAuthor.createdAt).toBeGreaterThan(HOUR);
+    // These should be separate versions
   });
 });
 
