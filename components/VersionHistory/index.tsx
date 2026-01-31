@@ -45,7 +45,7 @@ function describeChanges(
 ): string {
   if (!previous) {
     const scenes = getSceneNames(current.script);
-    if (scenes.size === 0) return 'created';
+    if (scenes.size === 0) return 'START';
     return `added ${Array.from(scenes).slice(0, 2).join(', ')}`;
   }
 
@@ -79,6 +79,11 @@ function describeChanges(
   if (edited.length > 0 && added.length === 0) {
     // Only show edited if nothing was added (to keep it short)
     parts.push(`~${edited.slice(0, 1).join(', ')}`);
+  }
+
+  // If no scenes found but content changed, refer to START
+  if (parts.length === 0 && currentScenes.size === 0) {
+    return '~START';
   }
 
   return parts.length > 0 ? parts.join(' ') : 'edited';
