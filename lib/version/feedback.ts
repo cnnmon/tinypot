@@ -124,7 +124,7 @@ export function detectFeedback(
 
   const aiScript = aiVersion.snapshot.script;
   const authorScript = authorVersion.snapshot.script;
-  const prevScript = []; // AI version is compared to "empty" to find what it added
+  const prevScript: string[] = []; // AI version is compared to "empty" to find what it added
 
   // Find what the AI added
   const aiBranches = findBranches(aiScript);
