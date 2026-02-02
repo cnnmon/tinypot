@@ -68,7 +68,7 @@ export default function VersionViewer({ script, previousScript }: VersionViewerP
   }, [script, previousScript]);
 
   return (
-    <div className="h-full overflow-y-scroll relative">
+    <div className="h-full overflow-y-scroll relative bg-zinc-100">
       <div ref={containerRef} className="h-full" />
     </div>
   );

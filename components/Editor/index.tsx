@@ -11,6 +11,12 @@ import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { useEffect, useMemo, useRef } from 'react';
 import {
+  blameHighlightPlugin,
+  blameHighlightState,
+  blameHighlightTheme,
+  setBlameHighlight,
+} from './utils/blameHighlight';
+import {
   branchHighlightPlugin,
   branchHighlightState,
   branchHighlightTheme,
@@ -114,7 +120,7 @@ export default function Editor({
   readOnly?: boolean;
   branch?: Branch | null;
 }) {
-  const { script, setScript, cursorLine, currentLineBlame, updateCursorLine } = useEditor();
+  const { script, setScript, blame, cursorLine, currentLineBlame, updateCursorLine } = useEditor();
   const { branches, sceneToBranchMap, selectedBranchId } = useProject();
 
   // Use prop branch if provided, otherwise fall back to context selection
@@ -188,9 +194,12 @@ export default function Editor({
         bonsaiTheme,
         bonsaiSyntaxTheme,
         branchHighlightTheme,
+        blameHighlightTheme,
         lineHighlighterPlugin,
         branchHighlightState,
         branchHighlightPlugin,
+        blameHighlightState,
+        blameHighlightPlugin,
         syntaxHighlighting(bonsaiHighlighting),
         updateListener,
         EditorView.lineWrapping,
@@ -253,6 +262,16 @@ export default function Editor({
     });
   }, [sceneToBranchMap, selectedBranch]);
 
+  // Update blame highlighting when blame data changes
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+
+    view.dispatch({
+      effects: setBlameHighlight.of(blame),
+    });
+  }, [blame]);
+
   // Check if viewing any resolved branch (approved or rejected)
   const isViewingResolved = selectedBranch ? isResolved(selectedBranch) : false;
 
@@ -260,8 +279,8 @@ export default function Editor({
   const blameLabel = currentLineBlame === Entity.SYSTEM ? 'ai' : currentLineBlame === Entity.AUTHOR ? 'you' : null;
 
   return (
-    <div className="h-full overflow-y-scroll relative bg-zinc-100">
-      <div ref={editorRef} className="h-full" />
+    <div className="h-full overflow-y-scroll relative">
+      <div ref={editorRef} className="h-full pb-10" />
       {isViewingResolved && (
         <div className="absolute top-0 px-2 py-1 text-sm bg-white rounded bordered m-2">
           Read-only ({selectedBranch?.approved ? 'approved' : 'rejected'})
