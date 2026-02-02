@@ -13,6 +13,7 @@ import { Version } from '@/types/version';
 import { useMutation, useQuery } from 'convex/react';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { detectFeedbackFromVersions, formatGuidebookFeedback } from '../version/feedback';
+import { shouldCoalesceAuthorEdit } from './coalesce';
 
 type SaveStatus = 'idle' | 'saving' | 'saved';
 
@@ -35,8 +36,6 @@ interface ProjectContextValue {
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
-// Session window for coalescing author versions (1 hour)
-const SESSION_WINDOW_MS = 60 * 60 * 1000;
 
 export function ProjectProvider({ children, projectId }: { children: ReactNode; projectId: Id<'projects'> }) {
   // Convex queries
@@ -58,7 +57,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         snapshot: { script: string[]; guidebook: string };
       }) => Promise<unknown>)
     | undefined;
-  const deleteVersionMutation = useMutation(api.versions?.remove) as
+  const deleteVersionMutation = useMutation(api.versions?.remove) as unknown as
     | ((args: { versionId: Id<'versions'> }) => Promise<void>)
     | undefined;
 
@@ -186,21 +185,19 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         versionTimeoutRef.current = setTimeout(() => {
           const now = Date.now();
 
-          // Use local pending state OR fall back to Convex version
+          // Use extracted coalesce logic to decide whether to update or create
           const pending = pendingVersionRef.current;
-          const lastUpdated = pending?.updatedAt ?? latestVersion?.updatedAt ?? latestVersion?.createdAt ?? 0;
+          const decision = shouldCoalesceAuthorEdit(
+            pending ? { versionId: pending.versionId as string, creator: pending.creator, updatedAt: pending.updatedAt } : null,
+            latestVersion,
+            now,
+          );
 
-          const canCoalesce =
-            (pending?.versionId || latestVersion) &&
-            (pending?.creator === Entity.AUTHOR || latestVersion?.creator === Entity.AUTHOR) &&
-            now - lastUpdated < SESSION_WINDOW_MS;
-
-          if (canCoalesce && updateVersionMutation && (pending?.versionId || latestVersion?.id)) {
-            // Update the existing version
-            const versionId = pending?.versionId ?? latestVersion!.id;
-            updateVersionMutation({ versionId, snapshot });
+          if (decision.action === 'coalesce' && decision.versionIdToUpdate && updateVersionMutation) {
+            // Update the existing author version
+            updateVersionMutation({ versionId: decision.versionIdToUpdate as Id<'versions'>, snapshot });
             // Update pending state
-            pendingVersionRef.current = { versionId, creator: Entity.AUTHOR, updatedAt: now };
+            pendingVersionRef.current = { versionId: decision.versionIdToUpdate as Id<'versions'>, creator: Entity.AUTHOR, updatedAt: now };
           } else {
             // Create new version
             createVersionMutation?.({ projectId, creator, snapshot })?.then((result) => {
@@ -231,21 +228,20 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
 
                 const feedback = detectFeedbackFromVersions([virtualAuthorVersion, latestVersion]);
                 if (feedback?.type) {
-                  // Append feedback to guidebook
+                  // Append feedback to guidebook - just update project, don't create new version
+                  // (creating a new AI version here would make the human's edit appear as AI)
                   const feedbackText = formatGuidebookFeedback(feedback.type, feedback.branch);
                   const updatedGuidebook = newProject.guidebook
                     ? `${newProject.guidebook}\n${feedbackText}`
                     : feedbackText;
 
-                  // Save guidebook update as a separate version
-                  createVersionMutation?.({
-                    projectId,
-                    creator: Entity.SYSTEM,
-                    snapshot: { script: newProject.script as string[], guidebook: updatedGuidebook },
-                  });
-
-                  // Update local state
+                  // Update local state and save to project (not as a version)
                   setProject((prev) => (prev ? { ...prev, guidebook: updatedGuidebook } : prev));
+                  updateProjectMutation({
+                    projectId,
+                    script: newProject.script as string[],
+                    guidebook: updatedGuidebook,
+                  });
                 }
               }
             }
