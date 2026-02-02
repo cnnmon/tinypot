@@ -25,6 +25,8 @@ interface ProjectContextValue {
   setSelectedVersionId: (id: string | null) => void;
   /** Get the diff scripts for a selected version: [before, after] */
   getDiffScripts: () => { before: string[]; after: string[] } | null;
+  /** Delete a version by ID */
+  deleteVersion: (versionId: string) => void;
   // Legacy branch fields (empty stubs for Editor compatibility)
   branches: Branch[];
   sceneToBranchMap: Record<string, string>;
@@ -55,6 +57,9 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         versionId: Id<'versions'>;
         snapshot: { script: string[]; guidebook: string };
       }) => Promise<unknown>)
+    | undefined;
+  const deleteVersionMutation = useMutation(api.versions?.remove) as
+    | ((args: { versionId: Id<'versions'> }) => Promise<void>)
     | undefined;
 
   // Save status for UI feedback
@@ -170,7 +175,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
       }
 
       if (creator === Entity.SYSTEM) {
-        // AI edits: always create new version immediately
+        // AI edits: create new version immediately (already checked for identical content above)
         createVersionMutation?.({ projectId, creator, snapshot });
         // Reset pending state since AI creates new version
         pendingVersionRef.current = null;
@@ -268,6 +273,19 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     };
   }, [selectedVersionId, versions]);
 
+  // Delete a version
+  const deleteVersion = useCallback(
+    (versionId: string) => {
+      if (!deleteVersionMutation) return;
+      // Clear selection if deleting the selected version
+      if (selectedVersionId === versionId) {
+        setSelectedVersionId(null);
+      }
+      deleteVersionMutation({ versionId: versionId as Id<'versions'> });
+    },
+    [deleteVersionMutation, selectedVersionId],
+  );
+
   // Show loading state while project data is loading
   if (convexProject === undefined || project === null) {
     return (
@@ -299,6 +317,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         selectedVersionId,
         setSelectedVersionId,
         getDiffScripts,
+        deleteVersion,
         // Legacy branch fields (empty stubs for Editor compatibility)
         branches: [],
         sceneToBranchMap: {},

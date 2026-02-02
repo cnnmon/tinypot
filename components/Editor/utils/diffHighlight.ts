@@ -41,16 +41,53 @@ function normalizeLine(line: string): string {
   return line.trim().toLowerCase();
 }
 
-/** Build a set of normalized lines for quick lookup */
-function buildLineSet(lines: string[]): Set<string> {
-  const set = new Set<string>();
-  for (const line of lines) {
-    const normalized = normalizeLine(line);
-    if (normalized) {
-      set.add(normalized);
+/**
+ * Simple LCS-based diff: returns indices of lines in "after" that are additions.
+ * Uses positional comparison so identical lines in different scenes don't get confused.
+ */
+function computeAddedLineIndices(before: string[], after: string[]): Set<number> {
+  const beforeNorm = before.map(normalizeLine);
+  const afterNorm = after.map(normalizeLine);
+
+  // Build LCS table
+  const m = beforeNorm.length;
+  const n = afterNorm.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (beforeNorm[i - 1] === afterNorm[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
     }
   }
-  return set;
+
+  // Backtrack to find matched indices in "after"
+  const matchedAfterIndices = new Set<number>();
+  let i = m;
+  let j = n;
+  while (i > 0 && j > 0) {
+    if (beforeNorm[i - 1] === afterNorm[j - 1]) {
+      matchedAfterIndices.add(j - 1); // 0-indexed
+      i--;
+      j--;
+    } else if (dp[i - 1][j] > dp[i][j - 1]) {
+      i--;
+    } else {
+      j--;
+    }
+  }
+
+  // Lines in "after" not matched = added
+  const addedIndices = new Set<number>();
+  for (let idx = 0; idx < after.length; idx++) {
+    if (!matchedAfterIndices.has(idx) && afterNorm[idx]) {
+      addedIndices.add(idx);
+    }
+  }
+  return addedIndices;
 }
 
 /** Widget to show removed lines count */
@@ -83,48 +120,29 @@ function buildDiffDecorations(view: EditorView): DecorationSet {
     return Decoration.none;
   }
 
-  // Build line sets for comparison
-  const beforeSet = buildLineSet(beforeScript);
-  const afterSet = buildLineSet(afterScript);
+  // Use LCS-based positional diff to find added lines
+  const addedIndices = computeAddedLineIndices(beforeScript, afterScript);
 
   const decorations: { from: number; deco: Decoration }[] = [];
   const doc = view.state.doc;
 
-  // Count removals (lines in "before" but not in "after")
-  let removedCount = 0;
-  for (const normalized of beforeSet) {
-    if (!afterSet.has(normalized)) {
-      removedCount++;
-    }
-  }
+  // Count removals using reverse LCS (lines in before not matched to after)
+  const removedIndices = computeAddedLineIndices(afterScript, beforeScript);
+  const removedCount = removedIndices.size;
 
   // Process each line in the displayed document (which shows "after")
   for (let i = 1; i <= doc.lines; i++) {
-    const line = doc.line(i);
-    const normalized = normalizeLine(line.text);
+    const lineIdx = i - 1; // 0-indexed for our addedIndices
 
-    if (!normalized) continue; // Skip empty lines
-
-    const inBefore = beforeSet.has(normalized);
-    const inAfter = afterSet.has(normalized);
-
-    let lineClass = '';
-
-    if (inAfter && !inBefore) {
-      // Line exists in "after" but not in "before" = ADDED in this version (green)
-      lineClass = 'cm-diff-added';
-    }
-    // Lines in both = unchanged, no highlight
-
-    if (lineClass) {
+    if (addedIndices.has(lineIdx)) {
       decorations.push({
-        from: line.from,
-        deco: Decoration.line({ class: lineClass }),
+        from: doc.line(i).from,
+        deco: Decoration.line({ class: 'cm-diff-added' }),
       });
     }
   }
 
-  // Add widget at top to show removals count (lines that were removed in this version)
+  // Add widget at top to show removals count
   if (removedCount > 0 && doc.lines > 0) {
     const firstLine = doc.line(1);
     decorations.push({

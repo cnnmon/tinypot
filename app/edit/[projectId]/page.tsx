@@ -15,7 +15,7 @@ import { useCallback, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 function ProjectContent() {
-  const { project, updateProject, versions, saveStatus, selectedVersionId, setSelectedVersionId, getDiffScripts } =
+  const { project, updateProject, versions, saveStatus, selectedVersionId, setSelectedVersionId, getDiffScripts, deleteVersion } =
     useProject();
   const [leftWidth, setLeftWidth] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -100,6 +100,7 @@ function ProjectContent() {
               saveStatus={saveStatus}
               selectedVersionId={selectedVersionId}
               onSelectVersion={setSelectedVersionId}
+              onDeleteVersion={deleteVersion}
             />
           </div>
         </Box>

@@ -10,6 +10,7 @@ interface VersionHistoryProps {
   saveStatus: 'idle' | 'saving' | 'saved';
   selectedVersionId: string | null;
   onSelectVersion: (versionId: string | null) => void;
+  onDeleteVersion?: (versionId: string) => void;
 }
 
 /** Format relative time (e.g., "2m ago", "1h ago") */
@@ -148,6 +149,7 @@ export default function VersionHistory({
   saveStatus,
   selectedVersionId,
   onSelectVersion,
+  onDeleteVersion,
 }: VersionHistoryProps) {
   // Build version items with change descriptions
   // Include current state as the first item if it differs from latest version
@@ -180,20 +182,36 @@ export default function VersionHistory({
           const isSelected = selectedVersionId === version.id;
 
           return (
-            <button
+            <div
               key={version.id}
-              onClick={() => onSelectVersion(isSelected ? null : version.id)}
               className={twMerge(
-                'w-full flex hover:bg-[var(--mint)]/30 justify-between',
+                'w-full flex hover:bg-[var(--mint)]/30 justify-between group',
                 isSelected ? 'bg-[var(--mint)]/50' : '',
               )}
             >
-              <div>
+              <button
+                onClick={() => onSelectVersion(isSelected ? null : version.id)}
+                className="flex-1 text-left"
+              >
                 <span className={isAI ? 'text-orange-600' : ''}>{isAI ? 'ai' : 'you'}</span>
                 <span className="ml-1 opacity-50">({changeDesc})</span>
+              </button>
+              <div className="flex items-center gap-1">
+                <span className="opacity-50">{formatRelativeTime(version.createdAt)}</span>
+                {onDeleteVersion && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteVersion(version.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-50 hover:!opacity-100 text-red-500 px-1"
+                    title="Delete version"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
-              <span className="opacity-50">{formatRelativeTime(version.createdAt)}</span>
-            </button>
+            </div>
           );
         })}
 

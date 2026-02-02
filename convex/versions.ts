@@ -51,3 +51,10 @@ export const update = mutation({
     return await ctx.db.get(versionId);
   },
 });
+
+export const remove = mutation({
+  args: { versionId: v.id('versions') },
+  handler: async (ctx, { versionId }) => {
+    await ctx.db.delete(versionId);
+  },
+});
