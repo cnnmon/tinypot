@@ -14,6 +14,7 @@ import {
   blameHighlightPlugin,
   blameHighlightState,
   blameHighlightTheme,
+  markLineReviewed,
   setBlameHighlight,
 } from './utils/blameHighlight';
 import {
@@ -120,7 +121,12 @@ export default function Editor({
   readOnly?: boolean;
   branch?: Branch | null;
 }) {
-  const { script, setScript, blame, cursorLine, currentLineBlame, updateCursorLine } = useEditor();
+  const { script, setScript, blame, cursorLine, currentLineBlame, updateCursorLine, showBlameHighlight } = useEditor();
+  
+  // Track reviewed lines (AI lines that author has edited)
+  const reviewedLinesRef = useRef<Set<number>>(new Set());
+  const showBlameHighlightRef = useRef(showBlameHighlight);
+  showBlameHighlightRef.current = showBlameHighlight;
   const { branches, sceneToBranchMap, selectedBranchId } = useProject();
 
   // Use prop branch if provided, otherwise fall back to context selection
@@ -163,6 +169,10 @@ export default function Editor({
   // Track updateCursorLine in a ref so we can use it in the listener
   const updateCursorLineRef = useRef(updateCursorLine);
   updateCursorLineRef.current = updateCursorLine;
+  
+  // Track blame in a ref for the update listener
+  const blameRef = useRef(blame);
+  blameRef.current = blame;
 
   // Initialize CodeMirror
   useEffect(() => {
@@ -176,6 +186,22 @@ export default function Editor({
       if (update.docChanged && shouldSyncToProjectRef.current && !isSyncingExternalRef.current) {
         const content = update.state.doc.toString();
         setScript(content.split('\n'));
+        
+        // Detect which lines were changed and mark AI lines as reviewed
+        const currentBlame = blameRef.current;
+        update.changes.iterChangedRanges((fromA, toA) => {
+          // Find which lines were affected by this change
+          const startLine = update.startState.doc.lineAt(fromA).number - 1;
+          const endLine = update.startState.doc.lineAt(Math.max(fromA, toA - 1)).number - 1;
+          
+          for (let lineIdx = startLine; lineIdx <= endLine; lineIdx++) {
+            // If this was an AI line, mark it as reviewed
+            if (currentBlame[lineIdx] === Entity.SYSTEM && !reviewedLinesRef.current.has(lineIdx)) {
+              reviewedLinesRef.current.add(lineIdx);
+              update.view.dispatch({ effects: markLineReviewed.of(lineIdx) });
+            }
+          }
+        });
       }
 
       // Track cursor position for blame display
@@ -262,15 +288,19 @@ export default function Editor({
     });
   }, [sceneToBranchMap, selectedBranch]);
 
-  // Update blame highlighting when blame data changes
+  // Update blame highlighting when blame data or visibility changes
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
 
     view.dispatch({
-      effects: setBlameHighlight.of(blame),
+      effects: setBlameHighlight.of({
+        blame,
+        reviewedLines: reviewedLinesRef.current,
+        showHighlighting: showBlameHighlight,
+      }),
     });
-  }, [blame]);
+  }, [blame, showBlameHighlight]);
 
   // Check if viewing any resolved branch (approved or rejected)
   const isViewingResolved = selectedBranch ? isResolved(selectedBranch) : false;

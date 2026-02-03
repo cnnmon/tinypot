@@ -11,6 +11,9 @@ interface VersionHistoryProps {
   selectedVersionId: string | null;
   onSelectVersion: (versionId: string | null) => void;
   onDeleteVersion?: (versionId: string) => void;
+  /** Show button to clear AI line highlighting */
+  hasAiHighlight?: boolean;
+  onClearHighlight?: () => void;
 }
 
 /** Format relative time (e.g., "2m ago", "1h ago") */
@@ -150,6 +153,8 @@ export default function VersionHistory({
   selectedVersionId,
   onSelectVersion,
   onDeleteVersion,
+  hasAiHighlight,
+  onClearHighlight,
 }: VersionHistoryProps) {
   // Build version items with change descriptions
   // Include current state as the first item if it differs from latest version
@@ -157,19 +162,30 @@ export default function VersionHistory({
 
   return (
     <div className="flex flex-col h-full gap-2">
-      {/* Save status indicator */}
+      {/* Header with save status */}
       <div className="flex items-center justify-between">
         <h1 className="cursor-default">versions</h1>
-        <span
-          className={twMerge(
-            'text-xs transition-opacity',
-            saveStatus === 'saving' && 'text-neutral-500 animate-pulse',
-            saveStatus === 'saved' && 'text-green-600',
-            saveStatus === 'idle' && 'opacity-0',
+        <div className="flex items-center gap-2">
+          {hasAiHighlight && onClearHighlight && (
+            <button
+              onClick={onClearHighlight}
+              className="text-xs text-orange-600 hover:text-orange-800"
+              title="Clear AI line highlighting"
+            >
+              dismiss
+            </button>
           )}
-        >
-          {saveStatus === 'saving' ? 'saving...' : saveStatus === 'saved' ? 'saved' : ''}
-        </span>
+          <span
+            className={twMerge(
+              'text-xs transition-opacity',
+              saveStatus === 'saving' && 'text-neutral-500 animate-pulse',
+              saveStatus === 'saved' && 'text-green-600',
+              saveStatus === 'idle' && 'opacity-0',
+            )}
+          >
+            {saveStatus === 'saving' ? 'saving...' : saveStatus === 'saved' ? 'saved' : ''}
+          </span>
+        </div>
       </div>
 
       {/* Version list */}
