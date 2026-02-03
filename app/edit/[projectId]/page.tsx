@@ -7,7 +7,6 @@ import Player from '@/components/Player';
 import VersionHistory from '@/components/VersionHistory';
 import VersionViewer from '@/components/VersionViewer';
 import { Id } from '@/convex/_generated/dataModel';
-import useEditor from '@/lib/editor';
 import { PlayerProvider } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
 import { getShareUrl } from '@/lib/share';
@@ -18,7 +17,6 @@ import { twMerge } from 'tailwind-merge';
 function ProjectContent() {
   const { project, updateProject, versions, saveStatus, selectedVersionId, setSelectedVersionId, getDiffScripts, deleteVersion } =
     useProject();
-  const { hasAiLines, showBlameHighlight, clearBlameHighlighting } = useEditor();
   const [leftWidth, setLeftWidth] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -103,8 +101,6 @@ function ProjectContent() {
               selectedVersionId={selectedVersionId}
               onSelectVersion={setSelectedVersionId}
               onDeleteVersion={deleteVersion}
-              hasAiHighlight={hasAiLines && showBlameHighlight}
-              onClearHighlight={clearBlameHighlighting}
             />
           </div>
         </Box>

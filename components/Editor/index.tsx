@@ -121,7 +121,7 @@ export default function Editor({
   readOnly?: boolean;
   branch?: Branch | null;
 }) {
-  const { script, setScript, blame, cursorLine, currentLineBlame, updateCursorLine, showBlameHighlight } = useEditor();
+  const { script, setScript, blame, cursorLine, currentLineBlame, updateCursorLine, showBlameHighlight, hasAiLines, clearBlameHighlighting } = useEditor();
   
   // Track reviewed lines (AI lines that author has edited)
   const reviewedLinesRef = useRef<Set<number>>(new Set());
@@ -316,18 +316,30 @@ export default function Editor({
           Read-only ({selectedBranch?.approved ? 'approved' : 'rejected'})
         </div>
       )}
-      {/* Line indicator with blame */}
-      <div className="absolute w-full bottom-0 p-2 text-right text-sm bg-gradient-to-b from-[#EBF7D2] border-t-2">
-        <span className="opacity-50">line {cursorLine + 1}/{script.length}</span>
-        {blameLabel && (
-          <>
-            <span className="opacity-50 mx-2">·</span>
-            <span className="opacity-50">last edit:</span>{' '}
-            <span className={currentLineBlame === Entity.SYSTEM ? 'text-orange-600' : 'text-neutral-700'}>
-              {blameLabel}
-            </span>
-          </>
-        )}
+      {/* Line indicator with blame and dismiss button */}
+      <div className="absolute w-full bottom-0 p-2 text-sm bg-gradient-to-b from-[#EBF7D2] border-t-2 flex justify-between items-center">
+        <div>
+          {hasAiLines && showBlameHighlight && (
+            <button
+              onClick={clearBlameHighlighting}
+              className="text-orange-600 hover:text-orange-800"
+            >
+              dismiss highlights
+            </button>
+          )}
+        </div>
+        <div>
+          <span className="opacity-50">line {cursorLine + 1}/{script.length}</span>
+          {blameLabel && (
+            <>
+              <span className="opacity-50 mx-2">·</span>
+              <span className="opacity-50">last edit:</span>{' '}
+              <span className={currentLineBlame === Entity.SYSTEM ? 'text-orange-600' : 'text-neutral-700'}>
+                {blameLabel}
+              </span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
