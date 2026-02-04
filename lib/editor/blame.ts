@@ -64,8 +64,10 @@ function findAddedLineIndices(before: string[], after: string[]): Set<number> {
 /**
  * Compute blame for each line in the current script.
  * Uses LCS-based diff to properly track insertions without wrongly blaming shifted lines.
+ * 
+ * @param onlyUnresolved - If true, only blame unresolved AI versions (for highlighting)
  */
-export function computeBlame(currentScript: string[], versions: Version[]): LineBlame[] {
+export function computeBlame(currentScript: string[], versions: Version[], onlyUnresolved = false): LineBlame[] {
   if (versions.length === 0) {
     return currentScript.map(() => null);
   }
@@ -76,6 +78,12 @@ export function computeBlame(currentScript: string[], versions: Version[]): Line
   // For each version (newest to oldest), find lines that were ADDED in that version
   for (let vIdx = 0; vIdx < versions.length; vIdx++) {
     const version = versions[vIdx];
+    
+    // Skip resolved AI versions if we only want unresolved highlights
+    if (onlyUnresolved && version.creator === Entity.SYSTEM && version.resolved) {
+      continue;
+    }
+    
     const versionScript = version.snapshot.script;
     const prevScript = versions[vIdx + 1]?.snapshot.script ?? [];
 

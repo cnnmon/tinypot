@@ -9,14 +9,17 @@ import VersionViewer from '@/components/VersionViewer';
 import { Id } from '@/convex/_generated/dataModel';
 import { PlayerProvider } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
-import { getShareUrl } from '@/lib/share';
+import { useProjects } from '@/lib/project/ProjectsProvider';
+import { decodeShareId, getShareUrl } from '@/lib/share';
+import { PencilIcon } from '@heroicons/react/24/outline';
 import { useParams } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 
-function ProjectContent() {
+function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
   const { project, updateProject, versions, saveStatus, selectedVersionId, setSelectedVersionId, getDiffScripts, deleteVersion } =
     useProject();
+  const { renameProject } = useProjects();
   const [leftWidth, setLeftWidth] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -60,14 +63,27 @@ function ProjectContent() {
       <div className="flex items-center justify-between">
         <div className="flex gap-2 items-center">
           <Header />
+          <p className="text-lg">{project.name} {isSharedView && <span className="text-neutral-400 text-sm">(view-only)</span>}</p>
+          {!isSharedView && (
+            <button
+              onClick={() => {
+                const newName = prompt('Enter new name', project.name);
+                if (newName) renameProject(project.id, newName);
+              }}
+            >
+              <PencilIcon className="w-4 h-4" />
+            </button>
+          )}
         </div>
         <div className="flex gap-1">
           <button onClick={() => window.open('/help', '_blank')} className="px-1">
             help
           </button>
-          <button onClick={handleShare} className="px-1">
-            share
-          </button>
+          {!isSharedView && (
+            <button onClick={handleShare} className="px-1">
+              share
+            </button>
+          )}
         </div>
       </div>
 
@@ -88,6 +104,7 @@ function ProjectContent() {
               placeholder="Always generate content based on this prompt..."
               className="w-full h-full"
               onChange={(e) => updateProject({ guidebook: e.target.value })}
+              readOnly={isSharedView}
             />
           </div>
         </Box>
@@ -122,7 +139,7 @@ function ProjectContent() {
           {diffScripts ? (
             <VersionViewer script={diffScripts.after} previousScript={diffScripts.before} />
           ) : (
-            <Editor />
+            <Editor readOnly={isSharedView} />
           )}
         </Box>
         <div
@@ -144,7 +161,11 @@ function ProjectContent() {
 
 export default function ProjectPage() {
   const params = useParams();
-  const projectId = params.projectId as string;
+  const rawProjectId = params.projectId as string;
+
+  // Check if this is a share ID (encrypted project ID)
+  const isSharedView = rawProjectId.startsWith('s_');
+  const projectId = isSharedView ? decodeShareId(rawProjectId) : rawProjectId;
 
   // Validate that projectId looks like a Convex ID (not legacy "123")
   const isValidId = projectId && projectId.length > 10;
@@ -165,7 +186,7 @@ export default function ProjectPage() {
   return (
     <ProjectProvider projectId={projectId as Id<'projects'>}>
       <PlayerProvider>
-        <ProjectContent />
+        <ProjectContent isSharedView={isSharedView} />
       </PlayerProvider>
     </ProjectProvider>
   );

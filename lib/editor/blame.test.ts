@@ -10,10 +10,12 @@ describe('computeBlame', () => {
     creator: Entity.AUTHOR | Entity.SYSTEM,
     script: string[],
     createdAt: number = Date.now(),
+    resolved?: boolean,
   ): Version => ({
     id: id as any,
     creator,
     createdAt,
+    resolved,
     snapshot: { script, guidebook: '' },
   });
 
@@ -184,6 +186,52 @@ describe('computeBlame', () => {
       
       // Should still match despite whitespace differences
       expect(blame[0]).not.toBe(Entity.SYSTEM);
+    });
+  });
+
+  describe('resolved versions', () => {
+    it('should skip resolved AI versions when onlyUnresolved is true', () => {
+      const currentScript = ['@HOME', 'The fire burns.', 'if look around', '  You see things.'];
+      
+      // AI added lines, but version is resolved
+      const aiVersion = makeVersion('v2', Entity.SYSTEM, currentScript, 2000, true);
+      const authorVersion = makeVersion('v1', Entity.AUTHOR, ['@HOME', 'The fire burns.'], 1000);
+      
+      // With onlyUnresolved = true, resolved AI versions should be skipped
+      const blame = computeBlame(currentScript, [aiVersion, authorVersion], true);
+      
+      // AI lines should NOT be attributed to SYSTEM because the version is resolved
+      expect(blame[2]).not.toBe(Entity.SYSTEM);
+      expect(blame[3]).not.toBe(Entity.SYSTEM);
+    });
+
+    it('should include resolved AI versions when onlyUnresolved is false', () => {
+      const currentScript = ['@HOME', 'The fire burns.', 'if look around', '  You see things.'];
+      
+      // AI added lines, but version is resolved
+      const aiVersion = makeVersion('v2', Entity.SYSTEM, currentScript, 2000, true);
+      const authorVersion = makeVersion('v1', Entity.AUTHOR, ['@HOME', 'The fire burns.'], 1000);
+      
+      // With onlyUnresolved = false (default), resolved AI versions should be included
+      const blame = computeBlame(currentScript, [aiVersion, authorVersion], false);
+      
+      // AI lines should be attributed to SYSTEM
+      expect(blame[2]).toBe(Entity.SYSTEM);
+      expect(blame[3]).toBe(Entity.SYSTEM);
+    });
+
+    it('should still show unresolved AI versions when onlyUnresolved is true', () => {
+      const currentScript = ['@HOME', 'The fire burns.', 'if look around', '  You see things.'];
+      
+      // AI added lines, version is NOT resolved
+      const aiVersion = makeVersion('v2', Entity.SYSTEM, currentScript, 2000, false);
+      const authorVersion = makeVersion('v1', Entity.AUTHOR, ['@HOME', 'The fire burns.'], 1000);
+      
+      const blame = computeBlame(currentScript, [aiVersion, authorVersion], true);
+      
+      // AI lines should be attributed to SYSTEM (not resolved)
+      expect(blame[2]).toBe(Entity.SYSTEM);
+      expect(blame[3]).toBe(Entity.SYSTEM);
     });
   });
 });

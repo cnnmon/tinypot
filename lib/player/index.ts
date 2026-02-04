@@ -130,6 +130,9 @@ export default function usePlayer() {
   // Handle player input
   const handleSubmit = useCallback(
     async (input: string) => {
+      // Auto-increment turn counter on each player input
+      variables.set('turn');
+
       const trimmedInput = input || '(stay silent)';
       let lineIdx = state.currentLineIdx;
 

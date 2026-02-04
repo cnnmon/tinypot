@@ -90,11 +90,15 @@ function parseMetadataLine(line: string): { key: string; value: string } | null 
 }
 
 /**
- * Check if line is a conditional start: when key, when !key (preferred), or legacy [if: condition], if [condition], when [condition]
+ * Check if line is a conditional start: 
+ * - when key (true if key >= 1)
+ * - when !key (true if key = 0)
+ * - when key >= N (true if key >= N)
+ * - Legacy: [if: condition], if [condition], when [condition]
  */
 function parseConditionalLine(line: string): string | null {
-  // Preferred: when key or when !key (no brackets)
-  const whenSimpleMatch = line.match(/^when\s+(!?\w+)\s*$/);
+  // Preferred: when key, when !key, or when key >= N
+  const whenSimpleMatch = line.match(/^when\s+(!?\w+(?:\s*>=\s*\d+)?)\s*$/);
   if (whenSimpleMatch) {
     return whenSimpleMatch[1].trim();
   }

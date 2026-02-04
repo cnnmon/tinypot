@@ -120,40 +120,75 @@ The flowers sway gently.`}
 
           {/* Variable Effects */}
           <div>
-            <h3 className="font-medium">Variable Effects</h3>
+            <h3 className="font-medium">Variables (Counters)</h3>
             <p className="text-sm text-neutral-600 mb-2">
-              Use <code>+var</code> to set a variable, <code>-var</code> to unset, and <code>& ?var</code> after a
-              choice to require it.
+              Variables are <strong>counters</strong>. Use <code>+var</code> to increment (add 1), <code>-var</code> to
+              decrement (subtract 1). Use <code>& ?var</code> after a choice to require it.
             </p>
             <pre className="bg-white/60 p-3 rounded text-sm font-mono border">
-              {`if take the key
-    +key
-    Yoink! You pocket the key.
+              {`if buy sword
+    -gold
+    +sword
+    You got a sword!
 
-if unlock the door & ?key
-    -key
-    You use your key to unlock it.
-    goto @SECRET_ROOM`}
+if buy another sword
+    -gold
+    +sword
+    Now you have two swords!
+
+if attack & ?sword
+    You swing your blade.`}
             </pre>
+            <p className="text-sm text-neutral-500 mt-2">
+              Display: <code>sword</code> (count=1), <code>sword (2)</code> (count=2), etc.
+            </p>
           </div>
 
           {/* Conditions */}
           <div>
             <h3 className="font-medium">Conditional Blocks</h3>
             <p className="text-sm text-neutral-600 mb-2">
-              Use <code>when var</code> to show content only when a variable is set, or{' '}
-              <code>when !var</code> when it&apos;s not.
+              Use <code>when var</code> (true if ≥1), <code>when !var</code> (true if 0), or{' '}
+              <code>when var {'>'}= N</code> for threshold checks.
             </p>
             <pre className="bg-white/60 p-3 rounded text-sm font-mono border">
-              {`@DESK
-when !key
-    There's a key on the desk.
-    if take it
-        +key
-        You grab the key.
+              {`@SHOP
+when gold >= 10
+    You can afford the sword!
+when !gold
+    Your pockets are empty.
 
-when key
-    The desk is empty now.`}
+@BATTLE
+when sword >= 2
+    You dual-wield your blades!
+when sword
+    You swing your sword.
+when !sword
+    You fight with your fists.`}
+            </pre>
+          </div>
+
+          {/* Turn Counter & Global Preamble */}
+          <div>
+            <h3 className="font-medium">Turn Counter & Global Conditions</h3>
+            <p className="text-sm text-neutral-600 mb-2">
+              A <code>turn</code> variable auto-increments on each player input. Add <strong>global conditions</strong>{' '}
+              before any scene to create time limits or pacing.
+            </p>
+            <pre className="bg-white/60 p-3 rounded text-sm font-mono border">
+              {`when turn >= 10
+    Time is running out...
+when turn >= 20
+    goto @GAME_OVER
+
+@START
+You begin your adventure.
+if explore
+    goto @FOREST
+
+@GAME_OVER
+Your time has run out.
+goto @END`}
             </pre>
           </div>
 
@@ -199,6 +234,12 @@ The garden is beautiful.`}
             <li>Synonyms in choices make your game more forgiving to players.</li>
             <li>Generated branches appear in the branch panel — review and prune regularly.</li>
             <li>The guidebook learns from your edits to generated content, making future generations better.</li>
+            <li>
+              Use <code>when turn {'>'}= N</code> in the global preamble for time limits or pacing events.
+            </li>
+            <li>
+              Stack variables with multiple <code>+var</code> for inventory, XP, or resource systems.
+            </li>
           </ul>
         </section>
       </div>

@@ -13,5 +13,6 @@ export interface Version {
   creator: Entity.AUTHOR | Entity.SYSTEM;
   createdAt: number;
   updatedAt?: number; // When the version was last updated (for coalescing)
+  resolved?: boolean; // Whether AI changes have been reviewed/dismissed
   snapshot: Pick<Project, 'script' | 'guidebook'>;
 }

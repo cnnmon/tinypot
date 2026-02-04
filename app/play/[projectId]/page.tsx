@@ -14,9 +14,11 @@ function PlayContent() {
 
   return (
     <div className="h-screen p-4 gap-4 flex flex-col">
-      <div className="flex w-full items-center gap-2">
-        <Header />
-        <p className="text-lg">{project.name}</p>
+      <div className="flex items-center justify-between">
+        <div className="flex w-full items-center gap-2">
+          <Header />
+          <p className="text-lg">{project.name}</p>
+        </div>
       </div>
 
       <div className="w-full max-w-xl h-[calc(100%-160px)]">

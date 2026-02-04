@@ -25,6 +25,50 @@ function makeErrorLine(errorType: string, message: string): Line {
 }
 
 /**
+ * Process the global preamble (entries before the first @SCENE).
+ * Evaluates `when` conditions and returns a jump target if found.
+ * Also collects any narrative lines to show.
+ */
+function processGlobalPreamble(
+  schema: Schema,
+  hasVariable?: (variable: string, threshold?: number) => boolean,
+): { jumpTarget: string | null; narratives: string[] } {
+  const narratives: string[] = [];
+  
+  // Find entries before the first scene
+  const firstSceneIdx = schema.findIndex((e) => e.type === EntryType.SCENE);
+  if (firstSceneIdx <= 0) {
+    return { jumpTarget: null, narratives: [] };
+  }
+
+  const preamble = schema.slice(0, firstSceneIdx);
+
+  // Process preamble entries
+  const processEntries = (entries: SchemaEntry[]): string | null => {
+    for (const entry of entries) {
+      if (entry.type === EntryType.CONDITIONAL) {
+        const conditional = entry as ConditionalEntry;
+        const conditionMet = evaluateCondition(conditional.condition, hasVariable);
+        const branchEntries = conditionMet ? conditional.then : conditional.else;
+
+        if (branchEntries) {
+          const target = processEntries(branchEntries);
+          if (target !== null) return target;
+        }
+      } else if (entry.type === EntryType.JUMP) {
+        return (entry as JumpEntry).target.trim();
+      } else if (entry.type === EntryType.NARRATIVE) {
+        narratives.push((entry as NarrativeEntry).text);
+      }
+    }
+    return null;
+  };
+
+  const jumpTarget = processEntries(preamble);
+  return { jumpTarget, narratives };
+}
+
+/**
  * Build a linear sequence of positions in a scene.
  * Each position is either a narrative or a decision point (where options exist).
  *
@@ -121,10 +165,24 @@ function buildScenePositions(
 
 /**
  * Evaluate a condition based on variable state.
- * Supports negation with ! prefix.
+ * Supports:
+ * - Simple check: `var` (true if var >= 1)
+ * - Negation: `!var` (true if var = 0)
+ * - Threshold: `var >= N` (true if var >= N)
  */
-function evaluateCondition(condition: string, hasVariable?: (variable: string) => boolean): boolean {
+function evaluateCondition(
+  condition: string,
+  hasVariable?: (variable: string, threshold?: number) => boolean,
+): boolean {
   const trimmed = condition.trim();
+
+  // Check for threshold comparison: var >= N
+  const thresholdMatch = trimmed.match(/^(\w+)\s*>=\s*(\d+)$/);
+  if (thresholdMatch) {
+    const varName = thresholdMatch[1];
+    const threshold = parseInt(thresholdMatch[2], 10);
+    return hasVariable?.(varName, threshold) ?? false;
+  }
 
   // Check for negation
   if (trimmed.startsWith('!')) {
@@ -132,6 +190,7 @@ function evaluateCondition(condition: string, hasVariable?: (variable: string) =
     return !hasVariable?.(varName);
   }
 
+  // Simple check (var >= 1)
   return hasVariable?.(trimmed) ?? false;
 }
 
@@ -141,7 +200,8 @@ function evaluateCondition(condition: string, hasVariable?: (variable: string) =
 export interface StepCallbacks {
   setVariable?: (variable: string) => void;
   unsetVariable?: (variable: string) => void;
-  hasVariable?: (variable: string) => boolean;
+  /** Check if variable exists (>= 1) or meets threshold (>= N) */
+  hasVariable?: (variable: string, threshold?: number) => boolean;
 }
 
 /**
@@ -171,6 +231,17 @@ export function step({
   type: 'continue' | 'wait' | 'end' | 'error';
   line?: Line;
 } {
+  // Check global preamble for any triggered conditions (e.g., when turn >= 20 -> goto @END)
+  const preambleResult = processGlobalPreamble(schema, callbacks?.hasVariable);
+  if (preambleResult.jumpTarget) {
+    if (preambleResult.jumpTarget === 'END') {
+      return { type: 'end' };
+    }
+    // Override scene with preamble jump target
+    sceneId = preambleResult.jumpTarget;
+    lineIdx = 0;
+  }
+
   let currentScene = sceneId;
   let currentLineIdx = lineIdx;
   const visited = new Set<string>();

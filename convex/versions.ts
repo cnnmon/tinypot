@@ -58,3 +58,26 @@ export const remove = mutation({
     await ctx.db.delete(versionId);
   },
 });
+
+export const resolve = mutation({
+  args: { versionId: v.id('versions') },
+  handler: async (ctx, { versionId }) => {
+    await ctx.db.patch(versionId, { resolved: true });
+  },
+});
+
+export const resolveAll = mutation({
+  args: { projectId: v.id('projects') },
+  handler: async (ctx, { projectId }) => {
+    const versions = await ctx.db
+      .query('versions')
+      .withIndex('by_project', (q) => q.eq('projectId', projectId))
+      .collect();
+    
+    for (const version of versions) {
+      if (!version.resolved) {
+        await ctx.db.patch(version._id, { resolved: true });
+      }
+    }
+  },
+});

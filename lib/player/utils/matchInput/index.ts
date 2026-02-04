@@ -22,7 +22,7 @@ export async function matchInput({
   sceneId: string;
   lineIdx: number;
   useFuzzyFallback?: boolean;
-  hasVariable?: (variable: string) => boolean;
+  hasVariable?: (variable: string, threshold?: number) => boolean;
 }): Promise<HandleInputResult> {
   const options = getOptionsAtPosition({ schema, sceneMap, sceneId, lineIdx, hasVariable });
 

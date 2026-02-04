@@ -7,21 +7,20 @@ import { parseIntoSchema } from '../project/parser';
 import { computeBlame, LineBlame } from './blame';
 
 export default function useEditor() {
-  const { project, updateProject, versions } = useProject();
+  const { project, updateProject, versions, resolveAllVersions } = useProject();
   const [cursorLine, setCursorLine] = useState<number>(0);
-  const [showBlameHighlight, setShowBlameHighlight] = useState(true);
 
   const schema = useMemo(() => {
     return parseIntoSchema(project.script);
   }, [project.script]);
 
-  // Compute blame for all lines
+  // Compute blame for all lines (only unresolved AI versions for highlighting)
   const blame = useMemo(() => {
-    return computeBlame(project.script, versions);
+    return computeBlame(project.script, versions, true);
   }, [project.script, versions]);
 
-  // Check if there are any AI-authored lines
-  const hasAiLines = useMemo(() => {
+  // Check if there are any unresolved AI-authored lines
+  const hasUnresolvedAiLines = useMemo(() => {
     return blame.some((b) => b === Entity.SYSTEM);
   }, [blame]);
 
@@ -39,9 +38,10 @@ export default function useEditor() {
     setCursorLine(line);
   }, []);
 
-  const clearBlameHighlighting = useCallback(() => {
-    setShowBlameHighlight(false);
-  }, []);
+  // Dismiss highlights by resolving all versions permanently
+  const dismissHighlights = useCallback(() => {
+    resolveAllVersions();
+  }, [resolveAllVersions]);
 
   return {
     script: project.script,
@@ -51,8 +51,7 @@ export default function useEditor() {
     cursorLine,
     currentLineBlame,
     updateCursorLine,
-    hasAiLines,
-    showBlameHighlight,
-    clearBlameHighlighting,
+    hasUnresolvedAiLines,
+    dismissHighlights,
   };
 }

@@ -121,12 +121,10 @@ export default function Editor({
   readOnly?: boolean;
   branch?: Branch | null;
 }) {
-  const { script, setScript, blame, cursorLine, currentLineBlame, updateCursorLine, showBlameHighlight, hasAiLines, clearBlameHighlighting } = useEditor();
+  const { script, setScript, blame, cursorLine, currentLineBlame, updateCursorLine, hasUnresolvedAiLines, dismissHighlights } = useEditor();
   
   // Track reviewed lines (AI lines that author has edited)
   const reviewedLinesRef = useRef<Set<number>>(new Set());
-  const showBlameHighlightRef = useRef(showBlameHighlight);
-  showBlameHighlightRef.current = showBlameHighlight;
   const { branches, sceneToBranchMap, selectedBranchId } = useProject();
 
   // Use prop branch if provided, otherwise fall back to context selection
@@ -297,10 +295,10 @@ export default function Editor({
       effects: setBlameHighlight.of({
         blame,
         reviewedLines: reviewedLinesRef.current,
-        showHighlighting: showBlameHighlight,
+        showHighlighting: hasUnresolvedAiLines,
       }),
     });
-  }, [blame, showBlameHighlight]);
+  }, [blame, hasUnresolvedAiLines]);
 
   // Check if viewing any resolved branch (approved or rejected)
   const isViewingResolved = selectedBranch ? isResolved(selectedBranch) : false;
@@ -319,9 +317,9 @@ export default function Editor({
       {/* Line indicator with blame and dismiss button */}
       <div className="absolute w-full bottom-0 p-2 text-sm bg-gradient-to-b from-[#EBF7D2] border-t-2 flex justify-between items-center">
         <div>
-          {hasAiLines && showBlameHighlight && (
+          {hasUnresolvedAiLines && (
             <button
-              onClick={clearBlameHighlighting}
+              onClick={dismissHighlights}
               className="text-orange-600 hover:text-orange-800"
             >
               dismiss highlights

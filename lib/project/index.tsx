@@ -28,6 +28,8 @@ interface ProjectContextValue {
   getDiffScripts: () => { before: string[]; after: string[] } | null;
   /** Delete a version by ID */
   deleteVersion: (versionId: string) => void;
+  /** Mark all versions as resolved (dismiss highlights) */
+  resolveAllVersions: () => void;
   // Legacy branch fields (empty stubs for Editor compatibility)
   branches: Branch[];
   sceneToBranchMap: Record<string, string>;
@@ -41,7 +43,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
   // Convex queries
   const convexProject = useQuery(api.projects.get, { projectId });
   const convexVersions = useQuery(api.versions?.list, { projectId }) as
-    | { _id: Id<'versions'>; creator: string; createdAt: number; updatedAt?: number; snapshot: { script: string[]; guidebook: string } }[]
+    | { _id: Id<'versions'>; creator: string; createdAt: number; updatedAt?: number; resolved?: boolean; snapshot: { script: string[]; guidebook: string } }[]
     | undefined;
   const updateProjectMutation = useMutation(api.projects.update);
   const createVersionMutation = useMutation(api.versions?.create) as
@@ -59,6 +61,9 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     | undefined;
   const deleteVersionMutation = useMutation(api.versions?.remove) as unknown as
     | ((args: { versionId: Id<'versions'> }) => Promise<void>)
+    | undefined;
+  const resolveAllMutation = useMutation(api.versions?.resolveAll) as unknown as
+    | ((args: { projectId: Id<'projects'> }) => Promise<void>)
     | undefined;
 
   // Save status for UI feedback
@@ -125,6 +130,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     creator: v.creator as Entity.AUTHOR | Entity.SYSTEM,
     createdAt: v.createdAt,
     updatedAt: v.updatedAt,
+    resolved: v.resolved,
     snapshot: v.snapshot,
   }));
 
@@ -282,6 +288,12 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     [deleteVersionMutation, selectedVersionId],
   );
 
+  // Mark all versions as resolved (dismiss highlights permanently)
+  const resolveAllVersions = useCallback(() => {
+    if (!resolveAllMutation) return;
+    resolveAllMutation({ projectId });
+  }, [resolveAllMutation, projectId]);
+
   // Show loading state while project data is loading
   if (convexProject === undefined || project === null) {
     return (
@@ -314,6 +326,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         setSelectedVersionId,
         getDiffScripts,
         deleteVersion,
+        resolveAllVersions,
         // Legacy branch fields (empty stubs for Editor compatibility)
         branches: [],
         sceneToBranchMap: {},

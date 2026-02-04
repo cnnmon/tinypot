@@ -44,6 +44,7 @@ export default defineSchema({
     creator: v.union(v.literal(Entity.AUTHOR), v.literal(Entity.SYSTEM)),
     createdAt: v.number(),
     updatedAt: v.optional(v.number()), // When the version was last updated (for coalescing)
+    resolved: v.optional(v.boolean()), // Whether AI changes have been reviewed/dismissed
     snapshot: v.object({
       script: v.array(v.string()),
       guidebook: v.string(),

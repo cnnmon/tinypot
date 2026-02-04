@@ -97,7 +97,7 @@ export function getOptionsAtPosition({
   sceneMap: Record<string, number>;
   sceneId: string;
   lineIdx: number;
-  hasVariable?: (variable: string) => boolean;
+  hasVariable?: (variable: string, threshold?: number) => boolean;
 }): OptionEntry[] {
   const sceneStart = sceneMap[sceneId];
   if (sceneStart === undefined) return [];
@@ -260,11 +260,26 @@ export async function matchOptionFuzzy(input: string, options: OptionEntry[]): P
 
 /**
  * Evaluate a condition string against current variables.
- * Supports negation with ! prefix.
+ * Supports:
+ * - Simple check: `var` (true if var >= 1)
+ * - Negation: `!var` (true if var = 0)
+ * - Threshold: `var >= N` (true if var >= N)
  */
-function evaluateCondition(condition: string, hasVariable?: (variable: string) => boolean): boolean {
+function evaluateCondition(
+  condition: string,
+  hasVariable?: (variable: string, threshold?: number) => boolean,
+): boolean {
   if (!hasVariable) return true;
   const trimmed = condition.trim();
+
+  // Check for threshold comparison: var >= N
+  const thresholdMatch = trimmed.match(/^(\w+)\s*>=\s*(\d+)$/);
+  if (thresholdMatch) {
+    const varName = thresholdMatch[1];
+    const threshold = parseInt(thresholdMatch[2], 10);
+    return hasVariable(varName, threshold);
+  }
+
   if (trimmed.startsWith('!')) {
     return !hasVariable(trimmed.slice(1).trim());
   }
@@ -278,7 +293,7 @@ function evaluateCondition(condition: string, hasVariable?: (variable: string) =
  */
 function processEntries(
   entries: SchemaEntry[],
-  hasVariable?: (variable: string) => boolean,
+  hasVariable?: (variable: string, threshold?: number) => boolean,
 ): {
   narratives: NarrativeEntry[];
   metadata: MetadataEntry[];
@@ -327,7 +342,7 @@ function processEntries(
  */
 function processOptionThen(
   option: OptionEntry,
-  hasVariable?: (variable: string) => boolean,
+  hasVariable?: (variable: string, threshold?: number) => boolean,
 ): {
   narratives: NarrativeEntry[];
   metadata: MetadataEntry[];
@@ -344,7 +359,7 @@ export function buildResultFromOption(
   sceneId: string,
   lineIdx: number,
   matchInfo?: MatchInfo,
-  hasVariable?: (variable: string) => boolean,
+  hasVariable?: (variable: string, threshold?: number) => boolean,
 ): HandleInputResult {
   const { narratives, metadata, target } = processOptionThen(option, hasVariable);
 
