@@ -8,8 +8,28 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProject } from '../project';
 import { addAliasToOption, addGeneratedOptionToScript, parseIntoSchema } from '../project/parser';
 import { useVariables } from './useVariables';
-import { constructSceneMap, getSceneAndLineIdx, matchInput, parseLineId, step } from './utils';
+import { constructSceneMap, getSceneAndLineIdx, matchInput, parseLineId, processGlobalPreamble, step } from './utils';
 import { getAllowsForScene, getOptionsAtPosition } from './utils/matchInput/utils';
+
+/**
+ * Extract all variable names used in the script (+var, -var, ?var, when var)
+ */
+function extractProjectVariables(script: string[]): string[] {
+  const variables = new Set<string>();
+  for (const line of script) {
+    const trimmed = line.trim();
+    // +var or -var
+    const setUnset = trimmed.match(/^[+-](\w+)$/);
+    if (setUnset) variables.add(setUnset[1].toLowerCase());
+    // & ?var (requires)
+    const requires = trimmed.match(/&\s*\?(\w+)/);
+    if (requires) variables.add(requires[1].toLowerCase());
+    // when var or when !var or when var >= N
+    const when = trimmed.match(/^when\s+!?(\w+)/);
+    if (when) variables.add(when[1].toLowerCase());
+  }
+  return Array.from(variables);
+}
 
 export enum Status {
   RUNNING = 'running',
@@ -133,15 +153,42 @@ export default function usePlayer() {
       // Auto-increment turn counter on each player input
       variables.set('turn');
 
+      // Check global preamble conditions after turn increments
+      const preambleResult = processGlobalPreamble(schema, variables.has, false);
+
       const trimmedInput = input || '(stay silent)';
       let lineIdx = state.currentLineIdx;
 
-      // Add the player's line
+      // Add the player's line FIRST
       addLine({
         id: `${currentSceneId}-${lineIdx}` as `${string}-${number}`,
         sender: Entity.PLAYER,
         text: trimmedInput,
       });
+
+      // Then show preamble narratives (if any) AFTER player input
+      if (preambleResult.narratives.length > 0) {
+        addLine({
+          id: `preamble-${Date.now()}` as `${string}-${number}`,
+          sender: Entity.AUTHOR,
+          text: preambleResult.narratives.join(' '),
+        });
+      }
+      
+      // Handle preamble jump (e.g., when turn >= 20 -> goto @END)
+      if (preambleResult.jumpTarget) {
+        if (preambleResult.jumpTarget === 'END') {
+          setState((prev) => ({ ...prev, status: Status.ENDED }));
+          return;
+        }
+        // Jump to another scene
+        setState({
+          currentSceneId: preambleResult.jumpTarget,
+          currentLineIdx: 0,
+          status: Status.RUNNING,
+        });
+        return;
+      }
 
       setState((prev) => ({ ...prev, status: Status.MATCHING }));
 
@@ -231,6 +278,7 @@ export default function usePlayer() {
             existingScenes: Object.keys(sceneMap),
             allowsConfig,
             currentVariables: variables.getAll(),
+            projectVariables: extractProjectVariables(project.script),
           } satisfies GenerateRequest),
         });
 

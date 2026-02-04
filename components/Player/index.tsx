@@ -17,16 +17,15 @@ export default function Player() {
   }, [lines]);
 
   return (
-    <div className="flex flex-col gap-2 justify-end">
+    <div className="flex flex-col gap-2 justify-end relative">
       {/* State */}
-      <div className="flex gap-1 justify-end">
-        <p>State:</p>
+      <div className="flex gap-1 justify-end sticky top-0 right-0 p-2 bg-white w-fit rounded-b-md bordered self-end truncate max-w-">
         <p>
           <span className="font-bold">{currentSceneId}</span>
         </p>
         {" / "}
-        <p>
-          <span className="font-bold">{variables.length > 0 ? variables.join(', ') : 'Empty'}</span>
+        <p title={variables.length > 0 ? variables.join(' / ') : 'Empty'}>
+          {variables.length > 0 ? variables.join(' / ') : 'Empty'}
         </p>
       </div>
 

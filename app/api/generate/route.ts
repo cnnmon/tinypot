@@ -13,7 +13,8 @@ export interface GenerateRequest {
   worldBible?: string; // Optional author's world context
   guidebook?: string; // Author preferences learned from metalearning
   allowsConfig?: AllowsConfig; // What the LLM is allowed to generate
-  currentVariables?: string[]; // Variables currently set in player state
+  currentVariables?: string[]; // Variables currently set in player state (with counts)
+  projectVariables?: string[]; // All variables defined in the project
 }
 
 /**
@@ -45,11 +46,11 @@ export interface GenerateResponse {
  */
 function buildConstraintsPrompt(allowsConfig?: AllowsConfig): string {
   if (!allowsConfig) {
-    // Default: can link to existing scenes, cannot create new
+    // Default: allow everything (new scenes, linking, etc.)
     return `
 CONSTRAINTS:
+- You MAY create new scenes (NEW_FORK is allowed)
 - You MAY link to any existing scene using LINK_SCENE
-- You CANNOT create new scenes (NEW_FORK is NOT allowed)
 - Use TEXT_ONLY for clarification or flavor that loops back`;
   }
 
@@ -106,6 +107,7 @@ export async function POST(req: Request) {
     guidebook,
     allowsConfig,
     currentVariables,
+    projectVariables,
   }: GenerateRequest = await req.json();
 
   if (!userInput) {
@@ -134,10 +136,17 @@ export async function POST(req: Request) {
 
   const constraintsContext = buildConstraintsPrompt(allowsConfig);
 
-  const variablesContext =
+  const projectVarsContext =
+    projectVariables && projectVariables.length > 0
+      ? `\nVARIABLES USED IN THIS PROJECT: ${projectVariables.join(', ')}\n(Use these when appropriate, or create new ones that fit the theme)`
+      : '';
+
+  const currentVarsContext =
     currentVariables && currentVariables.length > 0
-      ? `\nCURRENT PLAYER VARIABLES: ${currentVariables.join(', ')}\n(These are items/flags the player has acquired during gameplay)`
-      : '\nCURRENT PLAYER VARIABLES: (none)';
+      ? `\nPLAYER'S CURRENT STATE: ${currentVariables.join(', ')}\n(Variables with counts > 1 shown as "var (N)")`
+      : '\nPLAYER\'S CURRENT STATE: (none yet)';
+
+  const variablesContext = projectVarsContext + currentVarsContext;
 
   const response = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
@@ -192,30 +201,32 @@ SYNTAX RULES (use these exactly):
 - Navigation: goto @SCENE_NAME (or goto @END)
 - Choices: if Choice text | alias1 | alias2
 - Choices with requires: if Choice text & ?key (choice only available if player has key)
-- Set variable: +key (as its own indented line inside a choice block)
-- Unset variable: -key (as its own indented line inside a choice block)
-- Conditional blocks: when [key] / when [!key] for content shown only when variable is/isn't set
+- Increment variable: +var (as its own indented line - adds 1 to counter)
+- Decrement variable: -var (as its own indented line - subtracts 1 from counter)
+- Conditional blocks: when var (true if >= 1), when !var (true if 0), when var >= N (threshold)
 - Metadata: [key: value]
 
-VARIABLE SYSTEM:
-Variables are flags/items the player acquires (like "key", "sword", "talked_to_guard").
-- Use "+variablename" as a standalone line to SET a variable when player takes an action
-- Use "-variablename" as a standalone line to UNSET a variable (e.g., using up an item)
-- Use "& ?variablename" after a choice to REQUIRE a variable (choice only available if player has it)
-- Use "when [variablename]" blocks to show different content based on what player has
+VARIABLE SYSTEM (COUNTERS):
+Variables are COUNTERS, not flags. Each +var adds 1, each -var subtracts 1.
+Display: "gold" means gold=1, "gold (3)" means gold=3.
 
-Example requiring a variable:
-if use key on door & ?key
-    -key
-    The door unlocks with a click.
-
-Example setting a variable:
-if take the sword
+Examples:
+if buy sword
+    -gold
     +sword
-    You grab the sword.
+    You got a sword!
 
-Consider: Does this action require an item/flag the player should have obtained earlier?
-If so, add & ?variablename to require it. If this action grants something, add +variablename as a line in the then block.
+if attack & ?sword
+    You swing your blade.
+
+when gold >= 5
+    You can afford the fancy item.
+when !gold
+    Your pockets are empty.
+
+A "turn" variable auto-increments each player input. Use "when turn >= N" for time-based events.
+
+IMPORTANT: Look at the project's existing variables and use them consistently. Add new variables that fit the project's theme. Variables create meaningful tradeoffs - gaining one thing often means losing another.
 
 Respond in JSON format only:
 {
@@ -224,10 +235,10 @@ Respond in JSON format only:
   "optionText": "<clean, formal choice text that encapsulates the player's intent>",
   "narrative": ["<line 1>", "<line 2>", ...],
   
-  // Variable effects (optional, use when appropriate):
-  "setsVariable": "<variable name to SET when this choice is taken>",
-  "unsetsVariable": "<variable name to UNSET>",
-  "requiresVariable": "<variable name required for this choice - player must have it>",
+  // Variable effects (optional but encouraged - use project's existing variables):
+  "setsVariable": "<variable name to INCREMENT (+1) when this choice is taken>",
+  "unsetsVariable": "<variable name to DECREMENT (-1)>",
+  "requiresVariable": "<variable name required (must be >= 1) for this choice>",
   
   // For LINK_SCENE only:
   "targetScene": "<existing scene label to jump to>",
@@ -246,9 +257,11 @@ Guidelines:
 - Match the author's tone and style
 - Keep narrative punchy and evocative
 - Use "goto @SCENE_NAME" syntax for navigation
-- Consider variables: Does this action require something the player should have? Use requiresVariable.
-  Does it give them something? Use setsVariable. Does it use up something? Use unsetsVariable.
-- Look at existing patterns in the project to see how variables are used`,
+- VARIABLES ARE IMPORTANT: Look at the project's variables and use them!
+  - Does this action build on existing themes? Use setsVariable with a project variable.
+  - Does this action cost something? Use unsetsVariable.
+  - Does this action require something? Use requiresVariable.
+  - Create meaningful tradeoffs when possible.`,
       },
     ],
   });

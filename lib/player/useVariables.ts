@@ -75,7 +75,7 @@ export function useVariables(): VariablesState {
 
   const getAll = useCallback(() => {
     return Array.from(variables.entries()).map(([key, count]) => 
-      count > 1 ? `${key} (${count})` : key
+      `${key} (${count})`
     );
   }, [variables]);
 

@@ -26,46 +26,50 @@ function makeErrorLine(errorType: string, message: string): Line {
 
 /**
  * Process the global preamble (entries before the first @SCENE).
- * Evaluates `when` conditions and returns a jump target if found.
- * Also collects any narrative lines to show.
+ * Processes `when` conditional blocks and collects their narratives/jumps.
+ * Also finds any top-level goto to use as entry point.
  */
-function processGlobalPreamble(
+export function processGlobalPreamble(
   schema: Schema,
   hasVariable?: (variable: string, threshold?: number) => boolean,
-): { jumpTarget: string | null; narratives: string[] } {
+  includeTopLevelGoto?: boolean,
+): { jumpTarget: string | null; narratives: string[]; entryPoint: string | null } {
   const narratives: string[] = [];
+  let entryPoint: string | null = null;
   
   // Find entries before the first scene
   const firstSceneIdx = schema.findIndex((e) => e.type === EntryType.SCENE);
   if (firstSceneIdx <= 0) {
-    return { jumpTarget: null, narratives: [] };
+    return { jumpTarget: null, narratives: [], entryPoint: null };
   }
 
   const preamble = schema.slice(0, firstSceneIdx);
 
   // Process preamble entries
-  const processEntries = (entries: SchemaEntry[]): string | null => {
-    for (const entry of entries) {
-      if (entry.type === EntryType.CONDITIONAL) {
-        const conditional = entry as ConditionalEntry;
-        const conditionMet = evaluateCondition(conditional.condition, hasVariable);
-        const branchEntries = conditionMet ? conditional.then : conditional.else;
-
-        if (branchEntries) {
-          const target = processEntries(branchEntries);
-          if (target !== null) return target;
+  for (const entry of preamble) {
+    if (entry.type === EntryType.CONDITIONAL) {
+      const conditional = entry as ConditionalEntry;
+      const conditionMet = evaluateCondition(conditional.condition, hasVariable);
+      
+      if (conditionMet && conditional.then) {
+        // Process the matched conditional's content
+        for (const innerEntry of conditional.then) {
+          if (innerEntry.type === EntryType.NARRATIVE) {
+            narratives.push((innerEntry as NarrativeEntry).text);
+          } else if (innerEntry.type === EntryType.JUMP) {
+            // Return immediately on conditional jump
+            return { jumpTarget: (innerEntry as JumpEntry).target.trim(), narratives, entryPoint };
+          }
         }
-      } else if (entry.type === EntryType.JUMP) {
-        return (entry as JumpEntry).target.trim();
-      } else if (entry.type === EntryType.NARRATIVE) {
-        narratives.push((entry as NarrativeEntry).text);
       }
+    } else if (entry.type === EntryType.JUMP && includeTopLevelGoto) {
+      // Top-level goto - use as entry point only if requested
+      entryPoint = (entry as JumpEntry).target.trim();
     }
-    return null;
-  };
+    // Ignore top-level narratives - they would show on every scene entry
+  }
 
-  const jumpTarget = processEntries(preamble);
-  return { jumpTarget, narratives };
+  return { jumpTarget: null, narratives, entryPoint };
 }
 
 /**
@@ -231,15 +235,38 @@ export function step({
   type: 'continue' | 'wait' | 'end' | 'error';
   line?: Line;
 } {
-  // Check global preamble for any triggered conditions (e.g., when turn >= 20 -> goto @END)
-  const preambleResult = processGlobalPreamble(schema, callbacks?.hasVariable);
-  if (preambleResult.jumpTarget) {
-    if (preambleResult.jumpTarget === 'END') {
-      return { type: 'end' };
+  // Check if the current scene ACTUALLY exists as a scene in the schema
+  // (sceneMap always has START:0, but that doesn't mean @START exists)
+  const sceneIdx = sceneMap[sceneId];
+  const sceneExists = sceneIdx !== undefined && 
+    sceneIdx >= 0 && 
+    sceneIdx < schema.length && 
+    schema[sceneIdx]?.type === EntryType.SCENE;
+  
+  // Check global preamble ONLY when entering a scene fresh (lineIdx === 0)
+  // Also include top-level goto if current scene doesn't exist (for entry point)
+  let preambleNarrative: string | null = null;
+  if (lineIdx === 0) {
+    const preambleResult = processGlobalPreamble(schema, callbacks?.hasVariable, !sceneExists);
+    
+    // If scene doesn't exist and there's an entry point goto, use it
+    if (!sceneExists && preambleResult.entryPoint) {
+      sceneId = preambleResult.entryPoint;
     }
-    // Override scene with preamble jump target
-    sceneId = preambleResult.jumpTarget;
-    lineIdx = 0;
+    
+    // Check for conditional jumps (e.g., when turn >= 20 -> goto @END)
+    if (preambleResult.jumpTarget) {
+      if (preambleResult.jumpTarget === 'END') {
+        return { type: 'end' };
+      }
+      // Override scene with preamble jump target
+      sceneId = preambleResult.jumpTarget;
+    }
+    
+    // Collect preamble narratives to prepend to the first line
+    if (preambleResult.narratives.length > 0) {
+      preambleNarrative = preambleResult.narratives.join(' ');
+    }
   }
 
   let currentScene = sceneId;
@@ -299,12 +326,18 @@ export function step({
         currentLineIdx++;
         continue;
       }
+      // Prepend preamble narrative to the first line if present
+      const lineText = pos.type === 'image' ? '' : pos.text!;
+      const textWithPreamble = preambleNarrative && currentLineIdx === 0
+        ? `${preambleNarrative}\n\n${lineText}`
+        : lineText;
+      
       return {
         type: 'continue',
         line: {
           id: makeLineId(currentScene, currentLineIdx),
           sender: Entity.AUTHOR,
-          text: pos.type === 'image' ? '' : pos.text!,
+          text: textWithPreamble,
           ...(pos.type === 'image' && { metadata: { imageUrl: pos.text } }),
         },
       };

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { parseIntoSchema } from '@/lib/project/parser';
+import { describe, expect, it } from 'vitest';
 import { constructSceneMap, step } from './utils';
 
 describe('Numeric Variables', () => {
@@ -237,6 +237,180 @@ describe('Numeric Variables', () => {
       });
 
       expect(result.type).toBe('end');
+    });
+
+    it('should prepend preamble narratives to first scene line', () => {
+      const script = [
+        'when turn >= 3',
+        '  You feel older.',
+        '@START',
+        'What do you want to do?',
+      ];
+
+      const schema = parseIntoSchema(script);
+      const sceneMap = constructSceneMap({ schema });
+
+      const variables = new Map<string, number>([['turn', 5]]);
+      const has = (v: string, threshold = 1) => (variables.get(v.toLowerCase()) ?? 0) >= threshold;
+
+      const result = step({
+        schema,
+        sceneMap,
+        sceneId: 'START',
+        lineIdx: 0,
+        callbacks: { hasVariable: has },
+      });
+
+      expect(result.type).toBe('continue');
+      expect(result.line?.text).toContain('You feel older.');
+      expect(result.line?.text).toContain('What do you want to do?');
+    });
+
+    it('should NOT show preamble narrative when lineIdx > 0', () => {
+      const script = [
+        'when turn >= 3',
+        '  You feel older.',
+        '@START',
+        'Line one.',
+        'Line two.',
+      ];
+
+      const schema = parseIntoSchema(script);
+      const sceneMap = constructSceneMap({ schema });
+
+      const variables = new Map<string, number>([['turn', 5]]);
+      const has = (v: string, threshold = 1) => (variables.get(v.toLowerCase()) ?? 0) >= threshold;
+
+      // Check lineIdx 1 - should NOT include preamble
+      const result = step({
+        schema,
+        sceneMap,
+        sceneId: 'START',
+        lineIdx: 1,
+        callbacks: { hasVariable: has },
+      });
+
+      expect(result.type).toBe('continue');
+      expect(result.line?.text).toBe('Line two.');
+      expect(result.line?.text).not.toContain('You feel older.');
+    });
+
+    it('should handle top-level goto in preamble as entry point', () => {
+      const script = [
+        'when turn >= 3',
+        '  You are old.',
+        '  goto @END',
+        'when turn >= 2',
+        '  You are older.',
+        'when turn >= 1',
+        '  You are young.',
+        'goto @BEGIN',
+        '@BEGIN',
+        'What do you want to do?',
+      ];
+
+      const schema = parseIntoSchema(script);
+      const sceneMap = constructSceneMap({ schema });
+
+      // Turn = 1
+      const variables = new Map<string, number>([['turn', 1]]);
+      const has = (v: string, threshold = 1) => (variables.get(v.toLowerCase()) ?? 0) >= threshold;
+
+      // Starting from 'START' (default) should follow the goto @BEGIN
+      const result = step({
+        schema,
+        sceneMap,
+        sceneId: 'START', // Default scene
+        lineIdx: 0,
+        callbacks: { hasVariable: has },
+      });
+
+      // Should show preamble narrative + scene content
+      expect(result.type).toBe('continue');
+      expect(result.line?.text).toContain('You are young.');
+      expect(result.line?.text).toContain('What do you want to do?');
+    });
+
+    it('should handle life sim script with choices that loop', () => {
+      const script = [
+        'when turn >= 3',
+        '  You are old.',
+        '  goto @END',
+        'when turn >= 2',
+        '  You are older.',
+        'when turn >= 1',
+        '  You are young.',
+        'goto @BEGIN',
+        '@BEGIN',
+        'What do you want to do?',
+        'if run around',
+        '  You dash around energetically.',
+        'if accept and refocus',
+        '  Right. Time to get serious.',
+      ];
+
+      const schema = parseIntoSchema(script);
+      const sceneMap = constructSceneMap({ schema });
+
+      // Turn = 2
+      const variables = new Map<string, number>([['turn', 2]]);
+      const has = (v: string, threshold = 1) => (variables.get(v.toLowerCase()) ?? 0) >= threshold;
+
+      // First step - should show preamble + scene content
+      const result1 = step({
+        schema,
+        sceneMap,
+        sceneId: 'START',
+        lineIdx: 0,
+        callbacks: { hasVariable: has },
+      });
+
+      expect(result1.type).toBe('continue');
+      expect(result1.line?.text).toContain('You are older.');
+      expect(result1.line?.text).toContain('What do you want to do?');
+
+      // Next step - should wait for input (options available)
+      const result2 = step({
+        schema,
+        sceneMap,
+        sceneId: 'BEGIN',
+        lineIdx: 1,
+        callbacks: { hasVariable: has },
+      });
+
+      expect(result2.type).toBe('wait');
+    });
+
+    it('should NOT infinitely loop with top-level goto when already in target scene', () => {
+      const script = [
+        'when turn >= 1',
+        '  You are young.',
+        'goto @BEGIN',
+        '@BEGIN',
+        'What do you want to do?',
+        'if run around',
+        '  You dash around.',
+      ];
+
+      const schema = parseIntoSchema(script);
+      const sceneMap = constructSceneMap({ schema });
+
+      const variables = new Map<string, number>([['turn', 1]]);
+      const has = (v: string, threshold = 1) => (variables.get(v.toLowerCase()) ?? 0) >= threshold;
+
+      // When already in BEGIN, should NOT re-process the goto
+      const result = step({
+        schema,
+        sceneMap,
+        sceneId: 'BEGIN', // Already in BEGIN
+        lineIdx: 0,
+        callbacks: { hasVariable: has },
+      });
+
+      // Should show preamble narrative + scene content (not loop)
+      expect(result.type).toBe('continue');
+      expect(result.line?.text).toContain('You are young.');
+      expect(result.line?.text).toContain('What do you want to do?');
     });
   });
 
