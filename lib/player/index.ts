@@ -154,8 +154,20 @@ export default function usePlayer() {
       // Auto-increment turn counter on each player input
       variables.set('turn');
 
+      // IMPORTANT: React state updates are async, so variables.has/get still see the OLD value.
+      // We need to account for the pending +1 on turn when checking preamble conditions.
+      const hasWithPendingTurn = (v: string, threshold = 1) => {
+        const value = variables.get(v);
+        const effective = v.toLowerCase() === 'turn' ? value + 1 : value;
+        return effective >= threshold;
+      };
+      const getWithPendingTurn = (v: string) => {
+        const value = variables.get(v);
+        return v.toLowerCase() === 'turn' ? value + 1 : value;
+      };
+
       // Check global preamble conditions after turn increments
-      const preambleResult = processGlobalPreamble(schema, variables.has, false, variables.get);
+      const preambleResult = processGlobalPreamble(schema, hasWithPendingTurn, false, getWithPendingTurn);
 
       const trimmedInput = input || '(stay silent)';
       let lineIdx = state.currentLineIdx;

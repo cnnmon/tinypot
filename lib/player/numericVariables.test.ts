@@ -424,4 +424,195 @@ describe('Numeric Variables', () => {
       expect(format([['gold', 5], ['sword', 1]])).toEqual(['gold (5)', 'sword']);
     });
   });
+
+  describe('compound conditions (AND with &)', () => {
+    it('should match turn >= 1 & turn < 2 only when turn is exactly 1', () => {
+      const script = [
+        'when turn >= 3',
+        "  You're old.",
+        '  goto @END',
+        'when turn >= 2 & turn < 3',
+        "  You're older.",
+        'when turn >= 1 & turn < 2',
+        "  You're young.",
+        'goto @YOUTH',
+        '@YOUTH',
+        'You are born.',
+      ];
+
+      const schema = parseIntoSchema(script);
+      const sceneMap = constructSceneMap({ schema });
+
+      // Helper to create variable callbacks
+      const makeCallbacks = (turnValue: number) => {
+        const variables = new Map<string, number>([['turn', turnValue]]);
+        return {
+          hasVariable: (v: string, threshold = 1) => (variables.get(v.toLowerCase()) ?? 0) >= threshold,
+          getVariable: (v: string) => variables.get(v.toLowerCase()) ?? 0,
+        };
+      };
+
+      // Turn = 1: should show "You're young." + "You are born."
+      const result1 = step({
+        schema,
+        sceneMap,
+        sceneId: 'START',
+        lineIdx: 0,
+        callbacks: makeCallbacks(1),
+      });
+
+      expect(result1.type).toBe('continue');
+      expect(result1.line?.text).toContain("You're young.");
+      expect(result1.line?.text).toContain('You are born.');
+      expect(result1.line?.text).not.toContain("You're older.");
+      expect(result1.line?.text).not.toContain("You're old.");
+
+      // Turn = 2: should show "You're older." + "You are born."
+      const result2 = step({
+        schema,
+        sceneMap,
+        sceneId: 'START',
+        lineIdx: 0,
+        callbacks: makeCallbacks(2),
+      });
+
+      expect(result2.type).toBe('continue');
+      expect(result2.line?.text).toContain("You're older.");
+      expect(result2.line?.text).toContain('You are born.');
+      expect(result2.line?.text).not.toContain("You're young.");
+      expect(result2.line?.text).not.toContain("You're old.");
+
+      // Turn = 3: should show "You're old." and end
+      const result3 = step({
+        schema,
+        sceneMap,
+        sceneId: 'START',
+        lineIdx: 0,
+        callbacks: makeCallbacks(3),
+      });
+
+      expect(result3.type).toBe('end');
+    });
+
+    it('should work when turn is incremented just before checking (simulating React async state)', () => {
+      // This test simulates what happens in the real player:
+      // 1. User submits input
+      // 2. variables.set('turn') is called - but React state hasn't updated yet
+      // 3. processGlobalPreamble checks conditions with the OLD state
+      //
+      // We simulate this by having the "state" at turn=0, but needing to check as if turn=1
+      const script = [
+        'when turn >= 3',
+        "  You're old.",
+        '  goto @END',
+        'when turn >= 2 & turn < 3',
+        "  You're older.",
+        'when turn >= 1 & turn < 2',
+        "  You're young.",
+        'goto @YOUTH',
+        '@YOUTH',
+        'You are born.',
+      ];
+
+      const schema = parseIntoSchema(script);
+      const sceneMap = constructSceneMap({ schema });
+
+      // Simulate: turn starts at 0, but we just called set('turn') which should make it 1
+      // The pendingIncrement represents the +1 that will be applied
+      const baseValue = 0;
+      const pendingIncrement = 1;
+      const effectiveTurn = baseValue + pendingIncrement;
+
+      const variables = new Map<string, number>([['turn', baseValue]]);
+      
+      // These callbacks should account for the pending increment on 'turn'
+      const hasWithPending = (v: string, threshold = 1) => {
+        const value = variables.get(v.toLowerCase()) ?? 0;
+        const effective = v.toLowerCase() === 'turn' ? value + pendingIncrement : value;
+        return effective >= threshold;
+      };
+      const getWithPending = (v: string) => {
+        const value = variables.get(v.toLowerCase()) ?? 0;
+        return v.toLowerCase() === 'turn' ? value + pendingIncrement : value;
+      };
+
+      const result = step({
+        schema,
+        sceneMap,
+        sceneId: 'START',
+        lineIdx: 0,
+        callbacks: {
+          hasVariable: hasWithPending,
+          getVariable: getWithPending,
+        },
+      });
+
+      // Should show "You're young." because effective turn = 1
+      expect(result.type).toBe('continue');
+      expect(result.line?.text).toContain("You're young.");
+      expect(result.line?.text).toContain('You are born.');
+    });
+
+    it('should handle compound less-than conditions', () => {
+      const script = [
+        'when gold >= 5 & gold < 10',
+        '  You have some gold.',
+        '@START',
+        'Welcome.',
+      ];
+
+      const schema = parseIntoSchema(script);
+      const sceneMap = constructSceneMap({ schema });
+
+      // gold = 7 (5 <= 7 < 10) -> should trigger
+      const variables7 = new Map<string, number>([['gold', 7]]);
+      const result7 = step({
+        schema,
+        sceneMap,
+        sceneId: 'START',
+        lineIdx: 0,
+        callbacks: {
+          hasVariable: (v: string, threshold = 1) => (variables7.get(v.toLowerCase()) ?? 0) >= threshold,
+          getVariable: (v: string) => variables7.get(v.toLowerCase()) ?? 0,
+        },
+      });
+
+      expect(result7.type).toBe('continue');
+      expect(result7.line?.text).toContain('You have some gold.');
+
+      // gold = 3 (< 5) -> should NOT trigger
+      const variables3 = new Map<string, number>([['gold', 3]]);
+      const result3 = step({
+        schema,
+        sceneMap,
+        sceneId: 'START',
+        lineIdx: 0,
+        callbacks: {
+          hasVariable: (v: string, threshold = 1) => (variables3.get(v.toLowerCase()) ?? 0) >= threshold,
+          getVariable: (v: string) => variables3.get(v.toLowerCase()) ?? 0,
+        },
+      });
+
+      expect(result3.type).toBe('continue');
+      expect(result3.line?.text).toBe('Welcome.');
+      expect(result3.line?.text).not.toContain('You have some gold.');
+
+      // gold = 10 (>= 10) -> should NOT trigger
+      const variables10 = new Map<string, number>([['gold', 10]]);
+      const result10 = step({
+        schema,
+        sceneMap,
+        sceneId: 'START',
+        lineIdx: 0,
+        callbacks: {
+          hasVariable: (v: string, threshold = 1) => (variables10.get(v.toLowerCase()) ?? 0) >= threshold,
+          getVariable: (v: string) => variables10.get(v.toLowerCase()) ?? 0,
+        },
+      });
+
+      expect(result10.type).toBe('continue');
+      expect(result10.line?.text).toBe('Welcome.');
+      expect(result10.line?.text).not.toContain('You have some gold.');
+    });
+  });
 });
