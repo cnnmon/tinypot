@@ -148,9 +148,8 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
                 )}
               </ScrollContainer>
             </div>
-
           </div>
-          <div className="h-[calc(100%-60px)] overflow-scroll m-2 relative">
+          <div className="p-2 overflow-scroll relative">
             <Player />
           </div>
         </Box>

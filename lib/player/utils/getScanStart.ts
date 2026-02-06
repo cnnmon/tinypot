@@ -5,5 +5,6 @@ import { EntryType, Schema } from '@/types/schema';
  * If the scene starts with a SCENE marker, start after it.
  */
 export function getScanStart(schema: Schema, sceneStart: number): number {
-  return sceneStart < schema.length && schema[sceneStart].type === EntryType.SCENE ? sceneStart + 1 : sceneStart;
+  if (sceneStart < 0 || sceneStart >= schema.length) return sceneStart;
+  return schema[sceneStart]?.type === EntryType.SCENE ? sceneStart + 1 : sceneStart;
 }

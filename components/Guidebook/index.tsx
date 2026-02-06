@@ -56,7 +56,7 @@ export default function Guidebook({ readOnly = false }: { readOnly?: boolean }) 
       return () => document.removeEventListener('keydown', handleKeyDown);
     }
   }, [isModalOpen]);
-  
+
   return (
     <>
       {/* Compact preview */}
@@ -74,9 +74,7 @@ export default function Guidebook({ readOnly = false }: { readOnly?: boolean }) 
 
           <div className="p-2">
             {/* Current settings */}
-            <div><span className="font-bold">creativity:</span> {getCreativityLabel(settings.creativity).toLowerCase()}</div>
-            <div><span className="font-bold">verbosity:</span> {settings.verbosity}</div>
-            <div><span className="font-bold">rules:</span> {settings.rules.length > 0 ? settings.rules.join(', ') : 'none'}</div>
+            <div>{settings.rules.length > 0 ? settings.rules.join('\n') : 'none'}</div>
           </div>
         </div>
       </Box>

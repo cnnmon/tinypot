@@ -19,7 +19,7 @@ function PlayContent({ shareId }: { shareId: string }) {
           <Header />
           <div className="flex items-center gap-2">
             <p className="text-lg">{project.name}</p>
-            <button title="View project in editor" onClick={() => window.open(`/edit/${shareId}`, '_blank')} className="px-1"><EyeIcon className="w-4 h-4" /></button>
+            <button title="View project in editor" onClick={() => window.open(`/edit/${project.id}`, '_blank')} className="px-1"><EyeIcon className="w-4 h-4" /></button>
           </div>
       </div>
 
