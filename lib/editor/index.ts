@@ -1,13 +1,16 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { api } from '@/convex/_generated/api';
 import { Entity } from '@/types/entities';
+import { useMutation } from 'convex/react';
+import { useCallback, useMemo, useState } from 'react';
 import { useProject } from '../project';
 import { parseIntoSchema } from '../project/parser';
 import { computeBlame, LineBlame } from './blame';
 
 export default function useEditor() {
-  const { project, updateProject, versions, resolveAllVersions } = useProject();
+  const { project, updateProject, versions } = useProject();
+  const resolveAllMutation = useMutation(api.versions.resolveAll);
   const [cursorLine, setCursorLine] = useState<number>(0);
 
   const schema = useMemo(() => {
@@ -40,8 +43,8 @@ export default function useEditor() {
 
   // Dismiss highlights by resolving all versions permanently
   const dismissHighlights = useCallback(() => {
-    resolveAllVersions();
-  }, [resolveAllVersions]);
+    resolveAllMutation({ projectId: project.id });
+  }, [resolveAllMutation, project.id]);
 
   return {
     script: project.script,

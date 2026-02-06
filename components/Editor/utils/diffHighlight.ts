@@ -1,21 +1,54 @@
 /**
- * CodeMirror plugin for highlighting diff between adjacent versions.
+ * CodeMirror plugin for GitHub-style diff highlighting between versions.
  *
- * When viewing a version, we compare "before" (previous version) to "after" (selected version):
- * - Red: Lines that were in "before" but NOT in "after" (removed in this version)
- * - Green: Lines that are in "after" but NOT in "before" (added in this version)
- *
- * We show the "after" version in the editor, so:
- * - Red = this line was removed (only shown via count widget)
- * - Green = this line was added in this version
+ * Compares "before" (previous version) to "after" (selected version):
+ * - Red lines: Were in "before" but removed in "after" (shown as inline widgets)
+ * - Green lines: Added in "after" that weren't in "before"
  */
 
-import { StateEffect, StateField } from '@codemirror/state';
-import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from '@codemirror/view';
+import { computeLcsMapping, findAddedIndices } from '@/lib/diff';
+import { EditorState, StateEffect, StateField } from '@codemirror/state';
+import { Decoration, DecorationSet, EditorView, WidgetType } from '@codemirror/view';
 
 export interface DiffState {
   versionScript: string[] | null;
   currentScript: string[];
+}
+
+/** Find removed lines with their positions relative to the "after" document */
+function findRemovedLinesWithPositions(
+  before: string[],
+  after: string[],
+): { afterLineIdx: number; lines: string[] }[] {
+  const mapping = computeLcsMapping(before, after);
+  const matchedBeforeIndices = new Set(mapping.keys());
+
+  // Group consecutive removed lines and track where they should appear
+  const result: { afterLineIdx: number; lines: string[] }[] = [];
+  let currentGroup: string[] = [];
+  let insertAfterLine = -1; // -1 means before line 0
+
+  for (let i = 0; i < before.length; i++) {
+    if (matchedBeforeIndices.has(i)) {
+      // This line is matched - flush any accumulated removed lines
+      if (currentGroup.length > 0) {
+        result.push({ afterLineIdx: insertAfterLine, lines: [...currentGroup] });
+        currentGroup = [];
+      }
+      // Update insertion point to after the corresponding "after" line
+      insertAfterLine = mapping.get(i)!;
+    } else {
+      // This line was removed
+      currentGroup.push(before[i]);
+    }
+  }
+
+  // Flush remaining removed lines
+  if (currentGroup.length > 0) {
+    result.push({ afterLineIdx: insertAfterLine, lines: [...currentGroup] });
+  }
+
+  return result;
 }
 
 // State effect to update diff state
@@ -36,84 +69,51 @@ export const diffHighlightState = StateField.define<DiffState>({
   },
 });
 
-/** Normalize a line for comparison (trim whitespace, lowercase) */
-function normalizeLine(line: string): string {
-  return line.trim().toLowerCase();
-}
-
-/**
- * Simple LCS-based diff: returns indices of lines in "after" that are additions.
- * Uses positional comparison so identical lines in different scenes don't get confused.
- */
-function computeAddedLineIndices(before: string[], after: string[]): Set<number> {
-  const beforeNorm = before.map(normalizeLine);
-  const afterNorm = after.map(normalizeLine);
-
-  // Build LCS table
-  const m = beforeNorm.length;
-  const n = afterNorm.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (beforeNorm[i - 1] === afterNorm[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-      }
-    }
-  }
-
-  // Backtrack to find matched indices in "after"
-  const matchedAfterIndices = new Set<number>();
-  let i = m;
-  let j = n;
-  while (i > 0 && j > 0) {
-    if (beforeNorm[i - 1] === afterNorm[j - 1]) {
-      matchedAfterIndices.add(j - 1); // 0-indexed
-      i--;
-      j--;
-    } else if (dp[i - 1][j] > dp[i][j - 1]) {
-      i--;
-    } else {
-      j--;
-    }
-  }
-
-  // Lines in "after" not matched = added
-  const addedIndices = new Set<number>();
-  for (let idx = 0; idx < after.length; idx++) {
-    if (!matchedAfterIndices.has(idx) && afterNorm[idx]) {
-      addedIndices.add(idx);
-    }
-  }
-  return addedIndices;
-}
-
-/** Widget to show removed lines count */
+/** Widget to show actual removed lines (GitHub-style) */
 class RemovedLinesWidget extends WidgetType {
-  constructor(readonly count: number) {
+  constructor(readonly lines: string[]) {
     super();
   }
 
   toDOM() {
-    const span = document.createElement('span');
-    span.className = 'cm-diff-removed-widget';
-    span.textContent = `-${this.count} line${this.count > 1 ? 's' : ''} removed`;
-    return span;
+    const container = document.createElement('div');
+    container.className = 'cm-diff-removed-block';
+
+    for (const line of this.lines) {
+      const lineDiv = document.createElement('div');
+      lineDiv.className = 'cm-diff-removed-line';
+
+      const marker = document.createElement('span');
+      marker.className = 'cm-diff-removed-marker';
+      marker.textContent = '−';
+
+      const content = document.createElement('span');
+      content.className = 'cm-diff-removed-content';
+      content.textContent = line || ' '; // Show space for empty lines
+
+      lineDiv.appendChild(marker);
+      lineDiv.appendChild(content);
+      container.appendChild(lineDiv);
+    }
+
+    return container;
   }
 
   ignoreEvent() {
     return true;
   }
+
+  eq(other: RemovedLinesWidget) {
+    return this.lines.length === other.lines.length && this.lines.every((l, i) => l === other.lines[i]);
+  }
 }
 
 /** Build decorations for diff highlighting */
-function buildDiffDecorations(view: EditorView): DecorationSet {
-  const state = view.state.field(diffHighlightState);
+function buildDiffDecorations(state: EditorState): DecorationSet {
+  const diffState = state.field(diffHighlightState);
   // versionScript = "after" (the selected version we're viewing)
   // currentScript = "before" (the previous version to compare against)
-  const { versionScript: afterScript, currentScript: beforeScript } = state;
+  const { versionScript: afterScript, currentScript: beforeScript } = diffState;
 
   // No diff if no after script
   if (!afterScript || afterScript.length === 0) {
@@ -121,14 +121,14 @@ function buildDiffDecorations(view: EditorView): DecorationSet {
   }
 
   // Use LCS-based positional diff to find added lines
-  const addedIndices = computeAddedLineIndices(beforeScript, afterScript);
+  const addedIndices = findAddedIndices(beforeScript, afterScript);
 
-  const decorations: { from: number; deco: Decoration }[] = [];
-  const doc = view.state.doc;
+  // Track decorations with position and side for proper sorting
+  const decorations: { from: number; side: number; deco: Decoration }[] = [];
+  const doc = state.doc;
 
-  // Count removals using reverse LCS (lines in before not matched to after)
-  const removedIndices = computeAddedLineIndices(afterScript, beforeScript);
-  const removedCount = removedIndices.size;
+  // Find removed lines with their insertion positions
+  const removedGroups = findRemovedLinesWithPositions(beforeScript, afterScript);
 
   // Process each line in the displayed document (which shows "after")
   for (let i = 1; i <= doc.lines; i++) {
@@ -137,71 +137,100 @@ function buildDiffDecorations(view: EditorView): DecorationSet {
     if (addedIndices.has(lineIdx)) {
       decorations.push({
         from: doc.line(i).from,
+        side: -2, // Line decorations come before widgets at same position
         deco: Decoration.line({ class: 'cm-diff-added' }),
       });
     }
   }
 
-  // Add widget at top to show removals count
-  if (removedCount > 0 && doc.lines > 0) {
-    const firstLine = doc.line(1);
+  // Add widgets to show removed lines at their correct positions
+  for (const group of removedGroups) {
+    // afterLineIdx is the 0-indexed line in "after" that removed lines come after
+    // -1 means they come before line 0
+    let insertPos: number;
+    const side = group.afterLineIdx < 0 ? -1 : 1;
+    if (group.afterLineIdx < 0) {
+      // Insert before the first line
+      insertPos = 0;
+    } else if (group.afterLineIdx >= doc.lines) {
+      // Insert at end of document
+      insertPos = doc.length;
+    } else {
+      // Insert at the end of the referenced line
+      insertPos = doc.line(group.afterLineIdx + 1).to;
+    }
+
     decorations.push({
-      from: firstLine.from,
+      from: insertPos,
+      side,
       deco: Decoration.widget({
-        widget: new RemovedLinesWidget(removedCount),
-        side: -1,
+        widget: new RemovedLinesWidget(group.lines),
+        side,
+        block: true,
       }),
     });
   }
 
-  return Decoration.set(decorations.sort((a, b) => a.from - b.from).map((d) => d.deco.range(d.from)));
+  // Let CodeMirror handle the sorting (pass true as second arg)
+  return Decoration.set(
+    decorations.map((d) => d.deco.range(d.from)),
+    true // Enable automatic sorting
+  );
 }
 
-// View plugin for diff highlighting
-export const diffHighlightPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-
-    constructor(view: EditorView) {
-      this.decorations = buildDiffDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-      if (
-        update.docChanged ||
-        update.viewportChanged ||
-        update.transactions.some((tr) => tr.effects.some((e) => e.is(setDiffHighlight)))
-      ) {
-        this.decorations = buildDiffDecorations(update.view);
-      }
-    }
+// StateField for diff decorations (required for block widgets)
+export const diffHighlightPlugin = StateField.define<DecorationSet>({
+  create(state) {
+    return buildDiffDecorations(state);
   },
-  { decorations: (v) => v.decorations },
-);
+  update(decorations, tr) {
+    // Rebuild if diff state changed or document changed
+    if (tr.docChanged || tr.effects.some((e) => e.is(setDiffHighlight))) {
+      return buildDiffDecorations(tr.state);
+    }
+    return decorations;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
 
-// CSS for diff highlighting
+// CSS for diff highlighting (GitHub-style)
 export const diffHighlightTheme = EditorView.theme({
-  // Red - removed since this version (line is in version but not in current)
-  '.cm-diff-removed': {
-    backgroundColor: '#FEE2E2', // red-100
-    borderLeft: '3px solid #EF4444', // red-500
-    textDecoration: 'line-through',
-    opacity: 0.7,
-  },
-  // Green - added since this version
+  // Green - added lines
   '.cm-diff-added': {
-    backgroundColor: '#DCFCE7', // green-100
-    borderLeft: '3px solid #22C55E', // green-500
+    backgroundColor: '#dafbe1', // GitHub green bg
+    borderLeft: '4px solid #2da44e',
   },
-  // Widget showing removed lines count
-  '.cm-diff-removed-widget': {
+  // Container for removed lines block
+  '.cm-diff-removed-block': {
     display: 'block',
-    padding: '4px 8px',
-    marginBottom: '4px',
-    backgroundColor: '#FEE2E2',
-    borderLeft: '3px solid #EF4444',
-    color: '#991B1B',
-    fontSize: '12px',
-    fontStyle: 'italic',
+    width: '100%',
+  },
+  // Individual removed line (GitHub-style)
+  '.cm-diff-removed-line': {
+    display: 'flex',
+    backgroundColor: '#ffebe9', // GitHub red bg
+    borderLeft: '4px solid #cf222e',
+    fontFamily: 'inherit',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
+    minHeight: '1.4em',
+  },
+  // Minus marker
+  '.cm-diff-removed-marker': {
+    display: 'inline-block',
+    width: '20px',
+    textAlign: 'center',
+    color: '#cf222e',
+    fontWeight: 'bold',
+    flexShrink: 0,
+    userSelect: 'none',
+  },
+  // Removed line content
+  '.cm-diff-removed-content': {
+    flex: 1,
+    color: '#82071e',
+    whiteSpace: 'pre',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   },
 });

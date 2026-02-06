@@ -1,24 +1,23 @@
 'use client';
 
+import { useProject } from '@/lib/project';
 import { syntaxHighlighting } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
 import { EditorView, lineNumbers } from '@codemirror/view';
 import { useEffect, useRef } from 'react';
 import { diffHighlightPlugin, diffHighlightState, diffHighlightTheme, setDiffHighlight } from '../Editor/utils/diffHighlight';
 import { bonsaiHighlighting, bonsaiSyntaxTheme, bonsaiTheme } from '../Editor/utils/theme';
-
-interface VersionViewerProps {
-  /** The version's script to display */
-  script: string[];
-  /** The previous version's script for diff comparison */
-  previousScript: string[];
-}
+import { getDiffScripts } from '../Versions/utils/getDiffScripts';
 
 /**
  * Read-only viewer for historical versions.
  * Completely separate from the main Editor to prevent any save triggers.
  */
-export default function VersionViewer({ script, previousScript }: VersionViewerProps) {
+export default function VersionViewer() {
+  const { versions, selectedVersionId } = useProject();
+  const diffScripts = getDiffScripts(selectedVersionId, versions);
+  const script = diffScripts?.after ?? [];
+  const previousScript = diffScripts?.before ?? [];
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 

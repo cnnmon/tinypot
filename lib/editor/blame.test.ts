@@ -57,6 +57,44 @@ describe('computeBlame', () => {
   });
 
   describe('insertion without false positives', () => {
+    it('should NOT blame duplicate lines that already existed', () => {
+      // Original has "What do you want to do?" appearing twice
+      const originalScript = [
+        '@HOME',
+        'What do you want to do?',
+        'if go outside',
+        '  You step outside.',
+        '  What do you want to do?',
+      ];
+
+      // AI adds "if look around" with another "What do you want to do?"
+      const afterAiScript = [
+        '@HOME',
+        'What do you want to do?',
+        'if go outside',
+        '  You step outside.',
+        '  What do you want to do?',
+        'if look around',
+        '  You glance around.',
+        '  What do you want to do?',
+      ];
+
+      const aiVersion = makeVersion('v2', Entity.SYSTEM, afterAiScript, 2000);
+      const authorVersion = makeVersion('v1', Entity.AUTHOR, originalScript, 1000);
+
+      const blame = computeBlame(afterAiScript, [aiVersion, authorVersion]);
+
+      // Only AI-added lines should be blamed
+      expect(blame[0]).not.toBe(Entity.SYSTEM); // "@HOME"
+      expect(blame[1]).not.toBe(Entity.SYSTEM); // "What do you want to do?" - original
+      expect(blame[2]).not.toBe(Entity.SYSTEM); // "if go outside" - original
+      expect(blame[3]).not.toBe(Entity.SYSTEM); // "You step outside." - original
+      expect(blame[4]).not.toBe(Entity.SYSTEM); // "What do you want to do?" - original
+      expect(blame[5]).toBe(Entity.SYSTEM); // "if look around" - AI added
+      expect(blame[6]).toBe(Entity.SYSTEM); // "You glance around." - AI added
+      expect(blame[7]).toBe(Entity.SYSTEM); // "What do you want to do?" - AI added
+    });
+
     it('should NOT attribute shifted lines to AI when AI inserts in the middle', () => {
       // Original script by author
       const originalScript = [

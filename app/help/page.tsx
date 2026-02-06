@@ -82,14 +82,23 @@ export default function HelpPage() {
             <h3 className="font-medium">Scenes</h3>
             <p className="text-sm text-neutral-600 mb-2">
               Scenes are marked with <code>@</code>. They define locations or states in your story.
+              Add <code>[allows: new|link|text]</code> to control AI generation.
             </p>
             <pre className="bg-white/60 p-3 rounded text-sm font-mono border">
               {`@HOME
 You're in a cozy room.
 
-@GARDEN
-The flowers sway gently.`}
+@GARDEN [allows: new]
+The flowers sway gently.
+(AI can create new scenes from here)
+
+@HUB [allows: text]
+What do you want to do?
+(AI can only add flavor text, no scene changes)`}
             </pre>
+            <p className="text-sm text-neutral-500 mt-2">
+              <code>new</code> = AI can create scenes (default), <code>link</code> = only existing scenes, <code>text</code> = flavor only
+            </p>
           </div>
 
           {/* Choices */}
@@ -239,6 +248,9 @@ The garden is beautiful.`}
             </li>
             <li>
               Stack variables with multiple <code>+var</code> for inventory, XP, or resource systems.
+            </li>
+            <li>
+              Use <code>[allows: text]</code> on hub scenes to force explicit branches, letting AI extend within paths.
             </li>
           </ul>
         </section>

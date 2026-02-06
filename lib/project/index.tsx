@@ -6,7 +6,6 @@
 
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
-import { Branch } from '@/types/branch';
 import { Entity } from '@/types/entities';
 import { Project } from '@/types/project';
 import { Version } from '@/types/version';
@@ -17,6 +16,11 @@ import { shouldCoalesceAuthorEdit } from './coalesce';
 
 type SaveStatus = 'idle' | 'saving' | 'saved';
 
+export interface GuidebookSuggestion {
+  id: string;
+  text: string;
+}
+
 interface ProjectContextValue {
   project: Project;
   updateProject: (updates: Partial<Project>, creator?: Entity.AUTHOR | Entity.SYSTEM) => void;
@@ -24,16 +28,8 @@ interface ProjectContextValue {
   saveStatus: SaveStatus;
   selectedVersionId: string | null;
   setSelectedVersionId: (id: string | null) => void;
-  /** Get the diff scripts for a selected version: [before, after] */
-  getDiffScripts: () => { before: string[]; after: string[] } | null;
-  /** Delete a version by ID */
-  deleteVersion: (versionId: string) => void;
-  /** Mark all versions as resolved (dismiss highlights) */
-  resolveAllVersions: () => void;
-  // Legacy branch fields (empty stubs for Editor compatibility)
-  branches: Branch[];
-  sceneToBranchMap: Record<string, string>;
-  selectedBranchId: string | null;
+  guidebookSuggestions: GuidebookSuggestion[];
+  clearSuggestion: (id: string) => void;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -59,12 +55,6 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         snapshot: { script: string[]; guidebook: string };
       }) => Promise<unknown>)
     | undefined;
-  const deleteVersionMutation = useMutation(api.versions?.remove) as unknown as
-    | ((args: { versionId: Id<'versions'> }) => Promise<void>)
-    | undefined;
-  const resolveAllMutation = useMutation(api.versions?.resolveAll) as unknown as
-    | ((args: { projectId: Id<'projects'> }) => Promise<void>)
-    | undefined;
 
   // Save status for UI feedback
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -80,6 +70,9 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
 
   // Selected version for diff viewing
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+
+  // Guidebook suggestions from meta-learning
+  const [guidebookSuggestions, setGuidebookSuggestions] = useState<GuidebookSuggestion[]>([]);
 
   // Local project state - only initialize AFTER convexProject is loaded
   // This prevents the DEFAULT_LINES from ever being used when we have real data
@@ -234,20 +227,10 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
 
                 const feedback = detectFeedbackFromVersions([virtualAuthorVersion, latestVersion]);
                 if (feedback?.type) {
-                  // Append feedback to guidebook - just update project, don't create new version
-                  // (creating a new AI version here would make the human's edit appear as AI)
+                  // Add as a suggestion instead of directly updating guidebook
                   const feedbackText = formatGuidebookFeedback(feedback.type, feedback.branch);
-                  const updatedGuidebook = newProject.guidebook
-                    ? `${newProject.guidebook}\n${feedbackText}`
-                    : feedbackText;
-
-                  // Update local state and save to project (not as a version)
-                  setProject((prev) => (prev ? { ...prev, guidebook: updatedGuidebook } : prev));
-                  updateProjectMutation({
-                    projectId,
-                    script: newProject.script as string[],
-                    guidebook: updatedGuidebook,
-                  });
+                  const suggestionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                  setGuidebookSuggestions((prev) => [...prev, { id: suggestionId, text: feedbackText }]);
                 }
               }
             }
@@ -259,40 +242,10 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     [project, projectId, updateProjectMutation, versions, snapshotsEqual],
   );
 
-  // Get diff scripts for selected version: compare previous version to this one
-  const getDiffScripts = useCallback((): { before: string[]; after: string[] } | null => {
-    if (!selectedVersionId) return null;
-    const versionIdx = versions.findIndex((v) => v.id === selectedVersionId);
-    if (versionIdx === -1) return null;
-
-    const selectedVersion = versions[versionIdx];
-    // Versions are sorted desc (newest first), so "before" is the next item in array
-    const previousVersion = versions[versionIdx + 1];
-
-    return {
-      before: previousVersion?.snapshot.script ?? [],
-      after: selectedVersion.snapshot.script,
-    };
-  }, [selectedVersionId, versions]);
-
-  // Delete a version
-  const deleteVersion = useCallback(
-    (versionId: string) => {
-      if (!deleteVersionMutation) return;
-      // Clear selection if deleting the selected version
-      if (selectedVersionId === versionId) {
-        setSelectedVersionId(null);
-      }
-      deleteVersionMutation({ versionId: versionId as Id<'versions'> });
-    },
-    [deleteVersionMutation, selectedVersionId],
-  );
-
-  // Mark all versions as resolved (dismiss highlights permanently)
-  const resolveAllVersions = useCallback(() => {
-    if (!resolveAllMutation) return;
-    resolveAllMutation({ projectId });
-  }, [resolveAllMutation, projectId]);
+  // Clear a guidebook suggestion (accept or dismiss handled by component)
+  const clearSuggestion = useCallback((id: string) => {
+    setGuidebookSuggestions((prev) => prev.filter((s) => s.id !== id));
+  }, []);
 
   // Show loading state while project data is loading
   if (convexProject === undefined || project === null) {
@@ -324,13 +277,8 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         saveStatus,
         selectedVersionId,
         setSelectedVersionId,
-        getDiffScripts,
-        deleteVersion,
-        resolveAllVersions,
-        // Legacy branch fields (empty stubs for Editor compatibility)
-        branches: [],
-        sceneToBranchMap: {},
-        selectedBranchId: null,
+        guidebookSuggestions,
+        clearSuggestion,
       }}
     >
       {children}

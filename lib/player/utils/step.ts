@@ -257,10 +257,18 @@ export function step({
     // Check for conditional jumps (e.g., when turn >= 20 -> goto @END)
     if (preambleResult.jumpTarget) {
       if (preambleResult.jumpTarget === 'END') {
-        return { type: 'end' };
+        // Check if there's an actual @END scene with content
+        const endSceneIdx = sceneMap['END'];
+        if (endSceneIdx >= 0 && schema[endSceneIdx]?.type === EntryType.SCENE) {
+          // Jump to @END scene to play its content first
+          sceneId = 'END';
+        } else {
+          return { type: 'end' };
+        }
+      } else {
+        // Override scene with preamble jump target
+        sceneId = preambleResult.jumpTarget;
       }
-      // Override scene with preamble jump target
-      sceneId = preambleResult.jumpTarget;
     }
     
     // Collect preamble narratives to prepend to the first line
@@ -345,12 +353,31 @@ export function step({
 
     // Past the end of positions - use jump target from position building (includes conditionals)
     if (jumpTarget !== null) {
+      // Check if we're already in @END scene - if so, actually end the game
+      if (currentScene === 'END') {
+        return { type: 'end' };
+      }
+      
       if (jumpTarget === 'END') {
+        // Check if there's an actual @END scene with content
+        const endSceneIdx = sceneMap['END'];
+        if (endSceneIdx >= 0 && schema[endSceneIdx]?.type === EntryType.SCENE) {
+          // Jump to @END scene to play its content first
+          currentScene = 'END';
+          currentLineIdx = 0;
+          continue;
+        }
+        // No @END scene defined, just end immediately
         return { type: 'end' };
       }
       currentScene = jumpTarget;
       currentLineIdx = 0;
       continue;
+    }
+    
+    // If we're at the end of @END scene with no explicit goto, end the game
+    if (currentScene === 'END') {
+      return { type: 'end' };
     }
 
     // No jump found - wait at end of scene (implicit loop)

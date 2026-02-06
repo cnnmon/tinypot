@@ -33,7 +33,7 @@ export const bonsaiTheme = EditorView.theme({
     padding: '0 0px 0 8px',
   },
   '.cm-activeLine': {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#e5e5e5',
   },
   '.cm-activeLineGutter': {
     backgroundColor: '#f5f5f5',
@@ -128,13 +128,15 @@ function bonsaiLineHighlighter(view: EditorView) {
   const sceneMap = new Map<string, boolean>();
 
   // First pass: collect all valid scene names (new syntax: @SCENE_NAME)
+  // Include @START and @END as valid scenes
   for (let i = 1; i <= doc.lines; i++) {
     const line = doc.line(i);
     const trimmed = line.text.trimStart().toLowerCase();
 
-    if (trimmed.startsWith('@') && !trimmed.startsWith('@end')) {
-      const sceneName = trimmed.slice(1).trim();
-      if (!sceneMap.has(sceneName)) sceneMap.set(sceneName, false);
+    if (trimmed.startsWith('@')) {
+      // Extract scene name, handling potential metadata like [allows: new]
+      const sceneName = trimmed.slice(1).split(/\s+/)[0].trim();
+      if (sceneName && !sceneMap.has(sceneName)) sceneMap.set(sceneName, false);
     }
   }
 
@@ -146,16 +148,16 @@ function bonsaiLineHighlighter(view: EditorView) {
 
     let className = '';
     // Scene declaration: @SCENE_NAME
-    if (trimmed.startsWith('@') && !trimmed.startsWith('@end')) {
-      const sceneName = trimmed.slice(1).trim();
-      if (sceneName === 'start' || sceneMap.get(sceneName)) {
+    if (trimmed.startsWith('@')) {
+      const sceneName = trimmed.slice(1).split(/\s+/)[0].trim();
+      // @START and @END are special scenes (highlighted distinctly)
+      if (sceneMap.get(sceneName)) {
+        // Duplicate scene definition
         className = 'cm-bonsai-scene-start';
       } else {
         className = 'cm-bonsai-scene';
         sceneMap.set(sceneName, true);
       }
-    } else if (trimmed.startsWith('@end')) {
-      className = 'cm-bonsai-scene-start'; // END is special
     } else if (trimmed.startsWith('goto ')) {
       // Jump: goto @TARGET
       const gotoTarget = trimmed.slice(5).trim();

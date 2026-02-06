@@ -148,12 +148,25 @@ export function parseIntoSchema(rawEntries: string[]): Schema {
       continue;
     }
 
-    // Scene declaration: @SCENE_NAME
+    // Scene declaration: @SCENE_NAME or @SCENE_NAME [allows: new|link|text]
     if (trimmed.startsWith('@') && !trimmed.startsWith('@END')) {
-      schema.push({
-        type: EntryType.SCENE,
-        label: trimmed.slice(1).trim(),
-      });
+      // Check for inline [allows: ...] after scene name
+      const sceneMatch = trimmed.match(/^@(\w+)(?:\s*\[allows:\s*(new|link|text)\])?$/);
+      if (sceneMatch) {
+        const label = sceneMatch[1];
+        const allows = sceneMatch[2] as 'new' | 'link' | 'text' | undefined;
+        schema.push({
+          type: EntryType.SCENE,
+          label,
+          ...(allows && { allows }),
+        });
+      } else {
+        // Fallback for scenes without valid allows syntax
+        schema.push({
+          type: EntryType.SCENE,
+          label: trimmed.slice(1).trim().split(/\s+/)[0], // Just take the label
+        });
+      }
       i++;
       continue;
     }
@@ -650,6 +663,10 @@ export function addGeneratedOptionToScript(
           }
         }
       }
+    }
+    // Skip back over any trailing blank lines so new option appears right after content
+    while (insertIdx > 0 && result[insertIdx - 1].trim() === '') {
+      insertIdx--;
     }
     result.splice(insertIdx, 0, ...newOptionLines);
   }

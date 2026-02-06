@@ -28,6 +28,7 @@ export interface NarrativeEntry {
 export interface SceneEntry {
   type: EntryType.SCENE;
   label: string;
+  allows?: 'new' | 'link' | 'text'; // Controls AI generation: new=can create scenes, link=existing only, text=flavor only
 }
 
 export interface JumpEntry {
@@ -84,11 +85,24 @@ export type Schema = SchemaEntry[];
 
 // Helper to parse allows metadata value
 export function parseAllows(value: string | undefined): AllowsConfig {
-  // Default: can link to any existing scene, but cannot create new
+  // Default: allow new scenes (emergent by default)
   if (!value) {
-    return { scenes: [], allowNew: false, allowAny: true };
+    return { scenes: [], allowNew: true, allowAny: true };
   }
 
+  // Handle simple scene-level values: new, link, text
+  if (value === 'new') {
+    return { scenes: [], allowNew: true, allowAny: true };
+  }
+  if (value === 'link') {
+    return { scenes: [], allowNew: false, allowAny: true };
+  }
+  if (value === 'text') {
+    // Text only - no scene changes allowed
+    return { scenes: [], allowNew: false, allowAny: false };
+  }
+
+  // Legacy comma-separated format: new, @SCENE1, @SCENE2
   const parts = value.split(',').map((p) => p.trim());
   const scenes: string[] = [];
   let allowNew = false;

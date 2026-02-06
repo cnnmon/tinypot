@@ -1,3 +1,4 @@
+import { buildGuidebookPrompt, parseGuidebook } from '@/lib/guidebook';
 import { AllowsConfig } from '@/types/schema';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -132,9 +133,12 @@ export async function POST(req: Request) {
 
   const worldContext = worldBible ? `\nWorld/Style Guide:\n${worldBible}\n` : '';
 
-  const guidebookContext = guidebook ? `\nAUTHOR PREFERENCES (follow these closely):\n${guidebook}\n` : '';
+  // Parse guidebook settings and build prompts
+  const guidebookSettings = parseGuidebook(guidebook || '');
+  const { constraintsOverride, rulesPrompt, styleModifier } = buildGuidebookPrompt(guidebookSettings);
 
-  const constraintsContext = buildConstraintsPrompt(allowsConfig);
+  // Use guidebook constraints override if set, otherwise fall back to allowsConfig
+  const constraintsContext = constraintsOverride || buildConstraintsPrompt(allowsConfig);
 
   const projectVarsContext =
     projectVariables && projectVariables.length > 0
@@ -156,7 +160,7 @@ export async function POST(req: Request) {
         role: 'user',
         content: `You are a collaborative interactive fiction author. A player has typed something that doesn't match existing options. Determine the best response type and generate appropriate content.
 
-${worldContext}${guidebookContext}
+${worldContext}${rulesPrompt}${styleModifier}
 FULL PROJECT (for style reference):
 \`\`\`
 ${projectContext}
@@ -182,6 +186,7 @@ First, decide which response type is most appropriate (respecting the constraint
    - Input doesn't represent a meaningful choice
    - Response should loop back to same decision point
    - (Or when LINK_SCENE/NEW_FORK are not allowed by constraints)
+   - IMPORTANT: Generate NEW narrative responding to the action. Don't repeat the scene's existing text.
 
 2. LINK_SCENE - Use when:
    - Player wants to go somewhere that already exists
@@ -224,7 +229,8 @@ when gold >= 5
 when !gold
     Your pockets are empty.
 
-A "turn" variable auto-increments each player input. Use "when turn >= N" for time-based events.
+The "turn" variable auto-increments each player input. Use "when turn >= N" for time-based events.
+NEVER use +turn or -turn - the turn counter is managed automatically by the system.
 
 IMPORTANT: Look at the project's existing variables and use them consistently. Add new variables that fit the project's theme. Variables create meaningful tradeoffs - gaining one thing often means losing another.
 
@@ -251,9 +257,10 @@ Respond in JSON format only:
 }
 
 Guidelines:
-- For TEXT_ONLY: provide 1-2 lines of narrative, no jump
+- For TEXT_ONLY: provide 1-2 lines of NEW narrative responding to the action, no jump. Do NOT repeat the scene's existing text - the player already saw it.
 - For LINK_SCENE: verify the target exists in the scene list AND is allowed
-- For NEW_FORK: create a memorable scene label and 2-4 lines of content
+- For NEW_FORK: create a memorable scene label and 2-4 lines of content for the NEW scene only
+- NEVER repeat existing scene content - always generate fresh narrative
 - Match the author's tone and style
 - Keep narrative punchy and evocative
 - Use "goto @SCENE_NAME" syntax for navigation
@@ -331,19 +338,26 @@ Guidelines:
     const aliases: string[] = [];
 
     // Add sets/unsets as standalone lines at the start of the then block
-    if (parsed.setsVariable) thenLines.unshift(`+${parsed.setsVariable}`);
-    if (parsed.unsetsVariable) thenLines.unshift(`-${parsed.unsetsVariable}`);
+    // Never allow +turn or -turn - turn is auto-managed
+    if (parsed.setsVariable && parsed.setsVariable !== 'turn') {
+      thenLines.unshift(`+${parsed.setsVariable}`);
+    }
+    if (parsed.unsetsVariable && parsed.unsetsVariable !== 'turn') {
+      thenLines.unshift(`-${parsed.unsetsVariable}`);
+    }
 
     // Build new scene content for NEW_FORK
     let newScene: { label: string; content: string[] } | undefined;
     if (responseType === 'NEW_FORK') {
       // Extract scene label from either newScene object or from the jump target in thenLines
-      const sceneLabel =
+      const rawLabel =
         parsed.newScene?.label ||
         thenLines
           .find((l: string) => l.startsWith('goto @'))
           ?.slice(6)
           .trim();
+      // Clean: LLM sometimes includes @ prefix
+      const sceneLabel = rawLabel?.replace(/^@+/, '');
 
       if (sceneLabel) {
         // Get content from newScene or generate minimal content from narrative

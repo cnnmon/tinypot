@@ -1,17 +1,8 @@
 {
   "editor.formatOnSave": true,
-  "editor.defaultFormatter": "rvest.vs-code-prettier-eslint",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.codeActionsOnSave": {
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit"
-  },
-  "[javascript]": {
-    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
-  },
-  "[typescript]": {
-    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
-  },
-  "[typescriptreact]": {
-    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
   }
 }

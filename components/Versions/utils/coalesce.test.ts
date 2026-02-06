@@ -2,7 +2,7 @@ import { Id } from '@/convex/_generated/dataModel';
 import { Entity } from '@/types/entities';
 import { Version } from '@/types/version';
 import { describe, expect, it } from 'vitest';
-import { coalesceVersions } from './index';
+import { coalesceVersions } from '../index';
 
 const HOUR = 60 * 60 * 1000;
 const MINUTE = 60 * 1000;

@@ -1,4 +1,4 @@
-import { MetadataEntry, NarrativeEntry, OptionEntry } from '@/types/schema';
+import { ImageEntry, MetadataEntry, NarrativeEntry, OptionEntry } from '@/types/schema';
 
 export interface MatchInfo {
   fuzzyMatch?: { confidence: number; suggestedAlias: string };
@@ -15,7 +15,7 @@ export interface HandleInputResult {
   sceneId?: string;
   lineIdx?: number;
   optionText?: string;
-  narratives?: NarrativeEntry[];
+  narratives?: (NarrativeEntry | ImageEntry)[];
   metadata?: MetadataEntry[];
   // Fuzzy match info (when AI matching was used)
   fuzzyMatch?: {

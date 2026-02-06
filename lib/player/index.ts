@@ -217,20 +217,41 @@ export default function usePlayer() {
           }
         }
 
-        // Add narratives from the option
+        // Add narratives and images from the option
         if (result.narratives) {
-          for (const narrative of result.narratives) {
+          for (const entry of result.narratives) {
             lineIdx++;
-            addLine({
-              id: `${currentSceneId}-${lineIdx}` as `${string}-${number}`,
-              sender: Entity.AUTHOR,
-              text: narrative.text,
-            });
+            if (entry.type === 'image') {
+              addLine({
+                id: `${currentSceneId}-${lineIdx}` as `${string}-${number}`,
+                sender: Entity.AUTHOR,
+                text: '',
+                metadata: { imageUrl: entry.url },
+              });
+            } else {
+              addLine({
+                id: `${currentSceneId}-${lineIdx}` as `${string}-${number}`,
+                sender: Entity.AUTHOR,
+                text: entry.text,
+              });
+            }
           }
         }
 
         if (result.sceneId === 'END') {
-          setState((prev) => ({ ...prev, status: Status.ENDED }));
+          // Check if there's an actual @END scene with content
+          const endSceneIdx = sceneMap['END'];
+          if (endSceneIdx >= 0 && schema[endSceneIdx]?.type === 'scene') {
+            // Jump to @END scene to play its content first
+            setState({
+              currentSceneId: 'END',
+              currentLineIdx: 0,
+              status: Status.RUNNING,
+            });
+          } else {
+            // No @END scene, end immediately
+            setState((prev) => ({ ...prev, status: Status.ENDED }));
+          }
           return;
         }
 
@@ -318,11 +339,24 @@ export default function usePlayer() {
             if (trimmed.startsWith('goto ')) {
               const target = trimmed.slice(5).trim().replace(/^@/, '');
               if (target === 'END') {
-                setState((prev) => ({ ...prev, status: Status.ENDED }));
+                // Check if there's an actual @END scene with content
+                const endSceneIdx = sceneMap['END'];
+                if (endSceneIdx >= 0 && schema[endSceneIdx]?.type === 'scene') {
+                  // Jump to @END scene to play its content first
+                  setState({ currentSceneId: 'END', currentLineIdx: 0, status: Status.RUNNING });
+                } else {
+                  setState((prev) => ({ ...prev, status: Status.ENDED }));
+                }
                 return;
               }
               setState({ currentSceneId: target, currentLineIdx: 0, status: Status.RUNNING });
               return;
+            } else if (trimmed.match(/^\+\w+$/)) {
+              // Variable increment: +var
+              variables.set(trimmed.slice(1));
+            } else if (trimmed.match(/^-\w+$/)) {
+              // Variable decrement: -var
+              variables.unset(trimmed.slice(1));
             } else if (trimmed.length > 0) {
               addLine({
                 id: `${currentSceneId}-${++lineIdx}` as `${string}-${number}`,

@@ -2,12 +2,15 @@
 
 import Box from '@/components/Box';
 import Editor from '@/components/Editor';
+import Guidebook from '@/components/Guidebook';
 import Header from '@/components/Header';
 import Player from '@/components/Player';
-import VersionHistory from '@/components/VersionHistory';
+import ScrollContainer from '@/components/ScrollContainer';
+import Versions from '@/components/Versions';
+import { getDiffScripts } from '@/components/Versions/utils/getDiffScripts';
 import VersionViewer from '@/components/VersionViewer';
 import { Id } from '@/convex/_generated/dataModel';
-import { PlayerProvider } from '@/lib/player/PlayerProvider';
+import { PlayerProvider, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
 import { useProjects } from '@/lib/project/ProjectsProvider';
 import { decodeShareId, getShareUrl } from '@/lib/share';
@@ -17,13 +20,14 @@ import { useCallback, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
-  const { project, updateProject, versions, saveStatus, selectedVersionId, setSelectedVersionId, getDiffScripts, deleteVersion } =
-    useProject();
+  const { project, versions, selectedVersionId, saveStatus, setSelectedVersionId } = useProject();
   const { renameProject } = useProjects();
+  const { currentSceneId, variables } = usePlayerContext();
+
   const [leftWidth, setLeftWidth] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
-  const diffScripts = getDiffScripts();
+  const hasDiff = getDiffScripts(selectedVersionId, versions) !== null;
 
   const handleShare = useCallback(() => {
     const shareUrl = getShareUrl(project.id);
@@ -55,9 +59,6 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
     document.addEventListener('mouseup', handleMouseUp);
   }, []);
 
-  const guidebook = project.guidebook;
-  const isMetalearning = false;
-
   return (
     <div className="h-screen p-4 gap-2 flex flex-col">
       <div className="flex items-center justify-between">
@@ -75,7 +76,17 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
             </button>
           )}
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center">
+          <span
+            className={twMerge(
+              'transition-opacity',
+              saveStatus === 'saving' && 'text-neutral-500 animate-pulse',
+              saveStatus === 'saved' && 'text-green-600',
+              saveStatus === 'idle' && 'opacity-0',
+            )}
+          >
+            {saveStatus === 'saving' ? 'saving...' : saveStatus === 'saved' ? 'saved' : ''}
+          </span>
           <button onClick={() => window.open('/help', '_blank')} className="px-1">
             help
           </button>
@@ -88,46 +99,18 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
       </div>
 
       <div className="flex gap-2">
-        <Box
-          className={twMerge(
-            'bg-gradient-to-b from-[#EBF7D2] via-[#B7DCBD] to-white min-h-45 w-5 hover:opacity-90',
-            isMetalearning && 'bg-gradient-to-b via-[var(--orange)] from-[var(--rose)] to-white',
-          )}
-        >
-          <div className="p-3 h-full flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-1">
-              <h1 className="cursor-default">guidebook</h1>
-            </div>
-            {isMetalearning && <span className="text-neutral-800/40 animate-pulse">(Updating guidebook...)</span>}
-            <textarea
-              value={guidebook}
-              placeholder="Always generate content based on this prompt..."
-              className="w-full h-full"
-              onChange={(e) => updateProject({ guidebook: e.target.value })}
-              readOnly={isSharedView}
-            />
-          </div>
-        </Box>
+        <Guidebook readOnly={isSharedView} />
 
         <Box className="max-h-45 min-w-40 overflow-auto select-none bg-gradient-to-b from-[var(--sunflower)] to-white">
-          <div className="p-3 h-full">
-            <VersionHistory
-              versions={versions}
-              currentSnapshot={{ script: project.script, guidebook: project.guidebook }}
-              saveStatus={saveStatus}
-              selectedVersionId={selectedVersionId}
-              onSelectVersion={setSelectedVersionId}
-              onDeleteVersion={deleteVersion}
-            />
-          </div>
+          <Versions />
         </Box>
       </div>
 
       <div ref={containerRef} className="flex flex-row min-h-[calc(100%-210px)] h-[calc(100%-210px)] pb-5">
         <Box style={{ width: `${leftWidth}%` }}>
           <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
-            <b>{diffScripts ? `version ${selectedVersionId?.slice(1, 5)}` : 'editor'}</b>
-            {diffScripts && (
+            <b>{hasDiff ? `version ${selectedVersionId?.slice(1, 5)}` : 'editor'}</b>
+            {hasDiff && (
               <button
                 onClick={() => setSelectedVersionId(null)}
                 className="text-neutral-500 hover:text-neutral-800"
@@ -136,8 +119,8 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
               </button>
             )}
           </div>
-          {diffScripts ? (
-            <VersionViewer script={diffScripts.after} previousScript={diffScripts.before} />
+          {hasDiff ? (
+            <VersionViewer />
           ) : (
             <Editor readOnly={isSharedView} />
           )}
@@ -149,6 +132,23 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
         <Box style={{ width: `${100 - leftWidth}%` }}>
           <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
             <h1>player</h1>
+            {/* State */}
+            <div className="flex gap-2 items-center text-sm">
+              <div className="flex items-center gap-1">
+                <span className="opacity-50">Scene</span>
+                <span className="font-bold">{currentSceneId}</span>
+              </div>
+              <ScrollContainer direction="horizontal" className="flex">
+                {variables.length > 0 && (
+                  variables.map((v, i) => (
+                    <p key={i} className="flex flex-wrap min-w-fit px-1.5 py-0.5 bg-[#EBF7D2]">
+                      {v}
+                    </p>
+                  ))
+                )}
+              </ScrollContainer>
+            </div>
+
           </div>
           <div className="h-[calc(100%-60px)] overflow-scroll m-2 relative">
             <Player />

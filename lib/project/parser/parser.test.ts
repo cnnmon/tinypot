@@ -375,6 +375,57 @@ describe('parseIntoSchema - star syntax for indentation', () => {
   });
 });
 
+describe('parseIntoSchema - inline allows on scenes', () => {
+  it('should parse scene with [allows: new]', () => {
+    const lines = ['@GARDEN [allows: new]', 'The flowers sway gently.'];
+
+    const schema = parseIntoSchema(lines);
+
+    expect(schema.length).toBe(2);
+    expect(schema[0].type).toBe(EntryType.SCENE);
+    if (schema[0].type === EntryType.SCENE) {
+      expect(schema[0].label).toBe('GARDEN');
+      expect(schema[0].allows).toBe('new');
+    }
+  });
+
+  it('should parse scene with [allows: link]', () => {
+    const lines = ['@HUB [allows: link]', 'Choose your destination.'];
+
+    const schema = parseIntoSchema(lines);
+
+    expect(schema[0].type).toBe(EntryType.SCENE);
+    if (schema[0].type === EntryType.SCENE) {
+      expect(schema[0].label).toBe('HUB');
+      expect(schema[0].allows).toBe('link');
+    }
+  });
+
+  it('should parse scene with [allows: text]', () => {
+    const lines = ['@INTRO [allows: text]', 'What do you want to do?'];
+
+    const schema = parseIntoSchema(lines);
+
+    expect(schema[0].type).toBe(EntryType.SCENE);
+    if (schema[0].type === EntryType.SCENE) {
+      expect(schema[0].label).toBe('INTRO');
+      expect(schema[0].allows).toBe('text');
+    }
+  });
+
+  it('should parse scene without allows (undefined)', () => {
+    const lines = ['@ROOM', 'A simple room.'];
+
+    const schema = parseIntoSchema(lines);
+
+    expect(schema[0].type).toBe(EntryType.SCENE);
+    if (schema[0].type === EntryType.SCENE) {
+      expect(schema[0].label).toBe('ROOM');
+      expect(schema[0].allows).toBeUndefined();
+    }
+  });
+});
+
 describe('parseIntoSchema - nested options in conditionals', () => {
   it('should parse options nested inside conditionals', () => {
     const lines = [

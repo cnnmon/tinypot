@@ -2,6 +2,7 @@ import {
   AllowsConfig,
   ConditionalEntry,
   EntryType,
+  ImageEntry,
   MetadataEntry,
   NarrativeEntry,
   OptionEntry,
@@ -168,7 +169,8 @@ export function getOptionsAtPosition({
 
 /**
  * Get the allows configuration for the current scene.
- * Returns the most recent [allows: ...] metadata in the scene.
+ * First checks for inline [allows: ...] on the scene declaration,
+ * then falls back to [allows: ...] metadata within the scene.
  */
 export function getAllowsForScene({
   schema,
@@ -181,6 +183,13 @@ export function getAllowsForScene({
 }): AllowsConfig {
   const sceneStart = sceneMap[sceneId];
   if (sceneStart === undefined) return parseAllows(undefined);
+  
+  // Check for inline allows on the scene entry itself
+  const sceneEntry = schema[sceneStart];
+  if (sceneEntry?.type === EntryType.SCENE && sceneEntry.allows) {
+    return parseAllows(sceneEntry.allows);
+  }
+  
   const scanStart = getScanStart(schema, sceneStart);
 
   let allowsValue: string | undefined;
@@ -295,16 +304,18 @@ function processEntries(
   entries: SchemaEntry[],
   hasVariable?: (variable: string, threshold?: number) => boolean,
 ): {
-  narratives: NarrativeEntry[];
+  narratives: (NarrativeEntry | ImageEntry)[];
   metadata: MetadataEntry[];
   target: string | null;
 } {
-  const narratives: NarrativeEntry[] = [];
+  const narratives: (NarrativeEntry | ImageEntry)[] = [];
   const metadata: MetadataEntry[] = [];
   let target: string | null = null;
 
   for (const entry of entries) {
     if (entry.type === EntryType.NARRATIVE) {
+      narratives.push(entry);
+    } else if (entry.type === EntryType.IMAGE) {
       narratives.push(entry);
     } else if (entry.type === EntryType.METADATA) {
       const meta = entry as MetadataEntry;
@@ -344,7 +355,7 @@ function processOptionThen(
   option: OptionEntry,
   hasVariable?: (variable: string, threshold?: number) => boolean,
 ): {
-  narratives: NarrativeEntry[];
+  narratives: (NarrativeEntry | ImageEntry)[];
   metadata: MetadataEntry[];
   target: string | null;
 } {
