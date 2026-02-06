@@ -164,7 +164,7 @@ export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
       {/* Line indicator with blame and dismiss button */}
       <div className="absolute w-full bottom-0 p-2 text-sm bg-gradient-to-b from-[#EBF7D2] border-t-2 flex justify-between items-center">
         <div>
-          {hasUnresolvedAiLines && (
+          {hasUnresolvedAiLines && !readOnly && (
             <button
               onClick={dismissHighlights}
               className="text-orange-600 hover:text-orange-800"
