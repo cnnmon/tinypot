@@ -15,6 +15,7 @@ export async function matchInput({
   lineIdx,
   useFuzzyFallback = true,
   hasVariable,
+  getVariable,
 }: {
   input: string;
   schema: Schema;
@@ -23,8 +24,9 @@ export async function matchInput({
   lineIdx: number;
   useFuzzyFallback?: boolean;
   hasVariable?: (variable: string, threshold?: number) => boolean;
+  getVariable?: (variable: string) => number;
 }): Promise<HandleInputResult> {
-  const options = getOptionsAtPosition({ schema, sceneMap, sceneId, lineIdx, hasVariable });
+  const options = getOptionsAtPosition({ schema, sceneMap, sceneId, lineIdx, hasVariable, getVariable });
 
   if (options.length === 0) {
     return { matched: false };
@@ -37,7 +39,7 @@ export async function matchInput({
     const matchInfo: MatchInfo | undefined = matchResult.matchedAlias
       ? { cachedMatch: { matchedAlias: matchResult.matchedAlias } }
       : undefined;
-    return buildResultFromOption(matchResult.option, sceneId, lineIdx, matchInfo, hasVariable);
+    return buildResultFromOption(matchResult.option, sceneId, lineIdx, matchInfo, hasVariable, getVariable);
   }
 
   // Fallback to AI fuzzy matching
@@ -57,6 +59,7 @@ export async function matchInput({
           },
         },
         hasVariable,
+        getVariable,
       );
     }
   }

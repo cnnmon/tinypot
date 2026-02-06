@@ -103,6 +103,7 @@ export default function usePlayer() {
           setVariable: variables.set,
           unsetVariable: variables.unset,
           hasVariable: variables.has,
+          getVariable: variables.get,
         },
       });
 
@@ -154,7 +155,7 @@ export default function usePlayer() {
       variables.set('turn');
 
       // Check global preamble conditions after turn increments
-      const preambleResult = processGlobalPreamble(schema, variables.has, false);
+      const preambleResult = processGlobalPreamble(schema, variables.has, false, variables.get);
 
       const trimmedInput = input || '(stay silent)';
       let lineIdx = state.currentLineIdx;
@@ -200,6 +201,7 @@ export default function usePlayer() {
         sceneId: currentSceneId,
         lineIdx,
         hasVariable: variables.has,
+        getVariable: variables.get,
       });
 
       if (result.matched) {

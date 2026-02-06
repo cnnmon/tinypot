@@ -33,6 +33,7 @@ export function processGlobalPreamble(
   schema: Schema,
   hasVariable?: (variable: string, threshold?: number) => boolean,
   includeTopLevelGoto?: boolean,
+  getVariable?: (variable: string) => number,
 ): { jumpTarget: string | null; narratives: string[]; entryPoint: string | null } {
   const narratives: string[] = [];
   let entryPoint: string | null = null;
@@ -49,7 +50,7 @@ export function processGlobalPreamble(
   for (const entry of preamble) {
     if (entry.type === EntryType.CONDITIONAL) {
       const conditional = entry as ConditionalEntry;
-      const conditionMet = evaluateCondition(conditional.condition, hasVariable);
+      const conditionMet = evaluateCondition(conditional.condition, hasVariable, getVariable);
       
       if (conditionMet && conditional.then) {
         // Process the matched conditional's content
@@ -104,6 +105,7 @@ function buildScenePositions(
   schema: Schema,
   scanStart: number,
   hasVariable?: (variable: string) => boolean,
+  getVariable?: (variable: string) => number,
 ): BuildPositionsResult {
   const positions: ScenePosition[] = [];
   let pendingOptions = false;
@@ -138,7 +140,7 @@ function buildScenePositions(
       } else if (entry.type === EntryType.CONDITIONAL) {
         // Evaluate conditional and include appropriate branch
         const conditional = entry as ConditionalEntry;
-        const conditionMet = evaluateCondition(conditional.condition, hasVariable);
+        const conditionMet = evaluateCondition(conditional.condition, hasVariable, getVariable);
         const branchEntries = conditionMet ? conditional.then : conditional.else;
 
         if (branchEntries) {
@@ -168,17 +170,28 @@ function buildScenePositions(
 }
 
 /**
- * Evaluate a condition based on variable state.
+ * Evaluate a single condition clause (no & operators).
  * Supports:
  * - Simple check: `var` (true if var >= 1)
  * - Negation: `!var` (true if var = 0)
- * - Threshold: `var >= N` (true if var >= N)
+ * - Greater-equal: `var >= N` (true if var >= N)
+ * - Less-than: `var < N` (true if var < N)
  */
-function evaluateCondition(
+function evaluateSingleCondition(
   condition: string,
   hasVariable?: (variable: string, threshold?: number) => boolean,
+  getVariableValue?: (variable: string) => number,
 ): boolean {
   const trimmed = condition.trim();
+
+  // Check for less-than comparison: var < N
+  const lessThanMatch = trimmed.match(/^(\w+)\s*<\s*(\d+)$/);
+  if (lessThanMatch) {
+    const varName = lessThanMatch[1];
+    const threshold = parseInt(lessThanMatch[2], 10);
+    const value = getVariableValue?.(varName) ?? 0;
+    return value < threshold;
+  }
 
   // Check for threshold comparison: var >= N
   const thresholdMatch = trimmed.match(/^(\w+)\s*>=\s*(\d+)$/);
@@ -199,6 +212,25 @@ function evaluateCondition(
 }
 
 /**
+ * Evaluate a condition based on variable state.
+ * Supports compound conditions with & (AND):
+ * - `var >= 2 & var < 3` (both must be true)
+ */
+function evaluateCondition(
+  condition: string,
+  hasVariable?: (variable: string, threshold?: number) => boolean,
+  getVariableValue?: (variable: string) => number,
+): boolean {
+  const trimmed = condition.trim();
+
+  // Split on & for compound conditions
+  const parts = trimmed.split('&').map((p) => p.trim());
+  
+  // All parts must evaluate to true (AND logic)
+  return parts.every((part) => evaluateSingleCondition(part, hasVariable, getVariableValue));
+}
+
+/**
  * Callback type for variable operations during stepping
  */
 export interface StepCallbacks {
@@ -206,6 +238,8 @@ export interface StepCallbacks {
   unsetVariable?: (variable: string) => void;
   /** Check if variable exists (>= 1) or meets threshold (>= N) */
   hasVariable?: (variable: string, threshold?: number) => boolean;
+  /** Get the raw value of a variable (0 if not set) */
+  getVariable?: (variable: string) => number;
 }
 
 /**
@@ -247,7 +281,7 @@ export function step({
   // Also include top-level goto if current scene doesn't exist (for entry point)
   let preambleNarrative: string | null = null;
   if (lineIdx === 0) {
-    const preambleResult = processGlobalPreamble(schema, callbacks?.hasVariable, !sceneExists);
+    const preambleResult = processGlobalPreamble(schema, callbacks?.hasVariable, !sceneExists, callbacks?.getVariable);
     
     // If scene doesn't exist and there's an entry point goto, use it
     if (!sceneExists && preambleResult.entryPoint) {
@@ -313,7 +347,7 @@ export function step({
     }
 
     const scanStart = getScanStart(schema, sceneStart);
-    const { positions, jumpTarget } = buildScenePositions(schema, scanStart, callbacks?.hasVariable);
+    const { positions, jumpTarget } = buildScenePositions(schema, scanStart, callbacks?.hasVariable, callbacks?.getVariable);
 
     // Check if the position exists
     if (currentLineIdx < positions.length) {

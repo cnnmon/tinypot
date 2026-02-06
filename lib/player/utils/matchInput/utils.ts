@@ -93,12 +93,14 @@ export function getOptionsAtPosition({
   sceneId,
   lineIdx,
   hasVariable,
+  getVariable,
 }: {
   schema: Schema;
   sceneMap: Record<string, number>;
   sceneId: string;
   lineIdx: number;
   hasVariable?: (variable: string, threshold?: number) => boolean;
+  getVariable?: (variable: string) => number;
 }): OptionEntry[] {
   const sceneStart = sceneMap[sceneId];
   if (sceneStart === undefined) return [];
@@ -133,7 +135,7 @@ export function getOptionsAtPosition({
       } else if (entry.type === EntryType.CONDITIONAL) {
         // Evaluate conditional and process the appropriate branch
         const conditional = entry as ConditionalEntry;
-        const conditionMet = evaluateCondition(conditional.condition, hasVariable);
+        const conditionMet = evaluateCondition(conditional.condition, hasVariable, getVariable);
         const branchEntries = conditionMet ? conditional.then : conditional.else;
         if (branchEntries) {
           const shouldStop = processEntries(branchEntries);
@@ -268,18 +270,29 @@ export async function matchOptionFuzzy(input: string, options: OptionEntry[]): P
 }
 
 /**
- * Evaluate a condition string against current variables.
+ * Evaluate a single condition clause (no & operators).
  * Supports:
  * - Simple check: `var` (true if var >= 1)
  * - Negation: `!var` (true if var = 0)
- * - Threshold: `var >= N` (true if var >= N)
+ * - Greater-equal: `var >= N` (true if var >= N)
+ * - Less-than: `var < N` (true if var < N)
  */
-function evaluateCondition(
+function evaluateSingleCondition(
   condition: string,
   hasVariable?: (variable: string, threshold?: number) => boolean,
+  getVariable?: (variable: string) => number,
 ): boolean {
   if (!hasVariable) return true;
   const trimmed = condition.trim();
+
+  // Check for less-than comparison: var < N
+  const lessThanMatch = trimmed.match(/^(\w+)\s*<\s*(\d+)$/);
+  if (lessThanMatch) {
+    const varName = lessThanMatch[1];
+    const threshold = parseInt(lessThanMatch[2], 10);
+    const value = getVariable?.(varName) ?? 0;
+    return value < threshold;
+  }
 
   // Check for threshold comparison: var >= N
   const thresholdMatch = trimmed.match(/^(\w+)\s*>=\s*(\d+)$/);
@@ -296,6 +309,26 @@ function evaluateCondition(
 }
 
 /**
+ * Evaluate a condition string against current variables.
+ * Supports compound conditions with & (AND):
+ * - `var >= 2 & var < 3` (both must be true)
+ */
+function evaluateCondition(
+  condition: string,
+  hasVariable?: (variable: string, threshold?: number) => boolean,
+  getVariable?: (variable: string) => number,
+): boolean {
+  if (!hasVariable) return true;
+  const trimmed = condition.trim();
+
+  // Split on & for compound conditions
+  const parts = trimmed.split('&').map((p) => p.trim());
+  
+  // All parts must evaluate to true (AND logic)
+  return parts.every((part) => evaluateSingleCondition(part, hasVariable, getVariable));
+}
+
+/**
  * Process schema entries to extract narratives, metadata, and find the target scene.
  * Evaluates conditional entries based on current variables.
  * Stops processing when a jump/goto is encountered.
@@ -303,6 +336,7 @@ function evaluateCondition(
 function processEntries(
   entries: SchemaEntry[],
   hasVariable?: (variable: string, threshold?: number) => boolean,
+  getVariable?: (variable: string) => number,
 ): {
   narratives: (NarrativeEntry | ImageEntry)[];
   metadata: MetadataEntry[];
@@ -329,11 +363,11 @@ function processEntries(
       break;
     } else if (entry.type === EntryType.CONDITIONAL) {
       const conditional = entry as ConditionalEntry;
-      const conditionMet = evaluateCondition(conditional.condition, hasVariable);
+      const conditionMet = evaluateCondition(conditional.condition, hasVariable, getVariable);
       const branchEntries = conditionMet ? conditional.then : conditional.else;
 
       if (branchEntries) {
-        const branchResult = processEntries(branchEntries, hasVariable);
+        const branchResult = processEntries(branchEntries, hasVariable, getVariable);
         narratives.push(...branchResult.narratives);
         metadata.push(...branchResult.metadata);
         if (branchResult.target) {
@@ -354,12 +388,13 @@ function processEntries(
 function processOptionThen(
   option: OptionEntry,
   hasVariable?: (variable: string, threshold?: number) => boolean,
+  getVariable?: (variable: string) => number,
 ): {
   narratives: (NarrativeEntry | ImageEntry)[];
   metadata: MetadataEntry[];
   target: string | null;
 } {
-  return processEntries(option.then, hasVariable);
+  return processEntries(option.then, hasVariable, getVariable);
 }
 
 /**
@@ -371,8 +406,9 @@ export function buildResultFromOption(
   lineIdx: number,
   matchInfo?: MatchInfo,
   hasVariable?: (variable: string, threshold?: number) => boolean,
+  getVariable?: (variable: string) => number,
 ): HandleInputResult {
-  const { narratives, metadata, target } = processOptionThen(option, hasVariable);
+  const { narratives, metadata, target } = processOptionThen(option, hasVariable, getVariable);
 
   const base = {
     matched: true,

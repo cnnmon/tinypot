@@ -94,13 +94,16 @@ function parseMetadataLine(line: string): { key: string; value: string } | null 
  * - when key (true if key >= 1)
  * - when !key (true if key = 0)
  * - when key >= N (true if key >= N)
+ * - when key < N (true if key < N)
+ * - when key >= N & key < M (compound conditions)
  * - Legacy: [if: condition], if [condition], when [condition]
  */
 function parseConditionalLine(line: string): string | null {
-  // Preferred: when key, when !key, or when key >= N
-  const whenSimpleMatch = line.match(/^when\s+(!?\w+(?:\s*>=\s*\d+)?)\s*$/);
-  if (whenSimpleMatch) {
-    return whenSimpleMatch[1].trim();
+  // Match: when <condition> where condition can include &, >=, <, !, etc.
+  // But NOT "if Choice text" which starts with "if " followed by non-bracket text
+  const whenMatch = line.match(/^when\s+(.+)$/);
+  if (whenMatch) {
+    return whenMatch[1].trim();
   }
 
   // Legacy: Support [if: key] syntax
@@ -115,11 +118,7 @@ function parseConditionalLine(line: string): string | null {
     return ifMatch[1].trim();
   }
 
-  // Legacy: Support when [key] syntax
-  const whenMatch = line.match(/^when\s+\[([^\]]+)\]\s*$/);
-  if (whenMatch) {
-    return whenMatch[1].trim();
-  }
+  // Legacy: when [key] syntax is now handled by the broader regex above
 
   return null;
 }
