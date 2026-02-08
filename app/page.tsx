@@ -77,6 +77,7 @@ export default function Home() {
             {[
               { name: 'fireplace', shareId: 's_amQ3ZWJ2aHcydm5kdmZmNm5reTI4ajB3czE3ejlhenM' },
               { name: 'escaperoom', shareId: 's_amQ3OGMwazdndnNmM2hwcXlid2NiM2YxOTk3eW14Z2g' },
+              { name: 'lifesim', shareId: 's_amQ3ZnZxaHFmNDZyenJoZWYzNm5uNHpkN2Q4MGhqZ2s' }
             ].map((project) => (
               <button
                 key={project.shareId}

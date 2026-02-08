@@ -227,6 +227,305 @@ describe('computeBlame', () => {
     });
   });
 
+  describe('AI generation scenarios', () => {
+    it('should not highlight next scene when AI adds inline text before it', () => {
+      // Author has two scenes
+      const originalScript = [
+        '@HOME',
+        'You are in a cozy room.',
+        '@GARDEN',
+        'Flowers bloom everywhere.',
+      ];
+
+      // AI adds inline text in HOME scene (not a new scene)
+      const afterAiScript = [
+        '@HOME',
+        'You are in a cozy room.',
+        'A gentle breeze comes through the window.',
+        '@GARDEN',
+        'Flowers bloom everywhere.',
+      ];
+
+      const aiVersion = makeVersion('v2', Entity.SYSTEM, afterAiScript, 2000);
+      const authorVersion = makeVersion('v1', Entity.AUTHOR, originalScript, 1000);
+
+      const blame = computeBlame(afterAiScript, [aiVersion, authorVersion]);
+
+      // Only the AI-added line should be highlighted
+      expect(blame[2]).toBe(Entity.SYSTEM); // AI added inline text
+      
+      // Next scene should NOT be highlighted
+      expect(blame[3]).not.toBe(Entity.SYSTEM); // @GARDEN - original
+      expect(blame[4]).not.toBe(Entity.SYSTEM); // Flowers bloom - original
+      
+      // Original HOME content should not be highlighted
+      expect(blame[0]).not.toBe(Entity.SYSTEM); // @HOME
+      expect(blame[1]).not.toBe(Entity.SYSTEM); // You are in a cozy room
+    });
+
+    it('should not highlight existing scene when AI adds new scene after it', () => {
+      // Author has one scene
+      const originalScript = [
+        '@HOME',
+        'You are in a cozy room.',
+        '@END',
+      ];
+
+      // AI adds a new scene between HOME and END
+      const afterAiScript = [
+        '@HOME',
+        'You are in a cozy room.',
+        'if go outside',
+        '  goto @GARDEN',
+        '@GARDEN',
+        'Flowers bloom everywhere.',
+        'goto @END',
+        '@END',
+      ];
+
+      const aiVersion = makeVersion('v2', Entity.SYSTEM, afterAiScript, 2000);
+      const authorVersion = makeVersion('v1', Entity.AUTHOR, originalScript, 1000);
+
+      const blame = computeBlame(afterAiScript, [aiVersion, authorVersion]);
+
+      // AI-added lines should be highlighted
+      expect(blame[2]).toBe(Entity.SYSTEM); // if go outside
+      expect(blame[3]).toBe(Entity.SYSTEM); // goto @GARDEN
+      expect(blame[4]).toBe(Entity.SYSTEM); // @GARDEN
+      expect(blame[5]).toBe(Entity.SYSTEM); // Flowers bloom
+      expect(blame[6]).toBe(Entity.SYSTEM); // goto @END
+      
+      // Original lines should NOT be highlighted
+      expect(blame[0]).not.toBe(Entity.SYSTEM); // @HOME
+      expect(blame[1]).not.toBe(Entity.SYSTEM); // You are in a cozy room
+      expect(blame[7]).not.toBe(Entity.SYSTEM); // @END - original
+    });
+
+    it('should handle AI adding multiple inline responses without new scenes', () => {
+      const originalScript = [
+        '@HOME',
+        'The fire crackles.',
+        '@KITCHEN',
+        'Pots and pans hang on the wall.',
+      ];
+
+      // AI adds two inline responses in HOME (no scene changes)
+      const afterAiScript = [
+        '@HOME',
+        'The fire crackles.',
+        'if look around',
+        '  You notice shadows dancing on the walls.',
+        'if sit down',
+        '  You rest by the warm fire.',
+        '@KITCHEN',
+        'Pots and pans hang on the wall.',
+      ];
+
+      const aiVersion = makeVersion('v2', Entity.SYSTEM, afterAiScript, 2000);
+      const authorVersion = makeVersion('v1', Entity.AUTHOR, originalScript, 1000);
+
+      const blame = computeBlame(afterAiScript, [aiVersion, authorVersion]);
+
+      // AI-added lines
+      expect(blame[2]).toBe(Entity.SYSTEM); // if look around
+      expect(blame[3]).toBe(Entity.SYSTEM); // You notice shadows
+      expect(blame[4]).toBe(Entity.SYSTEM); // if sit down
+      expect(blame[5]).toBe(Entity.SYSTEM); // You rest by the warm fire
+      
+      // Original lines - should NOT be highlighted
+      expect(blame[0]).not.toBe(Entity.SYSTEM); // @HOME
+      expect(blame[1]).not.toBe(Entity.SYSTEM); // The fire crackles
+      expect(blame[6]).not.toBe(Entity.SYSTEM); // @KITCHEN
+      expect(blame[7]).not.toBe(Entity.SYSTEM); // Pots and pans
+    });
+  });
+
+  describe('AI generation edge cases', () => {
+    it('should correctly handle AI adding "if" option with indented response before next scene', () => {
+      // Real-world scenario: Author has two scenes, AI adds a choice in the first scene
+      const originalScript = [
+        '@HOME',
+        'The fire crackles softly.',
+        '@GARDEN',
+        'Flowers sway in the breeze.',
+      ];
+
+      // AI adds an "if" option with an indented response
+      const afterAiScript = [
+        '@HOME',
+        'The fire crackles softly.',
+        'if look around',
+        '   You notice shadows dancing on the walls.',
+        '@GARDEN',
+        'Flowers sway in the breeze.',
+      ];
+
+      const aiVersion = makeVersion('v2', Entity.SYSTEM, afterAiScript, 2000);
+      const authorVersion = makeVersion('v1', Entity.AUTHOR, originalScript, 1000);
+
+      const blame = computeBlame(afterAiScript, [aiVersion, authorVersion]);
+
+      // AI-added lines should be highlighted
+      expect(blame[2]).toBe(Entity.SYSTEM); // "if look around"
+      expect(blame[3]).toBe(Entity.SYSTEM); // "   You notice shadows..."
+
+      // Original lines should NOT be highlighted
+      expect(blame[0]).not.toBe(Entity.SYSTEM); // "@HOME"
+      expect(blame[1]).not.toBe(Entity.SYSTEM); // "The fire crackles softly."
+      expect(blame[4]).not.toBe(Entity.SYSTEM); // "@GARDEN" - CRITICAL: should NOT be highlighted
+      expect(blame[5]).not.toBe(Entity.SYSTEM); // "Flowers sway in the breeze."
+    });
+
+    it('should handle AI adding TEXT_ONLY response (no goto, stays in scene)', () => {
+      // TEXT_ONLY response: just narrative, no scene jump
+      const originalScript = [
+        '@CAVE',
+        'Darkness surrounds you.',
+        '@EXIT',
+        'You see daylight ahead.',
+      ];
+
+      const afterAiScript = [
+        '@CAVE',
+        'Darkness surrounds you.',
+        'if examine walls',
+        '   The walls are covered in ancient runes.',
+        '@EXIT',
+        'You see daylight ahead.',
+      ];
+
+      const aiVersion = makeVersion('v2', Entity.SYSTEM, afterAiScript, 2000);
+      const authorVersion = makeVersion('v1', Entity.AUTHOR, originalScript, 1000);
+
+      const blame = computeBlame(afterAiScript, [aiVersion, authorVersion]);
+
+      expect(blame[2]).toBe(Entity.SYSTEM); // AI added
+      expect(blame[3]).toBe(Entity.SYSTEM); // AI added
+      expect(blame[4]).not.toBe(Entity.SYSTEM); // @EXIT - original
+      expect(blame[5]).not.toBe(Entity.SYSTEM); // "You see daylight..." - original
+    });
+
+    it('should handle AI adding LINK_SCENE response (goto existing scene)', () => {
+      const originalScript = [
+        '@TOWN',
+        'The town square is busy.',
+        '@SHOP',
+        'Goods line the shelves.',
+      ];
+
+      const afterAiScript = [
+        '@TOWN',
+        'The town square is busy.',
+        'if enter shop | go to shop | visit shop',
+        '   You walk into the shop.',
+        '   goto @SHOP',
+        '@SHOP',
+        'Goods line the shelves.',
+      ];
+
+      const aiVersion = makeVersion('v2', Entity.SYSTEM, afterAiScript, 2000);
+      const authorVersion = makeVersion('v1', Entity.AUTHOR, originalScript, 1000);
+
+      const blame = computeBlame(afterAiScript, [aiVersion, authorVersion]);
+
+      // AI-added lines
+      expect(blame[2]).toBe(Entity.SYSTEM); // "if enter shop..."
+      expect(blame[3]).toBe(Entity.SYSTEM); // "   You walk into the shop."
+      expect(blame[4]).toBe(Entity.SYSTEM); // "   goto @SHOP"
+
+      // Original lines should NOT be highlighted
+      expect(blame[0]).not.toBe(Entity.SYSTEM); // "@TOWN"
+      expect(blame[1]).not.toBe(Entity.SYSTEM); // "The town square is busy."
+      expect(blame[5]).not.toBe(Entity.SYSTEM); // "@SHOP" - original, must not be highlighted
+      expect(blame[6]).not.toBe(Entity.SYSTEM); // "Goods line the shelves." - original
+    });
+
+    it('should handle AI adding NEW_FORK response (new scene at end)', () => {
+      const originalScript = [
+        '@HOME',
+        'You are at home.',
+        '@END',
+      ];
+
+      // AI adds choice + new scene at the end
+      const afterAiScript = [
+        '@HOME',
+        'You are at home.',
+        'if go outside',
+        '   You step into the sunlight.',
+        '   goto @GARDEN',
+        '@GARDEN',
+        'A beautiful garden stretches before you.',
+        'goto @END',
+        '@END',
+      ];
+
+      const aiVersion = makeVersion('v2', Entity.SYSTEM, afterAiScript, 2000);
+      const authorVersion = makeVersion('v1', Entity.AUTHOR, originalScript, 1000);
+
+      const blame = computeBlame(afterAiScript, [aiVersion, authorVersion]);
+
+      // AI-added lines
+      expect(blame[2]).toBe(Entity.SYSTEM); // "if go outside"
+      expect(blame[3]).toBe(Entity.SYSTEM); // "   You step into the sunlight."
+      expect(blame[4]).toBe(Entity.SYSTEM); // "   goto @GARDEN"
+      expect(blame[5]).toBe(Entity.SYSTEM); // "@GARDEN"
+      expect(blame[6]).toBe(Entity.SYSTEM); // "A beautiful garden..."
+      expect(blame[7]).toBe(Entity.SYSTEM); // "goto @END"
+
+      // Original lines
+      expect(blame[0]).not.toBe(Entity.SYSTEM); // "@HOME"
+      expect(blame[1]).not.toBe(Entity.SYSTEM); // "You are at home."
+      expect(blame[8]).not.toBe(Entity.SYSTEM); // "@END" - original
+    });
+
+    it('should handle multiple AI generations in sequence', () => {
+      // First author creates basic script
+      const v1Script = [
+        '@HOME',
+        'The room is warm.',
+        '@END',
+      ];
+
+      // AI adds first option
+      const v2Script = [
+        '@HOME',
+        'The room is warm.',
+        'if look around',
+        '   You see a cozy fireplace.',
+        '@END',
+      ];
+
+      // AI adds second option
+      const v3Script = [
+        '@HOME',
+        'The room is warm.',
+        'if look around',
+        '   You see a cozy fireplace.',
+        'if sit down',
+        '   You rest on the soft couch.',
+        '@END',
+      ];
+
+      const aiV3 = makeVersion('v3', Entity.SYSTEM, v3Script, 3000);
+      const aiV2 = makeVersion('v2', Entity.SYSTEM, v2Script, 2000);
+      const authorV1 = makeVersion('v1', Entity.AUTHOR, v1Script, 1000);
+
+      const blame = computeBlame(v3Script, [aiV3, aiV2, authorV1]);
+
+      // All AI-added lines should be SYSTEM
+      expect(blame[2]).toBe(Entity.SYSTEM); // "if look around" from v2
+      expect(blame[3]).toBe(Entity.SYSTEM); // "   You see a cozy fireplace." from v2
+      expect(blame[4]).toBe(Entity.SYSTEM); // "if sit down" from v3
+      expect(blame[5]).toBe(Entity.SYSTEM); // "   You rest on the soft couch." from v3
+
+      // Original lines
+      expect(blame[0]).not.toBe(Entity.SYSTEM); // "@HOME"
+      expect(blame[1]).not.toBe(Entity.SYSTEM); // "The room is warm."
+      expect(blame[6]).not.toBe(Entity.SYSTEM); // "@END"
+    });
+  });
+
   describe('resolved versions', () => {
     it('should skip resolved AI versions when onlyUnresolved is true', () => {
       const currentScript = ['@HOME', 'The fire burns.', 'if look around', '  You see things.'];

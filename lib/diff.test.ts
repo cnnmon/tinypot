@@ -47,6 +47,19 @@ describe('computeLcsMapping', () => {
 });
 
 describe('findAddedIndices', () => {
+  it('should correctly identify additions when AI adds inline text before next scene', () => {
+    const before = ['@HOME', 'The fire crackles softly.', '@GARDEN', 'Flowers sway in the breeze.'];
+    const after = ['@HOME', 'The fire crackles softly.', 'if look around', '   You notice shadows.', '@GARDEN', 'Flowers sway in the breeze.'];
+
+    const added = findAddedIndices(before, after);
+
+    // Only indices 2, 3 should be additions
+    expect(added.has(2)).toBe(true);  // "if look around"
+    expect(added.has(3)).toBe(true);  // "   You notice shadows."
+    expect(added.has(4)).toBe(false); // "@GARDEN" - should NOT be added
+    expect(added.has(5)).toBe(false); // "Flowers sway..." - should NOT be added
+  });
+
   it('should find no additions when arrays are identical', () => {
     const arr = ['a', 'b', 'c'];
     const added = findAddedIndices(arr, arr);

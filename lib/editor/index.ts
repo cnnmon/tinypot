@@ -1,6 +1,8 @@
 'use client';
 
 import { api } from '@/convex/_generated/api';
+import { MetalearningRequest } from '@/app/api/metalearning/route';
+import { parseGuidebook, serializeGuidebook } from '@/lib/guidebook';
 import { Entity } from '@/types/entities';
 import { useMutation } from 'convex/react';
 import { useCallback, useMemo, useState } from 'react';
@@ -9,7 +11,7 @@ import { parseIntoSchema } from '../project/parser';
 import { computeBlame, LineBlame } from './blame';
 
 export default function useEditor() {
-  const { project, updateProject, versions } = useProject();
+  const { project, updateProject, versions, setIsMetalearning } = useProject();
   const resolveAllMutation = useMutation(api.versions.resolveAll);
   const [cursorLine, setCursorLine] = useState<number>(0);
 
@@ -41,10 +43,60 @@ export default function useEditor() {
     setCursorLine(line);
   }, []);
 
-  // Dismiss highlights by resolving all versions permanently
-  const dismissHighlights = useCallback(() => {
+  // Dismiss highlights: check edits, run metalearning, then resolve
+  const dismissHighlights = useCallback(async () => {
+    // Find the most recent unresolved AI version
+    const unresolvedAiVersion = versions.find((v) => v.creator === Entity.SYSTEM && !v.resolved);
+    
+    if (unresolvedAiVersion) {
+      const generated = unresolvedAiVersion.snapshot.script.join('\n');
+      const authored = project.script.join('\n');
+      
+      // Check if there are actual edits
+      if (generated !== authored) {
+        console.log('=== METALEARNING: Detected edits ===');
+        console.log('GENERATED:\n', generated);
+        console.log('AUTHORED:\n', authored);
+        
+        // Show loading state
+        setIsMetalearning(true);
+        
+        // Kick off metalearning
+        try {
+          const response = await fetch('/api/metalearning', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              generated,
+              authored,
+              existingGuidebook: project.guidebook,
+            } satisfies MetalearningRequest),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('=== METALEARNING RESULT ===', data);
+            
+            // If we got a new rule, add it to the guidebook
+            if (data.newRule) {
+              const settings = parseGuidebook(project.guidebook);
+              settings.rules.push(data.newRule);
+              updateProject({ guidebook: serializeGuidebook(settings) });
+            }
+          }
+        } catch (err) {
+          console.error('Metalearning failed:', err);
+        } finally {
+          setIsMetalearning(false);
+        }
+      } else {
+        console.log('=== METALEARNING: No edits detected ===');
+      }
+    }
+    
+    // Resolve all versions
     resolveAllMutation({ projectId: project.id });
-  }, [resolveAllMutation, project.id]);
+  }, [resolveAllMutation, project.id, project.script, project.guidebook, versions, updateProject, setIsMetalearning]);
 
   return {
     script: project.script,

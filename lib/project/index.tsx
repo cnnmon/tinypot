@@ -11,15 +11,9 @@ import { Project } from '@/types/project';
 import { Version } from '@/types/version';
 import { useMutation, useQuery } from 'convex/react';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { detectFeedbackFromVersions, formatGuidebookFeedback } from '../version/feedback';
 import { shouldCoalesceAuthorEdit } from './coalesce';
 
 type SaveStatus = 'idle' | 'saving' | 'saved';
-
-export interface GuidebookSuggestion {
-  id: string;
-  text: string;
-}
 
 interface ProjectContextValue {
   project: Project;
@@ -28,8 +22,8 @@ interface ProjectContextValue {
   saveStatus: SaveStatus;
   selectedVersionId: string | null;
   setSelectedVersionId: (id: string | null) => void;
-  guidebookSuggestions: GuidebookSuggestion[];
-  clearSuggestion: (id: string) => void;
+  isMetalearning: boolean;
+  setIsMetalearning: (value: boolean) => void;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -71,8 +65,8 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
   // Selected version for diff viewing
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
 
-  // Guidebook suggestions from meta-learning
-  const [guidebookSuggestions, setGuidebookSuggestions] = useState<GuidebookSuggestion[]>([]);
+  // Metalearning loading state
+  const [isMetalearning, setIsMetalearning] = useState(false);
 
   // Local project state - only initialize AFTER convexProject is loaded
   // This prevents the DEFAULT_LINES from ever being used when we have real data
@@ -134,9 +128,6 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     },
     [],
   );
-
-  // Track version IDs we've already processed for feedback to avoid duplicates
-  const processedFeedbackRef = useRef<Set<string>>(new Set());
 
   // Update project with smart version management
   const updateProject = useCallback(
@@ -210,30 +201,6 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
               }
             });
 
-            // Check for AI→Author feedback pattern if creating a new author version
-            // after an AI version (latestVersion is AI, new version is author)
-            if (latestVersion?.creator === Entity.SYSTEM) {
-              const feedbackKey = `${latestVersion.id}`;
-              if (!processedFeedbackRef.current.has(feedbackKey)) {
-                processedFeedbackRef.current.add(feedbackKey);
-
-                // Build virtual "new author version" for comparison
-                const virtualAuthorVersion: Version = {
-                  id: 'pending' as Id<'versions'>,
-                  creator: Entity.AUTHOR as Entity.AUTHOR,
-                  createdAt: now,
-                  snapshot,
-                };
-
-                const feedback = detectFeedbackFromVersions([virtualAuthorVersion, latestVersion]);
-                if (feedback?.type) {
-                  // Add as a suggestion instead of directly updating guidebook
-                  const feedbackText = formatGuidebookFeedback(feedback.type, feedback.branch);
-                  const suggestionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-                  setGuidebookSuggestions((prev) => [...prev, { id: suggestionId, text: feedbackText }]);
-                }
-              }
-            }
           }
         }, 500); // Debounce version saves by 500ms
       }
@@ -241,11 +208,6 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [project, projectId, updateProjectMutation, versions, snapshotsEqual],
   );
-
-  // Clear a guidebook suggestion (accept or dismiss handled by component)
-  const clearSuggestion = useCallback((id: string) => {
-    setGuidebookSuggestions((prev) => prev.filter((s) => s.id !== id));
-  }, []);
 
   // Show loading state while project data is loading
   if (convexProject === undefined || project === null) {
@@ -277,8 +239,8 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         saveStatus,
         selectedVersionId,
         setSelectedVersionId,
-        guidebookSuggestions,
-        clearSuggestion,
+        isMetalearning,
+        setIsMetalearning,
       }}
     >
       {children}

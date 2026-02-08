@@ -8,7 +8,7 @@ import { twMerge } from 'tailwind-merge';
 import Box from '../Box';
 
 export default function Guidebook({ readOnly = false }: { readOnly?: boolean }) {
-  const { project, updateProject, guidebookSuggestions, clearSuggestion } = useProject();
+  const { project, updateProject, isMetalearning } = useProject();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newRule, setNewRule] = useState('');
 
@@ -35,17 +35,6 @@ export default function Guidebook({ readOnly = false }: { readOnly?: boolean }) 
     [settings.rules, updateSettings],
   );
 
-  const acceptSuggestion = useCallback(
-    (id: string) => {
-      const suggestion = guidebookSuggestions.find((s) => s.id === id);
-      if (!suggestion) return;
-      const updatedGuidebook = project.guidebook ? `${project.guidebook}\n${suggestion.text}` : suggestion.text;
-      updateProject({ guidebook: updatedGuidebook });
-      clearSuggestion(id);
-    },
-    [guidebookSuggestions, project.guidebook, updateProject, clearSuggestion],
-  );
-
   // Close modal on escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -64,6 +53,7 @@ export default function Guidebook({ readOnly = false }: { readOnly?: boolean }) 
         className={twMerge(
           'bg-gradient-to-b from-[#EBF7D2] via-[#B7DCBD] to-white min-h-45 w-5 hover:opacity-90 cursor-pointer',
           isModalOpen && 'bg-gradient-to-b via-[var(--orange)] from-[var(--rose)] to-white',
+          isMetalearning && 'bg-gradient-to-b from-red-300 via-red-200 to-white animate-pulse',
         )}
         onClick={() => setIsModalOpen(true)}
       >
