@@ -6,9 +6,8 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 
-export default function Guidebook({ readOnly = false }) {
+export default function Guidebook({ readOnly = false, onClose }: { readOnly?: boolean, onClose: () => void }) {
   const { project, updateProject } = useProject();
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [newRule, setNewRule] = useState('');
 
   const settings = useMemo(() => parseGuidebook(project.guidebook), [project.guidebook]);
@@ -37,19 +36,17 @@ export default function Guidebook({ readOnly = false }) {
   // Close modal on escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsModalOpen(false);
+      if (e.key === 'Escape') onClose();
     };
-    if (isModalOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isModalOpen]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   return (
     <>
       <div
         className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
-        onClick={() => setIsModalOpen(false)}
+        onClick={onClose}
       >
         <div
           className="bordered bg-white w-full max-w-lg max-h-[80vh] overflow-y-auto"
@@ -58,7 +55,7 @@ export default function Guidebook({ readOnly = false }) {
           {/* Header */}
           <div className="flex items-center justify-between border-b-2 p-3">
             <h2 className="font-bold">Guidebook Settings</h2>
-            <button onClick={() => setIsModalOpen(false)}>
+            <button onClick={onClose}>
               <XMarkIcon className="w-5 h-5" />
             </button>
           </div>

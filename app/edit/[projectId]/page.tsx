@@ -10,25 +10,29 @@ import Versions from '@/components/Versions';
 import { getDiffScripts } from '@/components/Versions/utils/getDiffScripts';
 import VersionViewer from '@/components/VersionViewer';
 import { Id } from '@/convex/_generated/dataModel';
+import { parseGuidebook } from '@/lib/guidebook';
 import { PlayerProvider, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
 import { useProjects } from '@/lib/project/ProjectsProvider';
 import { decodeShareId, getShareUrl } from '@/lib/share';
-import { ChevronDownIcon, ChevronUpIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { PencilIcon } from '@heroicons/react/24/outline';
 import { useParams } from 'next/navigation';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
-  const { project, versions, selectedVersionId, saveStatus, setSelectedVersionId } = useProject();
+  const { project, versions, selectedVersionId, saveStatus, setSelectedVersionId, isMetalearning } = useProject();
   const { renameProject } = useProjects();
   const { currentSceneId, variables } = usePlayerContext();
 
   const [leftWidth, setLeftWidth] = useState(50);
   const [collapsed, setCollapsed] = useState(false);
+  const [isGuidebookOpen, setIsGuidebookOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const hasDiff = getDiffScripts(selectedVersionId, versions) !== null;
+
+  const guidebook = useMemo(() => parseGuidebook(project.guidebook), [project.guidebook]);
 
   const handleShare = useCallback(() => {
     const shareUrl = getShareUrl(project.id);
@@ -61,111 +65,123 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
   }, []);
 
   return (
-    <div className="h-screen p-4 gap-2 flex flex-col">
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2 items-center">
-          <Header />
-          <p className="text-lg">
-            {project.name} {isSharedView && <span className="text-neutral-400 text-sm">(view-only)</span>}
-          </p>
-          {!isSharedView && (
-            <button
-              onClick={() => {
-                const newName = prompt('Enter new name', project.name);
-                if (newName) renameProject(project.id, newName);
-              }}
-            >
-              <PencilIcon className="w-4 h-4" />
-            </button>
-          )}
+    <>
+      {!collapsed && isGuidebookOpen && (
+        <div className="flex gap-2">
+          <Guidebook readOnly={isSharedView} onClose={() => setIsGuidebookOpen(false)} />
         </div>
-        <div className="flex gap-1 items-center">
-          <span
-            className={twMerge(
-              'transition-opacity',
-              saveStatus === 'saving' && 'text-neutral-500 animate-pulse',
-              saveStatus === 'saved' && 'text-green-600',
-              saveStatus === 'idle' && 'opacity-0',
-            )}
-          >
-            {saveStatus === 'saving' ? 'saving...' : saveStatus === 'saved' ? 'saved' : ''}
-          </span>
-          <button onClick={() => window.open('/help', '_blank')} className="px-1">
-            help
-          </button>
-          {!isSharedView && (
-            <button onClick={handleShare} className="px-1">
-              share
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center gap-1 text-sm px-2 py-1 hover:bg-gray-100 rounded w-fit"
-        >
-          {collapsed ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronUpIcon className="w-4 h-4" />}
-          {collapsed ? 'show' : 'hide'}
-        </button>
-        {!collapsed && (
-          <div className="flex gap-2">
-            <Guidebook readOnly={isSharedView} />
-              <Box className="max-h-45 min-w-40 overflow-auto select-none bg-gradient-to-b from-[var(--sunflower)] to-white">
-              <div className="flex items-center p-2 border-b-2 justify-between">
-                <h1 className="cursor-default">versions</h1>
-              </div>
-              <Versions />
-            </Box>
-          </div>
-        )}
-      </div>
-
-      <div
-        ref={containerRef}
-        className={`flex flex-row pb-5 ${collapsed ? 'min-h-[calc(100%-90px)] h-[calc(100%-90px)]' : 'min-h-[calc(100%-210px)] h-[calc(100%-210px)]'}`}
-      >
-        <Box style={{ width: `${leftWidth}%` }}>
-          <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
-            <b>{hasDiff ? `version ${selectedVersionId?.slice(1, 5)}` : 'editor'}</b>
-            {hasDiff && (
-              <button onClick={() => setSelectedVersionId(null)} className="text-neutral-500 hover:text-neutral-800">
-                ← back to editing
+      )}
+      <div className="h-screen p-4 gap-2 flex flex-col">
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2 items-center">
+            <Header />
+            <p className="text-lg">
+              {project.name} {isSharedView && <span className="text-neutral-400 text-sm">(view-only)</span>}
+            </p>
+            {!isSharedView && (
+              <button
+                onClick={() => {
+                  const newName = prompt('Enter new name', project.name);
+                  if (newName) renameProject(project.id, newName);
+                }}
+              >
+                <PencilIcon className="w-4 h-4" />
               </button>
             )}
           </div>
-          {hasDiff ? <VersionViewer /> : <Editor readOnly={isSharedView} />}
-        </Box>
-        <div
-          onMouseDown={handleMouseDown}
-          className="w-2 cursor-col-resize hover:bg-gray-300 transition-colors shrink-0"
-        />
-        <Box style={{ width: `${100 - leftWidth}%` }}>
-          <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
-            <h1>player</h1>
-            {/* State */}
-            <div className="flex gap-2 items-center text-sm">
-              <div className="flex items-center gap-1">
-                <span className="opacity-50">Scene</span>
-                <span className="font-bold">{currentSceneId}</span>
+          <div className="flex gap-1 items-center">
+            <span
+              className={twMerge(
+                'transition-opacity',
+                saveStatus === 'saving' && 'text-neutral-500 animate-pulse',
+                saveStatus === 'saved' && 'text-green-600',
+                saveStatus === 'idle' && 'opacity-0',
+              )}
+            >
+              {saveStatus === 'saving' ? 'saving...' : saveStatus === 'saved' ? 'saved' : ''}
+            </span>
+            <button onClick={() => window.open('/help', '_blank')} className="px-1">
+              help
+            </button>
+            {!isSharedView && (
+              <button onClick={handleShare} className="px-1">
+                share
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-2 max-h-45">
+          <Box
+            className={twMerge(
+              'bg-gradient-to-b from-[#EBF7D2] via-[#B7DCBD] to-white min-h-45 w-5 hover:opacity-90 cursor-pointer overflow-y-auto',
+              isGuidebookOpen && 'bg-gradient-to-b via-[var(--orange)] from-[var(--rose)] to-white',
+              isMetalearning && 'bg-gradient-to-b from-red-300 via-red-200 to-white animate-pulse',
+            )}
+            onClick={() => setIsGuidebookOpen(true)}
+          >
+            <div className="h-full flex flex-col">
+              <div className="p-2 flex items-center justify-between gap-1 border-b-2">
+                <h1 className="cursor-default">guidebook</h1>
               </div>
-              <ScrollContainer direction="horizontal" className="flex gap-2">
-                {variables.length > 0 &&
-                  variables.map((v, i) => (
-                    <p key={i} className="flex flex-wrap min-w-fit px-1.5 py-0.5 bg-[#EBF7D2]">
-                      {v}
-                    </p>
-                  ))}
-              </ScrollContainer>
+
+              <div className="p-2">
+                <div>{guidebook.rules.length > 0 ? guidebook.rules.join('\n') : 'none'}</div>
+              </div>
             </div>
-          </div>
-          <div className="p-2 overflow-scroll relative">
-            <Player />
-          </div>
-        </Box>
+          </Box>
+          <Box className="min-w-40 overflow-auto select-none bg-gradient-to-b from-[var(--sunflower)] to-white">
+            <div className="flex items-center p-2 border-b-2 justify-between">
+              <h1 className="cursor-default">versions</h1>
+            </div>
+            <Versions />
+          </Box>
+        </div>
+        <div
+          ref={containerRef}
+          className={`flex flex-row pb-5 ${collapsed ? 'min-h-[calc(100%-90px)] h-[calc(100%-90px)]' : 'min-h-[calc(100%-210px)] h-[calc(100%-210px)]'}`}
+        >
+          <Box style={{ width: `${leftWidth}%` }}>
+            <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
+              <b>{hasDiff ? `version ${selectedVersionId?.slice(1, 5)}` : 'editor'}</b>
+              {hasDiff && (
+                <button onClick={() => setSelectedVersionId(null)} className="text-neutral-500 hover:text-neutral-800">
+                  ← back to editing
+                </button>
+              )}
+            </div>
+            {hasDiff ? <VersionViewer /> : <Editor readOnly={isSharedView} />}
+          </Box>
+          <div
+            onMouseDown={handleMouseDown}
+            className="w-2 cursor-col-resize hover:bg-gray-300 transition-colors shrink-0"
+          />
+          <Box style={{ width: `${100 - leftWidth}%` }}>
+            <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
+              <h1>player</h1>
+              {/* State */}
+              <div className="flex gap-2 items-center text-sm">
+                <div className="flex items-center gap-1">
+                  <span className="opacity-50">Scene</span>
+                  <span className="font-bold">{currentSceneId}</span>
+                </div>
+                <ScrollContainer direction="horizontal" className="flex gap-2">
+                  {variables.length > 0 &&
+                    variables.map((v, i) => (
+                      <p key={i} className="flex flex-wrap min-w-fit px-1.5 py-0.5 bg-[#EBF7D2]">
+                        {v}
+                      </p>
+                    ))}
+                </ScrollContainer>
+              </div>
+            </div>
+            <div className="p-2 overflow-scroll relative">
+              <Player />
+            </div>
+          </Box>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
