@@ -15,6 +15,8 @@ import {
   setBlameHighlight,
 } from './utils/blameHighlight';
 import { bonsaiHighlighting, bonsaiSyntaxTheme, bonsaiTheme, lineHighlighterPlugin } from './utils/theme';
+import { slashMenuPlugin, slashMenuState, slashMenuKeymap } from './utils/slashMenu';
+import './utils/slashMenu.css';
 
 // Compartment for dynamically toggling read-only mode
 const readOnlyCompartment = new Compartment();
@@ -92,6 +94,9 @@ export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
         lineHighlighterPlugin,
         blameHighlightState,
         blameHighlightPlugin,
+        slashMenuState,
+        slashMenuPlugin,
+        slashMenuKeymap,
         syntaxHighlighting(bonsaiHighlighting),
         updateListener,
         EditorView.lineWrapping,

@@ -10,7 +10,6 @@ import ScrollContainer from '../ScrollContainer';
 import { describeChanges } from './utils/describeChanges';
 import { formatRelativeTime } from './utils/formatRelativeTime';
 import { snapshotsEqual } from './utils/snapshotsEqual';
-
 export { coalesceVersions } from './utils/coalesceVersions';
 
 export default function Versions() {
@@ -31,11 +30,6 @@ export default function Versions() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header with save status */}
-      <div className="flex items-center p-2 border-b-2 justify-between">
-        <h1 className="cursor-default">versions</h1>
-      </div>
-
       {/* Version list */}
       <ScrollContainer direction="vertical" className="space-y-1 p-2">
         {/* Saved versions with change descriptions */}

@@ -70,7 +70,6 @@ async function analyzeChanges(
     body: JSON.stringify({
       generated,
       authored,
-      approved: branch.approved ?? false,
       existingGuidebook,
     } satisfies MetalearningRequest),
   });
@@ -84,11 +83,13 @@ async function analyzeChanges(
     throw new Error(data.error || 'Metalearning failed');
   }
 
+  // API only returns newRule, we need to build updatedGuidebook ourselves
+  const action: 'add' | 'none' = data.newRule ? 'add' : 'none';
+  
   return {
-    updatedGuidebook: data.updatedGuidebook || existingGuidebook,
+    updatedGuidebook: existingGuidebook, // Caller will update the guidebook with newRule
     newRule: data.newRule,
-    action: data.action,
-    previousRule: data.previousRule,
+    action,
   };
 }
 

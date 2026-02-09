@@ -14,7 +14,7 @@ import { PlayerProvider, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
 import { useProjects } from '@/lib/project/ProjectsProvider';
 import { decodeShareId, getShareUrl } from '@/lib/share';
-import { PencilIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronUpIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { useParams } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
@@ -25,6 +25,7 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
   const { currentSceneId, variables } = usePlayerContext();
 
   const [leftWidth, setLeftWidth] = useState(50);
+  const [collapsed, setCollapsed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const hasDiff = getDiffScripts(selectedVersionId, versions) !== null;
@@ -64,7 +65,9 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
       <div className="flex items-center justify-between">
         <div className="flex gap-2 items-center">
           <Header />
-          <p className="text-lg">{project.name} {isSharedView && <span className="text-neutral-400 text-sm">(view-only)</span>}</p>
+          <p className="text-lg">
+            {project.name} {isSharedView && <span className="text-neutral-400 text-sm">(view-only)</span>}
+          </p>
           {!isSharedView && (
             <button
               onClick={() => {
@@ -98,32 +101,41 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <Guidebook readOnly={isSharedView} />
-
-        <Box className="max-h-45 min-w-40 overflow-auto select-none bg-gradient-to-b from-[var(--sunflower)] to-white">
-          <Versions />
-        </Box>
+      <div className="flex flex-col gap-1">
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="flex items-center gap-1 text-sm px-2 py-1 hover:bg-gray-100 rounded w-fit"
+        >
+          {collapsed ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronUpIcon className="w-4 h-4" />}
+          {collapsed ? 'show' : 'hide'}
+        </button>
+        {!collapsed && (
+          <div className="flex gap-2">
+            <Guidebook readOnly={isSharedView} />
+              <Box className="max-h-45 min-w-40 overflow-auto select-none bg-gradient-to-b from-[var(--sunflower)] to-white">
+              <div className="flex items-center p-2 border-b-2 justify-between">
+                <h1 className="cursor-default">versions</h1>
+              </div>
+              <Versions />
+            </Box>
+          </div>
+        )}
       </div>
 
-      <div ref={containerRef} className="flex flex-row min-h-[calc(100%-210px)] h-[calc(100%-210px)] pb-5">
+      <div
+        ref={containerRef}
+        className={`flex flex-row pb-5 ${collapsed ? 'min-h-[calc(100%-90px)] h-[calc(100%-90px)]' : 'min-h-[calc(100%-210px)] h-[calc(100%-210px)]'}`}
+      >
         <Box style={{ width: `${leftWidth}%` }}>
           <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
             <b>{hasDiff ? `version ${selectedVersionId?.slice(1, 5)}` : 'editor'}</b>
             {hasDiff && (
-              <button
-                onClick={() => setSelectedVersionId(null)}
-                className="text-neutral-500 hover:text-neutral-800"
-              >
+              <button onClick={() => setSelectedVersionId(null)} className="text-neutral-500 hover:text-neutral-800">
                 ← back to editing
               </button>
             )}
           </div>
-          {hasDiff ? (
-            <VersionViewer />
-          ) : (
-            <Editor readOnly={isSharedView} />
-          )}
+          {hasDiff ? <VersionViewer /> : <Editor readOnly={isSharedView} />}
         </Box>
         <div
           onMouseDown={handleMouseDown}
@@ -138,14 +150,13 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
                 <span className="opacity-50">Scene</span>
                 <span className="font-bold">{currentSceneId}</span>
               </div>
-              <ScrollContainer direction="horizontal" className="flex">
-                {variables.length > 0 && (
+              <ScrollContainer direction="horizontal" className="flex gap-2">
+                {variables.length > 0 &&
                   variables.map((v, i) => (
                     <p key={i} className="flex flex-wrap min-w-fit px-1.5 py-0.5 bg-[#EBF7D2]">
                       {v}
                     </p>
-                  ))
-                )}
+                  ))}
               </ScrollContainer>
             </div>
           </div>

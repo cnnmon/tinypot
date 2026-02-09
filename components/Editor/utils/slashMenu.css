@@ -1,0 +1,72 @@
+.slash-menu-wrapper {
+  position: absolute;
+  z-index: 9999;
+  margin-top: 1.5em;
+}
+
+.slash-menu {
+  background: white;
+  border: 2px solid black;
+  border-radius: 0.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+  min-width: 280px;
+  max-width: 320px;
+}
+
+.slash-menu-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.05s;
+}
+
+.slash-menu-item:last-child {
+  border-bottom: none;
+}
+
+.slash-menu-item:hover,
+.slash-menu-item-selected {
+  background-color: #f5f5f5;
+}
+
+.slash-menu-item-selected {
+  background-color: #EBF7D2;
+}
+
+.slash-menu-item-symbol {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+}
+
+.slash-menu-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.slash-menu-item-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: black;
+  margin-bottom: 2px;
+}
+
+.slash-menu-item-desc {
+  font-size: 12px;
+  color: #666;
+}
+
+.slash-menu-empty {
+  color: #999;
+  text-align: center;
+  font-size: 13px;
+  padding: 16px;
+}
+
