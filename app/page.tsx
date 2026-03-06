@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import { useProjects } from '@/lib/project/ProjectsProvider';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 export default function Home() {
   const router = useRouter();
@@ -19,13 +20,13 @@ export default function Home() {
       </div>
 
       <div className="flex-1 flex justify-start flex-col gap-4">
-        <p>bonsai is a tool for creating & playing interactive fiction in natural language. <a href="/help" className="text-blue-500 hover:text-blue-700">read more about how it works here</a>.</p>
+        <p>Bonsai is a tool for authoring a self-growing game in natural plaintext. <a href="/help" className="text-blue-500 hover:text-blue-700">Learn about it</a>.</p>
 
-        <hr className="border-t-1 border-gray-200" />
+        <hr className="border-t-1" />
 
         <div className="flex gap-4">
           <button onClick={() => createProject()} className="w-fit text-blue-500 hover:text-blue-700">
-            + new game
+            + New game
           </button>
         </div>
 
@@ -37,6 +38,9 @@ export default function Home() {
                 <div key={index} className="h-6 w-30 bg-gray-200" />
               ))}
             </div>
+          )}
+          {!isLoading && yourProjects.length === 0 && (
+            <p>You don't have any games yet. <button onClick={() => createProject()} className="text-blue-500 hover:text-blue-700">Create a game</button> to get started.</p>
           )}
           <div className="flex flex-col gap-1">
             {yourProjects.map((project) => (
@@ -73,18 +77,19 @@ export default function Home() {
 
         <div>
           <h1>Other games</h1>
-          <div className="flex flex-col gap-1">
+          <div className="flex gap-2">
             {[
-              { name: 'fireplace', shareId: 's_amQ3ZWJ2aHcydm5kdmZmNm5reTI4ajB3czE3ejlhenM' },
-              { name: 'escaperoom', shareId: 's_amQ3OGMwazdndnNmM2hwcXlid2NiM2YxOTk3eW14Z2g' },
-              { name: 'lifesim', shareId: 's_amQ3ZnZxaHFmNDZyenJoZWYzNm5uNHpkN2Q4MGhqZ2s' }
+              { name: 'fireplace', imageUrl: 'https://i.imgur.com/dWaQH2c.gif', shareId: 's_amQ3ZWJ2aHcydm5kdmZmNm5reTI4ajB3czE3ejlhenM' },
+              { name: 'escaperoom', imageUrl: 'https://i.imgur.com/PR6oN9P.png', shareId: 's_amQ3OGMwazdndnNmM2hwcXlid2NiM2YxOTk3eW14Z2g' },
+              { name: 'lifesim', imageUrl: 'https://i.imgur.com/XxcNmXj.png', shareId: 's_amQ3ZnZxaHFmNDZyenJoZWYzNm5uNHpkN2Q4MGhqZ2s' }
             ].map((project) => (
               <button
                 key={project.shareId}
-                onClick={() => router.push(`/play/${project.shareId}`)}
-                className="text-left hover:bg-gray-100 cursor-pointer"
+                onClick={() => router.push(`/edit/${project.shareId}`)}
+                className="text-center cursor-pointer group justify-between"
               >
-                {project.name}
+                <Image width={100} height={100} className="h-30 w-auto" src={project.imageUrl} alt={project.name} />
+                <p className="group-hover:underline">{project.name}</p>
               </button>
             ))}
           </div>
