@@ -49,7 +49,7 @@ export default function Guidebook({ readOnly = false, onClose }: { readOnly?: bo
         onClick={onClose}
       >
         <div
-          className="bordered bg-white w-full max-w-lg max-h-[80vh] overflow-y-auto"
+          className="bordered bg-gradient-to-b from-emerald-100 via-lime-100 to-white w-full max-w-lg max-h-[80vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -64,8 +64,8 @@ export default function Guidebook({ readOnly = false, onClose }: { readOnly?: bo
             {/* Creativity Slider */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <label className="font-medium">AI Freedom</label>
-                <span className="text-sm px-2 py-0.5 bg-neutral-100 border border-neutral-300">
+                <label className="font-medium">Generation Freedom</label>
+                <span className="px-2 py-0.5 bg-neutral-100 border border-neutral-300">
                   {getCreativityLabel(settings.creativity)}
                 </span>
               </div>
@@ -79,12 +79,12 @@ export default function Guidebook({ readOnly = false, onClose }: { readOnly?: bo
                 disabled={readOnly}
                 className="w-full accent-black"
               />
-              <div className="flex justify-between text-xs opacity-60">
+              <div className="flex justify-between text-sm opacity-60">
                 <span>Very Limited</span>
                 <span>Pretty Limited</span>
                 <span>Totally Free</span>
               </div>
-              <p className="text-xs opacity-60 mt-1">
+              <p className="mt-1">
                 {settings.creativity <= 0.33
                   ? 'Inline text only — no scene jumps or variable changes'
                   : settings.creativity <= 0.66
@@ -103,7 +103,7 @@ export default function Guidebook({ readOnly = false, onClose }: { readOnly?: bo
                     onClick={() => updateSettings({ verbosity: v })}
                     disabled={readOnly}
                     className={twMerge(
-                      'flex-1 py-1 border-2 border-black text-sm capitalize',
+                      'flex-1 py-1 border-2 border-black capitalize',
                       settings.verbosity === v ? 'bg-black text-white' : 'bg-white',
                     )}
                   >
@@ -115,8 +115,8 @@ export default function Guidebook({ readOnly = false, onClose }: { readOnly?: bo
 
             {/* Rules */}
             <div className="flex flex-col gap-2">
-              <label className="font-medium">Author Rules</label>
-              <p className="text-xs opacity-60">Prompts the AI will follow for all generations</p>
+              <label className="font-medium">New Branch Prompt</label>
+              <p className="opacity-60 text-sm">Prompts the AI will follow for new branch generations</p>
 
               {/* Rule chips */}
               {settings.rules.length > 0 && (
@@ -124,7 +124,7 @@ export default function Guidebook({ readOnly = false, onClose }: { readOnly?: bo
                   {settings.rules.map((rule, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-1 bg-neutral-100 border border-neutral-300 rounded px-2 py-1 text-sm"
+                      className="flex items-center gap-1 bg-neutral-100 border border-neutral-300 rounded px-2 py-1"
                     >
                       <span className="max-w-60 truncate" title={rule}>
                         {rule}
