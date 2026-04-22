@@ -15,7 +15,7 @@ import { PlayerProvider, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
 import { useProjects } from '@/lib/project/ProjectsProvider';
 import { decodeShareId, getShareUrl } from '@/lib/share';
-import { PencilIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { useParams } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
@@ -38,6 +38,16 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
     const shareUrl = getShareUrl(project.id);
     window.open(shareUrl, '_blank');
   }, [project.id]);
+
+  const handleDownloadHistory = useCallback(() => {
+    const blob = new Blob([JSON.stringify(versions, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.name}-history.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [versions, project.name]);
 
   /* Tooltips */
   const handleMouseDown = useCallback(() => {
@@ -133,6 +143,9 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
           <Box className="min-w-40 overflow-auto select-none bg-gradient-to-b from-[var(--sunflower)] to-white">
             <div className="flex items-center p-2 border-b-2 justify-between">
               <h1 className="cursor-default">versions</h1>
+              <button onClick={handleDownloadHistory} title="Download history as JSON">
+                <ArrowDownTrayIcon className="w-4 h-4 opacity-50 hover:opacity-100" />
+              </button>
             </div>
             <Versions />
           </Box>
