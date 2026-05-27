@@ -1,16 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
 @import 'tailwindcss';
 
 @font-face {
   font-family: 'bodytext';
-  src: url('../public/fonts/neuemontreal.otf');
+  src: url('../public/fonts/ReformatB-Regular.otf');
   font-weight: normal;
 }
 
 @font-face {
   font-family: 'bodytext';
-  src: url('../public/fonts/neuemontreal-medium.otf');
+  src: url('../public/fonts/ReformatB-Bold.otf');
   font-weight: bold;
+}
+
+@font-face {
+  font-family: 'headertext';
+  src: url('../public/fonts/StellageTest-Regular.otf');
+  font-weight: normal;
+}
+
+@font-face {
+  font-family: 'headertext';
+  src: url('../public/fonts/StellageTest-Italic.otf');
+  font-style: italic;
 }
 
 :root {
@@ -26,6 +37,27 @@
   /* Animation timing */
   --animation-duration: 0.3s;
   --animation-stagger: 150ms;
+}
+
+h1 {
+  font-family: 'headertext';
+  font-style: italic;
+  background: linear-gradient(90deg, #bedfc3 0%, #fff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: #b7dcbd;
+  font-size: 4rem;
+  /* Use text-shadow to push stroke outwards for extra outside effect */
+  text-shadow:
+    1px 1px 0 #000,
+    -1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px -1px 0 #000,
+    0px 1px 0 #000,
+    1px 0px 0 #000,
+    0px -1px 0 #000,
+    -1px 0px 0 #000;
 }
 
 @theme inline {
@@ -53,10 +85,6 @@ button {
   cursor: pointer;
 }
 
-button:hover {
-  opacity: 0.5;
-}
-
 button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
@@ -81,4 +109,8 @@ h1 {
   width: 3px; /* Remove scrollbar space */
   background: transparent;
   height: 0px;
+}
+
+button.display {
+  @apply border-2 px-2 py-1 hover:rounded-[10px] transition-all hover:-translate-x-[5px] hover:-translate-y-[5px] hover:shadow-[4px_4px_black] bg-white;
 }

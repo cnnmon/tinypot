@@ -164,10 +164,10 @@ export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
   const blameLabel = currentLineBlame === Entity.SYSTEM ? 'ai' : currentLineBlame === Entity.AUTHOR ? 'you' : null;
 
   return (
-    <div className="h-full overflow-y-scroll relative">
+    <div className="h-full overflow-hidden relative">
       <div ref={editorRef} className="h-full pb-10" />
       {/* Line indicator with blame and dismiss button */}
-      <div className="absolute w-full bottom-0 p-2 text-sm bg-gradient-to-b from-[#EBF7D2] border-t-2 flex justify-between items-center">
+      <div className="absolute inset-x-0 bottom-0 p-2 text-sm bg-gradient-to-b from-[#EBF7D2] border-t-2 flex justify-between items-center">
         <div>
           {hasUnresolvedAiLines && !readOnly && (
             <button

@@ -1,7 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 
-const anthropic = new Anthropic();
+const openai = new OpenAI();
 
+const MODEL = 'gpt-5-nano-2025-08-07';
 const MIN_SIMILARITY_SCORE = 0.7;
 
 export interface MatchRequest {
@@ -22,22 +23,20 @@ interface LLMResponse {
   normalizedInput: string;
 }
 
+const FAILED: MatchResponse = { matched: false, optionIndex: null, confidence: 0 };
+
 /**
  * Matches user natural language input against existing options.
  * Returns the best match if similarity is high enough, otherwise null.
+ *
+ * Uses GPT-5 nano: this is a hot path (called on every player turn), latency-
+ * sensitive, and classification-only — exactly nano's sweet spot.
  */
 export async function POST(req: Request) {
   const { userInput, options }: MatchRequest = await req.json();
 
-  if (!userInput || !options?.length) {
-    return Response.json({
-      matched: false,
-      optionIndex: null,
-      confidence: 0,
-    } satisfies MatchResponse);
-  }
+  if (!userInput || !options?.length) return Response.json(FAILED);
 
-  // Build a list of all possible matches (options + their aliases)
   const optionsList = options
     .map((opt, i) => {
       const aliases = opt.aliases?.length ? ` (also: ${opt.aliases.join(', ')})` : '';
@@ -45,88 +44,75 @@ export async function POST(req: Request) {
     })
     .join('\n');
 
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 256,
-    messages: [
-      {
-        role: 'user',
-        content: `You are matching player input to game options. Find the most similar option and return a similarity probability.
+  const system = `You match a player's natural-language input to one of a numbered list of game options.
+Consider synonyms, intent, and paraphrasing. If nothing fits, return the closest option with a low confidence.
+Reply with strict JSON only: {"optionIndex": <int>, "confidence": <0.0-1.0>, "normalizedInput": "<short normalized version>"}`;
 
-Available options:
+  const fewShot = [
+    {
+      role: 'user' as const,
+      content: `Available options:
 0: "Go to the forest"
 1: "Visit the castle"
 2: "Stay home"
 
-Player input: "I want to explore the woods"
-
-Return the most similar option with its similarity probability. Consider synonyms, intent, and paraphrasing.
-Respond in JSON: {"optionIndex": <number>, "confidence": <0.0-1.0>, "normalizedInput": "<short normalized version>"}`,
-      },
-      {
-        role: 'assistant',
-        content: `{"optionIndex": 0, "confidence": 0.92, "normalizedInput": "go to forest"}`,
-      },
-      {
-        role: 'user',
-        content: `Available options:
+Player input: "I want to explore the woods"`,
+    },
+    {
+      role: 'assistant' as const,
+      content: `{"optionIndex": 0, "confidence": 0.92, "normalizedInput": "go to forest"}`,
+    },
+    {
+      role: 'user' as const,
+      content: `Available options:
 0: "Fight the dragon"
 1: "Run away"
 2: "Talk to the dragon"
 
-Player input: "let's chat with it"
-
-Return the most similar option with its similarity probability. Consider synonyms, intent, and paraphrasing.
-Respond in JSON: {"optionIndex": <number>, "confidence": <0.0-1.0>, "normalizedInput": "<short normalized version>"}`,
-      },
-      {
-        role: 'assistant',
-        content: `{"optionIndex": 2, "confidence": 0.88, "normalizedInput": "talk to dragon"}`,
-      },
-      {
-        role: 'user',
-        content: `Available options:
+Player input: "let's chat with it"`,
+    },
+    {
+      role: 'assistant' as const,
+      content: `{"optionIndex": 2, "confidence": 0.88, "normalizedInput": "talk to dragon"}`,
+    },
+    {
+      role: 'user' as const,
+      content: `Available options:
 0: "Open the door"
 1: "Look through the window"
 
-Player input: "eat a sandwich"
+Player input: "eat a sandwich"`,
+    },
+    {
+      role: 'assistant' as const,
+      content: `{"optionIndex": 0, "confidence": 0.05, "normalizedInput": "eat sandwich"}`,
+    },
+  ];
 
-Return the most similar option with its similarity probability. Consider synonyms, intent, and paraphrasing.
-Respond in JSON: {"optionIndex": <number>, "confidence": <0.0-1.0>, "normalizedInput": "<short normalized version>"}`,
-      },
-      {
-        role: 'assistant',
-        content: `{"optionIndex": 0, "confidence": 0.05, "normalizedInput": "eat sandwich"}`,
-      },
+  const response = await openai.chat.completions.create({
+    model: MODEL,
+    response_format: { type: 'json_object' },
+    reasoning_effort: 'minimal', // classification only — skip GPT-5's chain-of-thought
+    messages: [
+      { role: 'system', content: system },
+      ...fewShot,
       {
         role: 'user',
         content: `Available options:
 ${optionsList}
 
-Player input: "${userInput}"
-
-Return the most similar option with its similarity probability. Consider synonyms, intent, and paraphrasing.
-Respond in JSON: {"optionIndex": <number>, "confidence": <0.0-1.0>, "normalizedInput": "<short normalized version>"}`,
+Player input: "${userInput}"`,
       },
     ],
   });
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : '';
+  const text = response.choices[0]?.message?.content ?? '';
 
   try {
-    // Extract JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return Response.json({
-        matched: false,
-        optionIndex: null,
-        confidence: 0,
-      } satisfies MatchResponse);
-    }
+    if (!jsonMatch) return Response.json(FAILED);
 
-    const parsed: LLMResponse = JSON.parse(jsonMatch[0]);
-    const { optionIndex, confidence, normalizedInput } = parsed;
-
+    const { optionIndex, confidence, normalizedInput }: LLMResponse = JSON.parse(jsonMatch[0]);
     const matched = confidence >= MIN_SIMILARITY_SCORE;
 
     return Response.json({
@@ -136,10 +122,6 @@ Respond in JSON: {"optionIndex": <number>, "confidence": <0.0-1.0>, "normalizedI
       normalizedInput,
     } satisfies MatchResponse);
   } catch {
-    return Response.json({
-      matched: false,
-      optionIndex: null,
-      confidence: 0,
-    } satisfies MatchResponse);
+    return Response.json(FAILED);
   }
 }

@@ -1,4 +1,5 @@
 import { Entity } from '@/types/entities';
+import { authTables } from '@convex-dev/auth/server';
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
@@ -23,13 +24,29 @@ const lineValidator = v.object({
 });
 
 export default defineSchema({
+  ...authTables,
+
+  users: defineTable({
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+    email: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    isAnonymous: v.optional(v.boolean()),
+    // App-specific mirrored field for backwards compatibility with current UI.
+    imageUrl: v.optional(v.string()),
+    updatedAt: v.optional(v.number()),
+  }).index('email', ['email']),
+
   projects: defineTable({
-    authorId: v.string(),
+    authorId: v.optional(v.string()), // Legacy field (kept for backwards compatibility)
+    userId: v.optional(v.id('users')),
     name: v.string(),
     description: v.string(),
     script: v.array(v.string()),
     guidebook: v.string(),
-  }),
+  }).index('by_userId', ['userId']),
 
   playthroughs: defineTable({
     projectId: v.id('projects'),

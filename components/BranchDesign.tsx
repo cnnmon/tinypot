@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'motion/react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const FILL = 'white';
 const STROKE_WIDTH = 1.5;
@@ -26,7 +26,11 @@ interface BranchProps {
   seed: number;
   color?: string;
   className?: string;
+  // Animation duration in seconds. 0 disables animation.
+  animationDuration?: number;
 }
+
+const formatSvgNumber = (value: number) => value.toFixed(3);
 
 // Seeded random number generator for reproducibility
 function seededRandom(seed: number) {
@@ -49,7 +53,22 @@ function quadraticPoint(p0: Point, p1: Point, p2: Point, t: number): Point {
   };
 }
 
-export default function Branch({ width = 65, height = 71, seed, color = 'currentColor', className }: BranchProps) {
+export default function Branch({
+  width = 65,
+  height = 71,
+  seed,
+  color = 'currentColor',
+  className,
+  animationDuration = 1,
+}: BranchProps) {
+  const animate = animationDuration > 0;
+  const [isMounted, setIsMounted] = useState(false);
+  const shouldAnimate = animate && isMounted;
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const paths = useMemo(() => {
     const random = seededRandom(seed);
     const lines: string[] = [];
@@ -67,7 +86,9 @@ export default function Branch({ width = 65, height = 71, seed, color = 'current
       end: { x: baseX + curve, y: tipY },
     };
 
-    lines.push(`M ${stem.start.x} ${stem.start.y} Q ${stem.ctrl.x} ${stem.ctrl.y} ${stem.end.x} ${stem.end.y}`);
+    lines.push(
+      `M ${formatSvgNumber(stem.start.x)} ${formatSvgNumber(stem.start.y)} Q ${formatSvgNumber(stem.ctrl.x)} ${formatSvgNumber(stem.ctrl.y)} ${formatSvgNumber(stem.end.x)} ${formatSvgNumber(stem.end.y)}`,
+    );
 
     // Pick decoration type randomly
     const pickDecoration = (): 'leaf' | 'flower' => {
@@ -116,7 +137,9 @@ export default function Branch({ width = 65, height = 71, seed, color = 'current
         y: origin.y + (endPt.y - origin.y) * 0.5,
       };
 
-      lines.push(`M ${origin.x} ${origin.y} Q ${ctrlPt.x} ${ctrlPt.y} ${endPt.x} ${endPt.y}`);
+      lines.push(
+        `M ${formatSvgNumber(origin.x)} ${formatSvgNumber(origin.y)} Q ${formatSvgNumber(ctrlPt.x)} ${formatSvgNumber(ctrlPt.y)} ${formatSvgNumber(endPt.x)} ${formatSvgNumber(endPt.y)}`,
+      );
 
       const pseudoRandom = (offset: number) => ((random() * 10 + offset) % 10) / 10;
       if (pseudoRandom(30) < DECORATION_LIKELIHOOD) {
@@ -146,20 +169,19 @@ export default function Branch({ width = 65, height = 71, seed, color = 'current
       className={className}
     >
       {/* Branches */}
-      {seed &&
-        paths.lines.map((d, i) => (
-          <motion.path
-            key={i}
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 1, ease: 'easeInOut' }}
-            d={d}
-            stroke={color}
-            strokeWidth={STROKE_WIDTH}
-            strokeLinecap="round"
-            fill="none"
-          />
-        ))}
+      {paths.lines.map((d, i) => (
+        <motion.path
+          key={i}
+          initial={shouldAnimate ? { pathLength: 0 } : false}
+          animate={shouldAnimate ? { pathLength: 1 } : undefined}
+          transition={shouldAnimate ? { duration: animationDuration, ease: 'easeInOut' } : undefined}
+          d={d}
+          stroke={color}
+          strokeWidth={STROKE_WIDTH}
+          strokeLinecap="round"
+          fill="none"
+        />
+      ))}
 
       {/* Decorations at branch tips */}
       {paths.decorations.map((dec, i) => {
@@ -167,16 +189,18 @@ export default function Branch({ width = 65, height = 71, seed, color = 'current
           return (
             <motion.path
               key={i}
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: 1, ease: 'easeInOut', delay: i * 0.1 }}
+              initial={shouldAnimate ? { pathLength: 0 } : false}
+              animate={shouldAnimate ? { pathLength: 1 } : undefined}
+              transition={
+                shouldAnimate ? { duration: animationDuration, ease: 'easeInOut', delay: i * 0.1 } : undefined
+              }
               d="M0 0 C -6 -5 -8 -14 0 -18 C 8 -14 6 -5 0 0"
               fill={FILL}
               stroke={color}
               strokeWidth={STROKE_WIDTH * 1.9}
               strokeLinecap="round"
               strokeLinejoin="round"
-              transform={`translate(${dec.x}, ${dec.y}) rotate(${dec.rotation}) scale(0.4)`}
+              transform={`translate(${formatSvgNumber(dec.x)}, ${formatSvgNumber(dec.y)}) rotate(${formatSvgNumber(dec.rotation)}) scale(0.4)`}
             />
           );
         }
@@ -190,7 +214,7 @@ export default function Branch({ width = 65, height = 71, seed, color = 'current
             strokeWidth={STROKE_WIDTH * 2}
             strokeLinecap="round"
             strokeLinejoin="round"
-            transform={`translate(${dec.x}, ${dec.y}) rotate(${dec.rotation}) scale(0.4)`}
+            transform={`translate(${formatSvgNumber(dec.x)}, ${formatSvgNumber(dec.y)}) rotate(${formatSvgNumber(dec.rotation)}) scale(0.4)`}
           />
         );
       })}

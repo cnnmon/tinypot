@@ -610,12 +610,18 @@ export function addGeneratedOptionToScript(
         if (nextIndent <= optionIndent) break;
         j++;
       }
-      // Push choice and its then block
+      // Push choice and its then block. Trailing blank lines (between the
+      // then-block and the next scene/option) get pushed too, but we record
+      // the insertion point BEFORE them so a new option doesn't get a leading
+      // blank line.
       result.push(line);
       for (let k = i + 1; k < j; k++) {
         result.push(lines[k]);
       }
       lastOptionEndIdx = result.length;
+      while (lastOptionEndIdx > 0 && result[lastOptionEndIdx - 1].trim() === '') {
+        lastOptionEndIdx--;
+      }
       i = j - 1;
       continue;
     }

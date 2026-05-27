@@ -20,6 +20,7 @@ interface ProjectContextValue {
   updateProject: (updates: Partial<Project>, creator?: Entity.AUTHOR | Entity.SYSTEM) => void;
   versions: Version[];
   saveStatus: SaveStatus;
+  canEdit: boolean;
   selectedVersionId: string | null;
   setSelectedVersionId: (id: string | null) => void;
   isMetalearning: boolean;
@@ -29,7 +30,15 @@ interface ProjectContextValue {
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
 
-export function ProjectProvider({ children, projectId }: { children: ReactNode; projectId: Id<'projects'> }) {
+export function ProjectProvider({
+  children,
+  projectId,
+  viewerUserId,
+}: {
+  children: ReactNode;
+  projectId: Id<'projects'>;
+  viewerUserId?: Id<'users'> | null;
+}) {
   // Convex queries
   const convexProject = useQuery(api.projects.get, { projectId });
   const convexVersions = useQuery(api.versions?.list, { projectId }) as
@@ -71,7 +80,8 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
   // Local project state - only initialize AFTER convexProject is loaded
   // This prevents the DEFAULT_LINES from ever being used when we have real data
   const [project, setProject] = useState<{
-    authorId: string;
+    userId?: Id<'users'>;
+    authorId?: string;
     name: string;
     description: string;
     script: string[];
@@ -82,6 +92,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
   useEffect(() => {
     if (convexProject) {
       setProject({
+        userId: convexProject.userId,
         authorId: convexProject.authorId,
         name: convexProject.name,
         description: convexProject.description,
@@ -93,11 +104,13 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
 
   // Track if we've saved the initial version
   const hasCreatedInitialVersionRef = useRef(false);
+  const canEdit = !!viewerUserId && !!convexProject && (convexProject.userId ? convexProject.userId === viewerUserId : true);
 
   // Initialize and save initial version if none exists (using AUTHOR, not SYSTEM)
   useEffect(() => {
     // Skip if already created or versions are still loading
     if (hasCreatedInitialVersionRef.current || convexVersions === undefined) return;
+    if (!canEdit) return;
 
     if (convexVersions.length === 0 && convexProject) {
       // No versions exist - create the initial version as AUTHOR
@@ -109,7 +122,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         snapshot,
       });
     }
-  }, [convexVersions, convexProject, projectId, createVersionMutation]);
+  }, [canEdit, convexVersions, convexProject, projectId, createVersionMutation]);
 
   // Transform Convex versions to our Version type
   const versions: Version[] = (convexVersions ?? []).map((v) => ({
@@ -132,6 +145,8 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
   // Update project with smart version management
   const updateProject = useCallback(
     (updates: Partial<Project>, creator: Entity.AUTHOR | Entity.SYSTEM = Entity.AUTHOR) => {
+      if (!canEdit || !viewerUserId) return;
+
       const newProject = { ...project, ...updates };
       setProject(newProject as Project);
 
@@ -145,7 +160,10 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
       saveTimeoutRef.current = setTimeout(() => {
         updateProjectMutation({
           projectId,
-          ...newProject,
+          name: newProject.name,
+          description: newProject.description,
+          script: newProject.script,
+          guidebook: newProject.guidebook,
         });
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 1500);
@@ -206,7 +224,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [project, projectId, updateProjectMutation, versions, snapshotsEqual],
+    [canEdit, project, projectId, updateProjectMutation, versions, snapshotsEqual, viewerUserId],
   );
 
   // Show loading state while project data is loading
@@ -237,6 +255,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
         updateProject,
         versions,
         saveStatus,
+        canEdit,
         selectedVersionId,
         setSelectedVersionId,
         isMetalearning,

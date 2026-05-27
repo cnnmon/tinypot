@@ -1,11 +1,12 @@
 'use client';
 
+import { useCurrentUser } from '@/lib/auth/useCurrentUser';
 import { api } from '@/convex/_generated/api';
 import { Doc, Id } from '@/convex/_generated/dataModel';
+import { useAuthActions } from '@convex-dev/auth/react';
 import { useMutation, useQuery } from 'convex/react';
-import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext } from 'react';
 import { DEFAULT_LINES } from './constants';
-import { addProjectKey, getProjectKeys, removeProjectKey } from './storage';
 
 interface PublicProject {
   name: string;
@@ -25,49 +26,39 @@ interface ProjectsContextValue {
 const ProjectsContext = createContext<ProjectsContextValue | null>(null);
 
 export function ProjectsProvider({ children }: { children: ReactNode }) {
-  const [projectKeys, setProjectKeys] = useState<string[]>([]);
+  const { isAuthenticated, isLoading: isLoadingUser, userId } = useCurrentUser();
+  const { signIn } = useAuthActions();
   const createProjectMutation = useMutation(api.projects.create);
   const removeProjectMutation = useMutation(api.projects.remove);
   const updateProjectMutation = useMutation(api.projects.update);
 
-  // Load keys from localStorage on mount
-  useEffect(() => {
-    setProjectKeys(getProjectKeys());
-  }, []);
-
-  // Fetch user's projects
-  const allProjects = useQuery(api.projects.list);
-  const isLoading = allProjects === undefined;
+  // Fetch account-owned projects
+  const allProjects = useQuery(api.projects.listMine, {});
   const projects = allProjects ?? [];
+  const projectKeys = projects.map((project) => project._id);
+  const isLoading = isLoadingUser || (isAuthenticated && allProjects === undefined);
 
-  // Fetch public projects (with encoded share IDs only)
-  const publicProjectsQuery = useQuery(
-    api.projects.listPublic,
-    projectKeys.length > 0 ? { excludeIds: projectKeys as Id<'projects'>[] } : 'skip',
-  );
+  // Fetch public projects (excluding current account-owned project IDs)
+  const publicProjectsQuery = useQuery(api.projects.listPublic, {
+    excludeIds: projectKeys as Id<'projects'>[],
+  });
   const publicProjects = publicProjectsQuery ?? [];
 
-  const addKey = useCallback((projectId: string) => {
-    addProjectKey(projectId);
-    setProjectKeys(getProjectKeys());
-  }, []);
-
-  const removeKey = useCallback((projectId: string) => {
-    removeProjectKey(projectId);
-    setProjectKeys(getProjectKeys());
-  }, []);
-
   const createProject = async () => {
+    if (isLoadingUser) return undefined;
+    if (!isAuthenticated || !userId) {
+      await signIn('google');
+      return undefined;
+    }
+
     try {
       const project = await createProjectMutation({
-        authorId: 'default-author',
         name: 'Untitled Project',
         description: '',
         script: DEFAULT_LINES,
         guidebook: '',
       });
       if (project) {
-        addKey(project._id);
         window.location.href = `/edit/${project._id}`;
       }
       return project?._id ?? undefined;
@@ -79,17 +70,18 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
 
   const deleteProject = useCallback(
     async (projectId: Id<'projects'>) => {
+      if (!userId) return;
       await removeProjectMutation({ projectId });
-      removeKey(projectId);
     },
-    [removeProjectMutation, removeKey],
+    [removeProjectMutation, userId],
   );
 
   const renameProject = useCallback(
     async (projectId: Id<'projects'>, name: string) => {
+      if (!userId) return;
       await updateProjectMutation({ projectId, name: name ?? 'Untitled Project' });
     },
-    [updateProjectMutation],
+    [updateProjectMutation, userId],
   );
 
   return (

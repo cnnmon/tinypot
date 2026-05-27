@@ -17,6 +17,9 @@ export const bonsaiTheme = EditorView.theme({
     height: '100%',
     fontSize: '14px',
   },
+  '&.cm-focused': {
+    outline: 'none',
+  },
   '.cm-scroller': {
     lineHeight: '1.5',
     backgroundColor: '',

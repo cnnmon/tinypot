@@ -11,15 +11,18 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
+    "@auth/core": "^0.37.0",
     "@codemirror/autocomplete": "^6.20.0",
     "@codemirror/commands": "^6.10.1",
     "@codemirror/language": "^6.11.3",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.39.4",
+    "@convex-dev/auth": "^0.0.92",
     "@heroicons/react": "^2.2.0",
     "convex": "^1.31.2",
     "motion": "^12.23.26",
     "next": "^16.0.10",
+    "openai": "^6.38.0",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "tailwind-merge": "^3.4.0"

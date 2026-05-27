@@ -243,6 +243,30 @@ describe('addGeneratedOptionToScript', () => {
       ]);
     });
 
+    it('should insert new option BEFORE trailing blank line in scene (no extra space)', () => {
+      const lines = [
+        '@HOME',
+        'if old option',
+        '   then1',
+        '',
+        '@GARDEN',
+        'garden content',
+      ];
+
+      const result = addGeneratedOptionToScript(lines, 'HOME', 'new option', [], ['new then']);
+
+      expect(result).toEqual([
+        '@HOME',
+        'if old option',
+        '   then1',
+        'if new option',
+        '   new then',
+        '',
+        '@GARDEN',
+        'garden content',
+      ]);
+    });
+
     it('should add option to HOME scene even with empty lines or whitespace before it', () => {
       // Sometimes scripts might have leading whitespace or empty lines
       const lines = [

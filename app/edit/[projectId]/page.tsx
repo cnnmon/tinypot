@@ -1,105 +1,69 @@
 'use client';
 
+import AuthButton from '@/components/AuthButton';
 import Box from '@/components/Box';
+import BranchesCard from '@/components/BranchesCard';
 import Editor from '@/components/Editor';
-import Guidebook from '@/components/Guidebook';
 import Header from '@/components/Header';
 import Player from '@/components/Player';
+import ProjectSwitcher from '@/components/ProjectSwitcher';
 import ScrollContainer from '@/components/ScrollContainer';
-import Versions from '@/components/Versions';
 import { getDiffScripts } from '@/components/Versions/utils/getDiffScripts';
 import VersionViewer from '@/components/VersionViewer';
+import WorldBibleCard from '@/components/WorldBibleCard';
 import { Id } from '@/convex/_generated/dataModel';
-import { parseGuidebook } from '@/lib/guidebook';
+import { useCurrentUser } from '@/lib/auth/useCurrentUser';
 import { PlayerProvider, usePlayerContext } from '@/lib/player/PlayerProvider';
 import { ProjectProvider, useProject } from '@/lib/project';
-import { useProjects } from '@/lib/project/ProjectsProvider';
 import { decodeShareId, getShareUrl } from '@/lib/share';
-import { ArrowDownTrayIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { useParams } from 'next/navigation';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
-  const { project, versions, selectedVersionId, saveStatus, setSelectedVersionId, isMetalearning } = useProject();
-  const { renameProject } = useProjects();
+  const { project, versions, selectedVersionId, saveStatus, setSelectedVersionId, canEdit } = useProject();
   const { currentSceneId, variables } = usePlayerContext();
+  const isReadOnly = isSharedView || !canEdit;
 
-  const [leftWidth, setLeftWidth] = useState(50);
-  const [collapsed, setCollapsed] = useState(false);
-  const [isGuidebookOpen, setIsGuidebookOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
+  // Resizable split between editor (left) and player (right). Sidebar is fixed-width.
+  const [editorPct, setEditorPct] = useState(50);
+  const splitRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
   const hasDiff = getDiffScripts(selectedVersionId, versions) !== null;
 
-  const guidebook = useMemo(() => parseGuidebook(project.guidebook), [project.guidebook]);
+  const handleShare = useCallback(() => window.open(getShareUrl(project.id), '_blank'), [project.id]);
 
-  const handleShare = useCallback(() => {
-    const shareUrl = getShareUrl(project.id);
-    window.open(shareUrl, '_blank');
-  }, [project.id]);
-
-  const handleDownloadHistory = useCallback(() => {
-    const blob = new Blob([JSON.stringify(versions, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${project.name}-history.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [versions, project.name]);
-
-  /* Tooltips */
-  const handleMouseDown = useCallback(() => {
-    isDragging.current = true;
+  const handleSplitMouseDown = useCallback(() => {
+    dragging.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
-      setLeftWidth(Math.min(Math.max(newWidth, 20), 80));
+    const onMove = (e: MouseEvent) => {
+      if (!dragging.current || !splitRef.current) return;
+      const rect = splitRef.current.getBoundingClientRect();
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      setEditorPct(Math.min(Math.max(pct, 20), 80));
     };
-
-    const handleMouseUp = () => {
-      isDragging.current = false;
+    const onUp = () => {
+      dragging.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
     };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   }, []);
 
   return (
-    <>
-      {!collapsed && isGuidebookOpen && (
-        <div className="flex gap-2">
-          <Guidebook readOnly={isSharedView} onClose={() => setIsGuidebookOpen(false)} />
+    <div className="h-screen flex flex-col p-3 gap-3">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Header />
+          <ProjectSwitcher readOnly={isReadOnly} />
         </div>
-      )}
-      <div className="h-screen p-4 gap-2 flex flex-col">
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2 items-center">
-            <Header />
-            <p className="text-lg">
-              {project.name} {isSharedView && <span className="text-neutral-400 text-sm">(view-only)</span>}
-            </p>
-            {!isSharedView && (
-              <button
-                onClick={() => {
-                  const newName = prompt('Enter new name', project.name);
-                  if (newName) renameProject(project.id, newName);
-                }}
-              >
-                <PencilIcon className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-          <div className="flex gap-1 items-center">
+        <div className="flex items-center gap-2">
+          {!isReadOnly && (
             <span
               className={twMerge(
                 'transition-opacity',
@@ -110,70 +74,50 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
             >
               {saveStatus === 'saving' ? 'saving...' : saveStatus === 'saved' ? 'saved' : ''}
             </span>
-            <button onClick={() => window.open('/help', '_blank')} className="px-1">
-              help
-            </button>
-            {!isSharedView && (
-              <button onClick={handleShare} className="px-1">
-                share
-              </button>
-            )}
-          </div>
+          )}
+          {!isSharedView && !canEdit && <span className="opacity-60">view-only</span>}
+          <button onClick={() => window.open('/help', '_blank')}>help</button>
+          {!isReadOnly && <button onClick={handleShare}>share</button>}
+          <AuthButton />
         </div>
+      </div>
 
-        <div className="flex gap-2 max-h-45">
-          <Box
-            className={twMerge(
-              'bg-gradient-to-b from-[#EBF7D2] via-[#B7DCBD] to-white min-h-45 w-5 hover:opacity-90 cursor-pointer overflow-y-auto',
-              isGuidebookOpen && 'bg-gradient-to-b via-[var(--orange)] from-[var(--rose)] to-white',
-              isMetalearning && 'bg-gradient-to-b from-red-300 via-red-200 to-white animate-pulse',
-            )}
-            onClick={() => setIsGuidebookOpen(true)}
-          >
-            <div className="h-full flex flex-col">
-              <div className="p-2 flex items-center justify-between gap-1 border-b-2">
-                <h1 className="cursor-default">guidebook</h1>
-              </div>
+      {/* 3-column body */}
+      <div className="flex flex-1 gap-3 min-h-0">
+        {/* Left sidebar */}
+        <aside className="flex flex-col gap-3 w-60 shrink-0 min-h-0">
+          <WorldBibleCard readOnly={isReadOnly} />
+          <BranchesCard />
+        </aside>
 
-              <div className="p-2">
-                <div>{guidebook.rules.length > 0 ? guidebook.rules.join('\n') : 'none'}</div>
-              </div>
-            </div>
-          </Box>
-          <Box className="min-w-40 overflow-auto select-none bg-gradient-to-b from-[var(--sunflower)] to-white">
-            <div className="flex items-center p-2 border-b-2 justify-between">
-              <h1 className="cursor-default">versions</h1>
-              <button onClick={handleDownloadHistory} title="Download history as JSON">
-                <ArrowDownTrayIcon className="w-4 h-4 opacity-50 hover:opacity-100" />
-              </button>
-            </div>
-            <Versions />
-          </Box>
-        </div>
-        <div
-          ref={containerRef}
-          className={`flex flex-row pb-5 ${collapsed ? 'min-h-[calc(100%-90px)] h-[calc(100%-90px)]' : 'min-h-[calc(100%-210px)] h-[calc(100%-210px)]'}`}
-        >
-          <Box style={{ width: `${leftWidth}%` }}>
-            <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
-              <b>{hasDiff ? `version ${selectedVersionId?.slice(1, 5)}` : 'editor'}</b>
+        {/* Editor + Player split */}
+        <div ref={splitRef} className="flex flex-1 min-w-0">
+          <Box style={{ width: `${editorPct}%` }}>
+            <div className="flex items-center justify-between gap-1 border-b-2 p-2">
+              <h2 className="flex items-center gap-2">
+                {hasDiff ? `version ${selectedVersionId?.slice(1, 5)}` : 'Editor'}
+              </h2>
               {hasDiff && (
-                <button onClick={() => setSelectedVersionId(null)} className="text-neutral-500 hover:text-neutral-800">
+                <button
+                  onClick={() => setSelectedVersionId(null)}
+                  className="text-neutral-500 hover:bg-black hover:text-white"
+                >
                   ← back to editing
                 </button>
               )}
             </div>
-            {hasDiff ? <VersionViewer /> : <Editor readOnly={isSharedView} />}
+            {hasDiff ? <VersionViewer /> : <Editor readOnly={isReadOnly} />}
           </Box>
+
           <div
-            onMouseDown={handleMouseDown}
-            className="w-2 cursor-col-resize hover:bg-gray-300 transition-colors shrink-0"
+            onMouseDown={handleSplitMouseDown}
+            className="w-2 cursor-col-resize hover:bg-neutral-200 transition-colors shrink-0"
           />
-          <Box style={{ width: `${100 - leftWidth}%` }}>
-            <div className="flex h-10 items-center justify-between gap-1 border-b-2 p-2">
-              <h1>player</h1>
-              {/* State */}
-              <div className="flex gap-2 items-center text-sm">
+
+          <Box style={{ width: `${100 - editorPct}%` }}>
+            <div className="flex items-center justify-between gap-1 border-b-2 p-2">
+              <h2>Player</h2>
+              <div className="flex gap-2 items-center">
                 <div className="flex items-center gap-1">
                   <span className="opacity-50">Scene</span>
                   <span className="font-bold">{currentSceneId}</span>
@@ -188,33 +132,29 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
                 </ScrollContainer>
               </div>
             </div>
-            <div className="p-2 overflow-scroll relative">
+            <div className="p-2 overflow-scroll relative h-full">
               <Player />
             </div>
           </Box>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
 export default function ProjectPage() {
   const params = useParams();
+  const { isLoading: isLoadingUser, userId } = useCurrentUser();
   const rawProjectId = params.projectId as string;
 
-  // Check if this is a share ID (encrypted project ID)
   const isSharedView = rawProjectId.startsWith('s_');
   const projectId = isSharedView ? decodeShareId(rawProjectId) : rawProjectId;
-
-  // Validate that projectId looks like a Convex ID (not legacy "123")
   const isValidId = projectId && projectId.length > 10;
 
   if (!isValidId) {
     return (
-      <div className="h-screen p-4 gap-2 flex flex-col">
-        <div className="flex gap-2 items-center">
-          <Header />
-        </div>
+      <div className="h-screen p-4 flex flex-col gap-2">
+        <Header />
         <div className="flex-1 flex items-center justify-center">
           <p className="text-neutral-400">Invalid project ID. Please select a project from the dropdown.</p>
         </div>
@@ -222,8 +162,19 @@ export default function ProjectPage() {
     );
   }
 
+  if (!isSharedView && isLoadingUser) {
+    return (
+      <div className="h-screen p-4 flex flex-col gap-2">
+        <Header />
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-neutral-400">Loading account...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <ProjectProvider projectId={projectId as Id<'projects'>}>
+    <ProjectProvider projectId={projectId as Id<'projects'>} viewerUserId={userId}>
       <PlayerProvider>
         <ProjectContent isSharedView={isSharedView} />
       </PlayerProvider>

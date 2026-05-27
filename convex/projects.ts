@@ -1,3 +1,4 @@
+import { getAuthUserId } from '@convex-dev/auth/server';
 import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 
@@ -15,10 +16,16 @@ export const get = query({
   },
 });
 
-export const list = query({
+export const listMine = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db.query('projects').collect();
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    return await ctx.db
+      .query('projects')
+      .withIndex('by_userId', (q) => q.eq('userId', userId))
+      .collect();
   },
 });
 
@@ -47,34 +54,24 @@ export const listByIds = query({
   },
 });
 
-export const getOrCreate = mutation({
-  args: {
-    authorId: v.string(),
-    name: v.string(),
-    description: v.string(),
-    script: v.array(v.string()),
-    guidebook: v.string(),
-  },
-  handler: async (ctx, args) => {
-    // For now, get the first project or create one
-    const existing = await ctx.db.query('projects').first();
-    if (existing) return existing;
-
-    const projectId = await ctx.db.insert('projects', args);
-    return await ctx.db.get(projectId);
-  },
-});
-
 export const create = mutation({
   args: {
-    authorId: v.string(),
     name: v.string(),
     description: v.string(),
     script: v.array(v.string()),
     guidebook: v.string(),
   },
   handler: async (ctx, args) => {
-    const projectId = await ctx.db.insert('projects', args);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error('Authentication required');
+
+    const projectId = await ctx.db.insert('projects', {
+      userId,
+      name: args.name,
+      description: args.description,
+      script: args.script,
+      guidebook: args.guidebook,
+    });
     return await ctx.db.get(projectId);
   },
 });
@@ -82,15 +79,32 @@ export const create = mutation({
 export const update = mutation({
   args: {
     projectId: v.id('projects'),
-    authorId: v.optional(v.string()),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
     script: v.optional(v.array(v.string())),
     guidebook: v.optional(v.string()),
   },
   handler: async (ctx, { projectId, ...updates }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error('Authentication required');
+
+    const project = await ctx.db.get(projectId);
+    if (!project) return null;
+
+    if (project.userId && project.userId !== userId) {
+      throw new Error('Not authorized to edit this project');
+    }
+
     // Filter out undefined values
-    const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined));
+    const cleanUpdates = Object.fromEntries(
+      Object.entries({
+        ...updates,
+        userId: project.userId ?? userId,
+      }).filter(([, value]) => value !== undefined),
+    );
+
+    if (Object.keys(cleanUpdates).length === 0) return project;
+
     await ctx.db.patch(projectId, cleanUpdates);
     return await ctx.db.get(projectId);
   },
@@ -99,6 +113,16 @@ export const update = mutation({
 export const remove = mutation({
   args: { projectId: v.id('projects') },
   handler: async (ctx, { projectId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error('Authentication required');
+
+    const project = await ctx.db.get(projectId);
+    if (!project) return;
+
+    if (project.userId && project.userId !== userId) {
+      throw new Error('Not authorized to delete this project');
+    }
+
     await ctx.db.delete(projectId);
   },
 });

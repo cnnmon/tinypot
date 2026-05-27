@@ -15,13 +15,9 @@ export default function Header() {
 
   return (
     <>
-      <div
-        className="flex items-center justify-center gap-1 cursor-pointer hover:opacity-50 transition-opacity"
-        onClick={() => router.push('/')}
-      >
-        <p>bonsai</p>
-        <div className="relative flex justify-center items-center mb-1">
-          <BranchDesign seed={randomNumber} width={25} height={25} />
+      <div className="flex items-center cursor-pointer hover:opacity-60" onClick={() => router.push('/')}>
+        <div className="relative flex justify-center items-center mb-1 scale-130">
+          <BranchDesign seed={randomNumber} width={25} height={25} animationDuration={0} />
           <Image alt="plantpot" src="/icons/PlantPot.svg" width={15} height={15} className="absolute top-[12px]" />
         </div>
       </div>
