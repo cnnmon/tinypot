@@ -1,9 +1,16 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI();
-
 const MODEL = 'gpt-5-nano-2025-08-07';
 const MIN_SIMILARITY_SCORE = 0.7;
+
+let openai: OpenAI | null = null;
+
+function getOpenAI() {
+  if (!process.env.OPENAI_API_KEY) return null;
+
+  openai ??= new OpenAI();
+  return openai;
+}
 
 export interface MatchRequest {
   userInput: string;
@@ -36,6 +43,14 @@ export async function POST(req: Request) {
   const { userInput, options }: MatchRequest = await req.json();
 
   if (!userInput || !options?.length) return Response.json(FAILED);
+
+  const client = getOpenAI();
+  if (!client) {
+    return Response.json(
+      { ...FAILED, error: 'Missing OPENAI_API_KEY' },
+      { status: 503 },
+    );
+  }
 
   const optionsList = options
     .map((opt, i) => {
@@ -89,7 +104,7 @@ Player input: "eat a sandwich"`,
     },
   ];
 
-  const response = await openai.chat.completions.create({
+  const response = await client.chat.completions.create({
     model: MODEL,
     response_format: { type: 'json_object' },
     reasoning_effort: 'minimal', // classification only — skip GPT-5's chain-of-thought
