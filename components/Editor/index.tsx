@@ -22,8 +22,17 @@ import './utils/slashMenu.css';
 const readOnlyCompartment = new Compartment();
 
 export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
-  const { script, setScript, blame, cursorLine, currentLineBlame, updateCursorLine, hasUnresolvedAiLines, dismissHighlights } = useEditor();
-  
+  const {
+    script,
+    setScript,
+    blame,
+    cursorLine,
+    currentLineBlame,
+    updateCursorLine,
+    hasUnresolvedAiLines,
+    dismissHighlights,
+  } = useEditor();
+
   // Track reviewed lines (AI lines that author has edited)
   const reviewedLinesRef = useRef<Set<number>>(new Set());
 
@@ -40,7 +49,7 @@ export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
   // Track updateCursorLine in a ref so we can use it in the listener
   const updateCursorLineRef = useRef(updateCursorLine);
   updateCursorLineRef.current = updateCursorLine;
-  
+
   // Track blame in a ref for the update listener
   const blameRef = useRef(blame);
   blameRef.current = blame;
@@ -57,14 +66,14 @@ export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
       if (update.docChanged && shouldSyncToProjectRef.current && !isSyncingExternalRef.current) {
         const content = update.state.doc.toString();
         setScript(content.split('\n'));
-        
+
         // Detect which lines were changed and mark AI lines as reviewed
         const currentBlame = blameRef.current;
         update.changes.iterChangedRanges((fromA, toA) => {
           // Find which lines were affected by this change
           const startLine = update.startState.doc.lineAt(fromA).number - 1;
           const endLine = update.startState.doc.lineAt(Math.max(fromA, toA - 1)).number - 1;
-          
+
           for (let lineIdx = startLine; lineIdx <= endLine; lineIdx++) {
             // If this was an AI line, mark it as reviewed
             if (currentBlame[lineIdx] === Entity.SYSTEM && !reviewedLinesRef.current.has(lineIdx)) {
@@ -170,16 +179,15 @@ export default function Editor({ readOnly = false }: { readOnly?: boolean }) {
       <div className="absolute inset-x-0 bottom-0 p-2 text-sm bg-gradient-to-b from-[#EBF7D2] border-t-2 flex justify-between items-center">
         <div>
           {hasUnresolvedAiLines && !readOnly && (
-            <button
-              onClick={dismissHighlights}
-              className="text-orange-600 hover:text-orange-800"
-            >
-              dismiss highlights
+            <button onClick={dismissHighlights} className="text-orange-600 hover:text-orange-800">
+              finish editing (dismiss highlights & adapt)
             </button>
           )}
         </div>
         <div>
-          <span className="opacity-50">line {cursorLine + 1}/{script.length}</span>
+          <span className="opacity-50">
+            line {cursorLine + 1}/{script.length}
+          </span>
           {blameLabel && (
             <>
               <span className="opacity-50 mx-2">·</span>

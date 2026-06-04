@@ -49,7 +49,7 @@ export default function ProjectCard({
   }, [menuOpen]);
 
   return (
-    <div className={twMerge('relative group to-white', className)}>
+    <div className={twMerge('relative group bg-white', className)}>
       <button
         onClick={onClick}
         className={twMerge(
@@ -59,7 +59,9 @@ export default function ProjectCard({
           buttonClassName,
         )}
       >
-        {!isDesktop && <div className="absolute inset-0 mix-blend-multiply z-[1]" style={{ background: gradient.css }} />}
+        {!isDesktop && (
+          <div className="absolute inset-0 mix-blend-multiply z-[1]" style={{ background: gradient.css }} />
+        )}
         {!isDesktop && (
           <div
             className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/2 z-[5] -skew-x-12 bg-white/35 opacity-0 transition-all duration-500 ease-out group-hover:left-[125%] group-hover:opacity-100"

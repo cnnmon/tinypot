@@ -22,7 +22,7 @@ export default function Home() {
           <AuthButton />
         </div>
 
-        <div className="flex justify-start flex-col gap-4 border-2 bg-white p-4 h-screen">
+        <div className="flex justify-start flex-col gap-4 p-4 h-screen">
           <div>
             <div className="flex items-center">
               <Image src="/logo.png" alt="bonsai" width={300} height={300} />
