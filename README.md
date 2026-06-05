@@ -12,7 +12,7 @@ uses a custom markup language for interactive narrative authoring.
 
 - Google login runs through Convex Auth (`@convex-dev/auth`) with OAuth provider config in `convex/auth.ts`.
 - Convex Auth routes are mounted from `convex/http.ts` and proxied via `proxy.ts` at `/api/auth`.
-- Required Convex env vars: `SITE_URL`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` (+ Convex Auth key material from setup: `JWT_PRIVATE_KEY`, `JWKS`).
+- Required Convex env vars: `CONVEX_SITE_URL`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` (+ Convex Auth key material from setup: `JWT_PRIVATE_KEY`, `JWKS`).
 - The authenticated user comes from Convex Auth `users` table (`api.users.viewer` + `getAuthUserId` in backend functions).
 - Projects now carry `projects.userId` (linked to `users._id`); project mutations enforce owner-only writes.
 - `/edit/[projectId]` automatically falls back to view-only when the signed-in account does not own the project.

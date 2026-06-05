@@ -115,7 +115,7 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
           />
 
           <Box style={{ width: `${100 - editorPct}%` }}>
-            <div className="flex items-center justify-between gap-1 border-b-2 p-2">
+            <div className="flex flex-col items-center justify-between gap-1 border-b-2 p-2">
               <h2>Player</h2>
               <div className="flex gap-2 items-center">
                 <div className="flex items-center gap-1">
