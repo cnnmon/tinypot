@@ -1,5 +1,6 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { v } from 'convex/values';
+import { Id } from './_generated/dataModel';
 import { mutation, query } from './_generated/server';
 
 const SHARE_PREFIX = 's_';
@@ -10,9 +11,13 @@ function encodeShareId(projectId: string): string {
 }
 
 export const get = query({
-  args: { projectId: v.id('projects') },
+  args: { projectId: v.string() },
   handler: async (ctx, { projectId }) => {
-    return await ctx.db.get(projectId);
+    try {
+      return await ctx.db.get(projectId as Id<'projects'>);
+    } catch {
+      return null;
+    }
   },
 });
 
