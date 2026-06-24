@@ -1,15 +1,20 @@
 import { Entity } from '@/types/entities';
 import { v } from 'convex/values';
+import { Id } from './_generated/dataModel';
 import { mutation, query } from './_generated/server';
 
 export const list = query({
-  args: { projectId: v.id('projects') },
+  args: { projectId: v.string() },
   handler: async (ctx, { projectId }) => {
-    return await ctx.db
-      .query('versions')
-      .withIndex('by_project', (q) => q.eq('projectId', projectId))
-      .order('desc')
-      .collect();
+    try {
+      return await ctx.db
+        .query('versions')
+        .withIndex('by_project', (q) => q.eq('projectId', projectId as Id<'projects'>))
+        .order('desc')
+        .collect();
+    } catch {
+      return [];
+    }
   },
 });
 

@@ -30,6 +30,11 @@ interface ProjectContextValue {
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
 
+// Convex IDs are alphanumeric strings (typically 32 chars). Skip queries for obviously invalid IDs.
+function isLikelyValidConvexId(id: string): boolean {
+  return id.length >= 20 && /^[a-zA-Z0-9_]+$/.test(id);
+}
+
 export function ProjectProvider({
   children,
   projectId,
@@ -39,9 +44,11 @@ export function ProjectProvider({
   projectId: Id<'projects'>;
   viewerUserId?: Id<'users'> | null;
 }) {
+  const validId = isLikelyValidConvexId(projectId);
+
   // Convex queries
-  const convexProject = useQuery(api.projects.get, { projectId });
-  const convexVersions = useQuery(api.versions?.list, { projectId }) as
+  const convexProject = useQuery(api.projects.get, validId ? { projectId } : 'skip');
+  const convexVersions = useQuery(api.versions?.list, validId ? { projectId } : 'skip') as
     | { _id: Id<'versions'>; creator: string; createdAt: number; updatedAt?: number; resolved?: boolean; snapshot: { script: string[]; guidebook: string } }[]
     | undefined;
   const updateProjectMutation = useMutation(api.projects.update);
@@ -227,20 +234,20 @@ export function ProjectProvider({
     [canEdit, project, projectId, updateProjectMutation, versions, snapshotsEqual, viewerUserId],
   );
 
+  // Show invalid state if ID is clearly wrong or project doesn't exist
+  if (!validId || convexProject === null) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <p className="text-neutral-400">Invalid project ID</p>
+      </div>
+    );
+  }
+
   // Show loading state while project data is loading
   if (convexProject === undefined || project === null) {
     return (
       <div className="h-screen flex items-center justify-center">
         <p className="text-neutral-400">loading project...</p>
-      </div>
-    );
-  }
-
-  // Show invalid state if project doesn't exist
-  if (convexProject === null) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <p className="text-neutral-400">Invalid project ID</p>
       </div>
     );
   }
