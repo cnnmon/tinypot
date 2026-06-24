@@ -16,11 +16,17 @@ function PlayContent({ shareId }: { shareId: string }) {
   return (
     <div className="h-screen p-4 gap-4 flex flex-col items-center">
       <div className="flex w-full items-center justify-between">
-          <Header />
-          <div className="flex items-center gap-2">
-            <p className="text-lg">{project.name}</p>
-            <button title="View project in editor" onClick={() => window.open(`/edit/${shareId}`, '_blank')} className="px-1"><EyeIcon className="w-4 h-4" /></button>
-          </div>
+        <Header />
+        <div className="flex items-center gap-2">
+          <p className="text-lg">{project.name}</p>
+          <button
+            title="View project in editor"
+            onClick={() => window.open(`/edit/${shareId}`, '_blank')}
+            className="px-1"
+          >
+            <EyeIcon className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <div className="w-full md:max-w-2xl h-[calc(100%-160px)]">

@@ -46,24 +46,24 @@ export default function Home() {
                 {
                   name: 'fireplace',
                   imageUrl: 'https://i.imgur.com/dWaQH2c.gif',
-                  shareId: 's_amQ3ZWJ2aHcydm5kdmZmNm5reTI4ajB3czE3ejlhenM',
+                  shareId: 's_azE3ZmEwZWJoMWQ5NjBoa21uYm4yYnJ6M2g4OTl2MDU',
                 },
                 {
                   name: 'escaperoom',
                   imageUrl: 'https://i.imgur.com/PR6oN9P.png',
-                  shareId: 's_amQ3OGMwazdndnNmM2hwcXlid2NiM2YxOTk3eW14Z2g',
+                  shareId: 's_azE3NnpycjJwcWJyYTZid3Y5YWFrNThuMTE4OThrOTQ',
                 },
                 {
                   name: 'lifesim',
                   imageUrl: 'https://i.imgur.com/XxcNmXj.png',
-                  shareId: 's_amQ3ZnZxaHFmNDZyenJoZWYzNm5uNHpkN2Q4MGhqZ2s',
+                  shareId: 's_azE3OHpwd2M0Znh0MGs5eXdlNXR0N3JzMWQ4OThzc2Q',
                 },
               ].map((project) => (
                 <ProjectCard
                   key={project.shareId}
                   name={project.name}
                   imageUrl={project.imageUrl}
-                  onClick={() => router.push(`/edit/${project.shareId}`)}
+                  onClick={() => router.push(`/play/${project.shareId}`)}
                 />
               ))}
             </div>
