@@ -43,7 +43,7 @@ export function decodeShareId(shareId: string): string | null {
 export function getShareUrl(projectId: string): string {
   const shareId = encodeShareId(projectId);
   if (typeof window !== 'undefined') {
-    return `${window.location.origin}/play/${shareId}`;
+    return `${window.location.origin}/edit/${shareId}`;
   }
-  return `/play/${shareId}`;
+  return `/edit/${shareId}`;
 }
