@@ -23,7 +23,9 @@ import { twMerge } from 'tailwind-merge';
 function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
   const { project, versions, selectedVersionId, saveStatus, setSelectedVersionId, canEdit } = useProject();
   const { currentSceneId, variables } = usePlayerContext();
-  const isReadOnly = isSharedView || !canEdit;
+  const { isAdmin } = useCurrentUser();
+  // Admins can edit even through shared links
+  const isReadOnly = (isSharedView && !isAdmin) || !canEdit;
 
   // Resizable split between editor (left) and player (right). Sidebar is fixed-width.
   const [editorPct, setEditorPct] = useState(50);
@@ -115,7 +117,7 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
           />
 
           <Box style={{ width: `${100 - editorPct}%` }}>
-            <div className="flex flex-col items-center justify-between gap-1 border-b-2 p-2">
+            <div className="flex items-center justify-between gap-1 border-b-2 p-2">
               <h2>Player</h2>
               <div className="flex gap-2 items-center">
                 <div className="flex items-center gap-1">
@@ -144,7 +146,7 @@ function ProjectContent({ isSharedView = false }: { isSharedView?: boolean }) {
 
 export default function ProjectPage() {
   const params = useParams();
-  const { isLoading: isLoadingUser, userId } = useCurrentUser();
+  const { isLoading: isLoadingUser, userId, isAdmin } = useCurrentUser();
   const rawProjectId = params.projectId as string;
 
   const isSharedView = rawProjectId.startsWith('s_');
@@ -174,7 +176,7 @@ export default function ProjectPage() {
   }
 
   return (
-    <ProjectProvider projectId={projectId as Id<'projects'>} viewerUserId={userId}>
+    <ProjectProvider projectId={projectId as Id<'projects'>} viewerUserId={userId} viewerIsAdmin={isAdmin}>
       <PlayerProvider>
         <ProjectContent isSharedView={isSharedView} />
       </PlayerProvider>

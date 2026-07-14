@@ -1,4 +1,5 @@
 import { ConditionalEntry, EntryType, Schema, SchemaEntry } from '@/types/schema';
+import { resolveImageUrl } from './localAssets';
 
 /**
  * Parser for the new game script format (v2):
@@ -337,7 +338,7 @@ export function parseIntoSchema(rawEntries: string[]): Schema {
         );
 
         if (isValidImage) {
-          schema.push({ type: EntryType.IMAGE, url: value });
+          schema.push({ type: EntryType.IMAGE, url: resolveImageUrl(value) });
         } else {
           schema.push({
             type: EntryType.NARRATIVE,

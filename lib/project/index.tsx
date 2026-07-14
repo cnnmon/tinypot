@@ -34,10 +34,12 @@ export function ProjectProvider({
   children,
   projectId,
   viewerUserId,
+  viewerIsAdmin = false,
 }: {
   children: ReactNode;
   projectId: Id<'projects'>;
   viewerUserId?: Id<'users'> | null;
+  viewerIsAdmin?: boolean;
 }) {
   // Convex queries
   const convexProject = useQuery(api.projects.get, { projectId });
@@ -104,7 +106,8 @@ export function ProjectProvider({
 
   // Track if we've saved the initial version
   const hasCreatedInitialVersionRef = useRef(false);
-  const canEdit = !!viewerUserId && !!convexProject && (convexProject.userId ? convexProject.userId === viewerUserId : true);
+  const canEdit =
+    !!viewerUserId && !!convexProject && (viewerIsAdmin || !convexProject.userId || convexProject.userId === viewerUserId);
 
   // Initialize and save initial version if none exists (using AUTHOR, not SYSTEM)
   useEffect(() => {

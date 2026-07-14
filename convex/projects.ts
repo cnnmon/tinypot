@@ -1,9 +1,17 @@
+import { isAdminEmail } from '@/lib/auth/admins';
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { v } from 'convex/values';
-import { Id } from './_generated/dataModel';
-import { mutation, query } from './_generated/server';
+import { Doc, Id } from './_generated/dataModel';
+import { mutation, query, QueryCtx } from './_generated/server';
 
 const SHARE_PREFIX = 's_';
+
+// Owners can always modify their project; admins can modify any project.
+async function canModify(ctx: QueryCtx, userId: Id<'users'>, project: Doc<'projects'>): Promise<boolean> {
+  if (!project.userId || project.userId === userId) return true;
+  const user = await ctx.db.get(userId);
+  return isAdminEmail(user?.email);
+}
 
 function encodeShareId(projectId: string): string {
   const encoded = btoa(projectId);
@@ -96,7 +104,7 @@ export const update = mutation({
     const project = await ctx.db.get(projectId);
     if (!project) return null;
 
-    if (project.userId && project.userId !== userId) {
+    if (!(await canModify(ctx, userId, project))) {
       throw new Error('Not authorized to edit this project');
     }
 
@@ -124,7 +132,7 @@ export const remove = mutation({
     const project = await ctx.db.get(projectId);
     if (!project) return;
 
-    if (project.userId && project.userId !== userId) {
+    if (!(await canModify(ctx, userId, project))) {
       throw new Error('Not authorized to delete this project');
     }
 

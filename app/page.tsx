@@ -63,7 +63,7 @@ export default function Home() {
                   key={project.shareId}
                   name={project.name}
                   imageUrl={project.imageUrl}
-                  onClick={() => router.push(`/play/${project.shareId}`)}
+                  onClick={() => router.push(`/edit/${project.shareId}`)}
                 />
               ))}
             </div>

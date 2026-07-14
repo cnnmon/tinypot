@@ -16,6 +16,7 @@ uses a custom markup language for interactive narrative authoring.
 - The authenticated user comes from Convex Auth `users` table (`api.users.viewer` + `getAuthUserId` in backend functions).
 - Projects now carry `projects.userId` (linked to `users._id`); project mutations enforce owner-only writes.
 - `/edit/[projectId]` automatically falls back to view-only when the signed-in account does not own the project.
+- Admins (emails hardcoded in `lib/auth/admins.ts`) can edit/delete any project, including via `s_` share links. Enforced in `convex/projects.ts` and mirrored in the UI via `useCurrentUser().isAdmin`.
 
 ## sandboxes
 
