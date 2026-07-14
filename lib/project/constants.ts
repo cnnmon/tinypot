@@ -1,6 +1,7 @@
 export const DEFAULT_LINES = [
   '@HOME',
   '+bike',
+  '[image: /fire.gif]',
   'The fire burns brightly.',
   'if ride a bike & ?bike',
   "\tThat's cool!",
